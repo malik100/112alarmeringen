@@ -10,6 +10,11 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
+- **Route en reistijd:** de knop "🧭 Route" opent je eigen navigatie-app (standaard Apple Kaarten op
+  een iPhone; te wijzigen naar Google Maps, Waze of OpenStreetMap onder *Overzicht → Instellingen*).
+  De lijsten tonen een geschatte reistijd, bijv. "🚶 4 min · 🚲 1 min" (hemelsbreed × 1,3, gemiddelde
+  snelheden). Alleen als je op de routeknop tikt, gaat de bestemming naar die navigatie-app. Bij
+  112-meldingen staat bewust geen routeknop.
 - **Kaartlagen** zet je los aan en uit (meldingen, flitsers, parkeren, laadpalen, statiegeld).
   Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
@@ -300,6 +305,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen                  |
 | `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
+| `app/sirene/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |
 | `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
 | `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
 | `app/sirene/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |

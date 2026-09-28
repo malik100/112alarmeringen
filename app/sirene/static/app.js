@@ -24,6 +24,7 @@ const state = {
   onlySirene: false,
   alerted: new Set(),
   tab: "overzicht",
+  navApp: "auto",
   showIncidents: true,
   showCams: true,
   sg: { points: [], near: [], show: true, onlyOpen: false, nearFrom: null },
@@ -90,6 +91,11 @@ async function api(path, options) {
 
 // ---------- kaart ----------
 
+// Popups niet onder de bovenbalk of (op een telefoon) het paneel onderaan laten vallen.
+L.Popup.mergeOptions({
+  autoPanPaddingTopLeft: L.point(16, 110),
+  autoPanPaddingBottomRight: L.point(16, window.matchMedia("(max-width: 720px)").matches ? 110 : 16),
+});
 const map = L.map("map", { zoomControl: false, attributionControl: true }).setView(NL_CENTER, 8);
 L.control.zoom({ position: "bottomleft" }).addTo(map);
 const incidentLayer = L.layerGroup().addTo(map);
@@ -382,13 +388,13 @@ function sgPopup(point) {
   ].filter(Boolean);
   return `
     <b>${esc(point.name)}</b><br>
-    ${esc(point.address)}${d != null ? ` · ${esc(fmtDistance(d))}` : ""}<br>
+    ${esc(point.address)}${d != null ? ` · ${esc(fmtDistance(d))} · ${esc(Nav.eta(d))}` : ""}<br>
     <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>
     <table class="sg-hours">${rows}</table>
     ${point.materials.length ? `<div><small>Neemt in: ${esc(point.materials.join(", "))}</small></div>` : ""}
     ${point.payouts.length ? `<div><small>Uitbetaling: ${esc(point.payouts.join(", "))}</small></div>` : ""}
     ${facts.length ? `<div><small>${esc(facts.join(" · "))}</small></div>` : ""}
-    <a href="https://www.openstreetmap.org/directions?to=${point.lat}%2C${point.lon}" target="_blank" rel="noopener noreferrer">Route ↗</a>`;
+    ${routeLink(point.lat, point.lon)}`;
 }
 
 function sgIcon(st) {
@@ -438,7 +444,7 @@ function sgListItem(point, st, dist) {
   const status = document.createElement("span");
   status.className = SG_STATE_CLASS[st.state];
   status.textContent = st.text;
-  meta.append(status, ` · ${point.address}`);
+  meta.append(status, " · ", etaSpan(Nav.eta(dist)), ` · ${point.address}`);
   li.append(bar, what, distEl, meta);
   const open = () => {
     // De marker bestaat mogelijk pas na het laden van dit kaartgebied.
@@ -575,7 +581,14 @@ function pkPopup(zone) {
     ${facts ? `<div><small>${esc(facts)}</small></div>` : ""}
     ${zone.special_days ? '<div class="pk-note">Op feestdagen en bij evenementen kunnen andere tijden gelden.</div>' : ""}
     <div class="pk-note">Bron: RDW/NPR. Borden ter plaatse gaan altijd voor.</div>
+    ${zone.kind === "garage" ? routeLink(...pkPoint(zone)) + "<br>" : ""}
     ${zone.url ? `<a href="${esc(/^https?:/.test(zone.url) ? zone.url : "https://" + zone.url)}" target="_blank" rel="noopener noreferrer">${esc(zone.manager)} ↗</a>` : ""}`;
+}
+
+/** Punt voor de route naar een garage/terrein: het punt zelf of het midden van het vlak. */
+function pkPoint(zone) {
+  if (zone.geometry.type === "Point") return [zone.geometry.coordinates[1], zone.geometry.coordinates[0]];
+  return [(zone.bbox[1] + zone.bbox[3]) / 2, (zone.bbox[0] + zone.bbox[2]) / 2];
 }
 
 let pkPendingPopup = null;
@@ -769,14 +782,14 @@ function chPopup(station) {
   const d = state.location ? haversine(state.location.lat, state.location.lon, station.lat, station.lon) : null;
   return `
     <b>${esc(Charging.displayName(station))}</b><br>
-    ${esc(station.operator || "")}${station.operator ? " · " : ""}${esc(station.address)}${d != null ? ` · ${esc(fmtDistance(d))}` : ""}<br>
+    ${esc(station.operator || "")}${station.operator ? " · " : ""}${esc(station.address)}${d != null ? ` · ${esc(fmtDistance(d))} · ${esc(Nav.eta(d, "auto"))}` : ""}<br>
     <span class="ch-status" style="--c:${CH_COLORS[av.state]}">${esc(av.text)}</span> <small>(${esc(chStatusAge())})</small>
     <ul class="ch-conn">${conns}</ul>
     <div><small>Betalen: ${esc(pay.length ? `laadpas, app of ${pay.join("/")}` : "laadpas of app")}</small></div>
     ${warn}
     <div class="pk-note" data-ch-parking="${esc(station.id)}"></div>
     <div class="pk-note">Tarief volgens de exploitant; met je eigen laadpas kan het anders zijn.</div>
-    <a href="https://www.openstreetmap.org/directions?to=${station.lat}%2C${station.lon}" target="_blank" rel="noopener noreferrer">Route ↗</a>`;
+    ${routeLink(station.lat, station.lon)}`;
 }
 
 /** Parkeertarief op de plek van de laadpaal (handig bij bestemmingsladen). */
@@ -857,7 +870,7 @@ function chListItem(station) {
   const status = document.createElement("span");
   status.className = "ch-status";
   status.textContent = av.text;
-  meta.append(status, ` · ${Charging.summary(station)}`);
+  meta.append(status, " · ", etaSpan(Nav.eta(station.distance_m, "auto")), ` · ${Charging.summary(station)}`);
   for (const w of Charging.warnings(station, chProfile()).slice(0, 1)) meta.append(` · ⚠ ${w}`);
   li.append(bar, what, dist, meta);
   const open = () => {
@@ -1001,12 +1014,12 @@ function shPopup(shop) {
   const [osmType, osmId] = shop.id.split("/");
   return `
     <b>${esc(shop.name)}</b><br>
-    ${esc(SH_KIND_LABEL[shop.kind])}${shop.address ? ` · ${esc(shop.address)}` : ""}${d != null ? ` · ${esc(fmtDistance(d))}` : ""}<br>
+    ${esc(SH_KIND_LABEL[shop.kind])}${shop.address ? ` · ${esc(shop.address)}` : ""}${d != null ? ` · ${esc(fmtDistance(d))}<br>${esc(Nav.eta(d))}` : ""}<br>
     <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>${shop.late ? ' <span class="tag late">LAAT OPEN</span>' : ""}
     ${shop.hours ? `<table class="sg-hours">${shWeekRows(shop)}</table>` : ""}
     <div class="pk-note">${shop.hours_source ? `Openingstijden: ${esc(shop.hours_source)}. ` : "Geen openingstijden bekend. "}Feestdagen kunnen afwijken.</div>
     <a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer">Klopt iets niet? Verbeter het op OpenStreetMap ↗</a><br>
-    <a href="https://www.openstreetmap.org/directions?to=${shop.lat}%2C${shop.lon}" target="_blank" rel="noopener noreferrer">Route ↗</a>`;
+    ${routeLink(shop.lat, shop.lon)}`;
 }
 
 let shPendingPopup = null;
@@ -1066,6 +1079,7 @@ function shListItem(x) {
     tag.textContent = "LAAT OPEN";
     meta.append(" ", tag);
   }
+  meta.append(" · ", etaSpan(Nav.eta(d)));
   if (shop.address) meta.append(` · ${shop.address}`);
   li.append(bar, what, distEl, meta);
   const open = () => {
@@ -1162,6 +1176,35 @@ function initShops() {
   });
   scheduleShopsViewport();
   loadShopsNear(true).catch(console.error);
+}
+
+// ---------- navigatie ----------
+
+function routeLink(lat, lon) {
+  const app = state.navApp === "auto" ? (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? "Apple Kaarten" : "Google Maps")
+    : Nav.APPS[state.navApp];
+  return `<a class="route-btn" href="${esc(Nav.routeUrl(lat, lon, state.navApp, navigator.userAgent))}" target="_blank" rel="noopener noreferrer">🧭 Route in ${esc(app)}</a>`;
+}
+
+/** Reistijd vanaf je locatie, bijv. "🚶 5 min · 🚲 2 min". */
+function etaTo(lat, lon, prefer) {
+  if (!state.location) return "";
+  return Nav.eta(haversine(state.location.lat, state.location.lon, lat, lon), prefer);
+}
+
+function etaSpan(text) {
+  const span = document.createElement("span");
+  span.className = "eta";
+  span.textContent = text;
+  return span;
+}
+
+function initNav() {
+  state.navApp = store.get("navApp") || "auto";
+  const select = $("nav-app");
+  for (const [key, label] of Object.entries(Nav.APPS)) select.add(new Option(label, key));
+  select.value = state.navApp;
+  select.addEventListener("change", () => { state.navApp = select.value; store.set("navApp", select.value); });
 }
 
 // ---------- overzicht ----------
@@ -1458,6 +1501,7 @@ async function init() {
   state.location = loc;
   if (loc) map.setView([loc.lat, loc.lon], 14);
   initOverview();
+  initNav();
   renderAll();
   loadCams().catch(console.error);
   initStatiegeld();

@@ -383,4 +383,11 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
   .leaflet-bottom { bottom: 64px; }
 }
 .ch-profile-select { display: flex; width: 100%; margin-bottom: 6px; }
+.nav-select { display: flex; flex-wrap: wrap; width: 100%; margin-bottom: 4px; }
+.nav-select select { flex: 1 1 160px; }
+.eta { white-space: nowrap; }
+.route-btn {
+  display: inline-block; margin-top: 6px; padding: 5px 10px; border-radius: 8px;
+  background: #0ea5e9; color: #fff !important; text-decoration: none; font-weight: 600;
+}
 .ch-profile-select select { flex: 1; width: 100%; }
