@@ -2,3 +2,4 @@ fastapi==0.141.1
 uvicorn[standard]==0.54.0
 httpx==0.28.1
 PyYAML==6.0.1
+ijson==3.5.1

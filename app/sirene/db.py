@@ -84,6 +84,14 @@ CREATE TABLE IF NOT EXISTS incident_news (
     PRIMARY KEY (incident_id, news_guid)
 );
 
+CREATE TABLE IF NOT EXISTS charging (
+    id   TEXT PRIMARY KEY,
+    lat  REAL NOT NULL,
+    lon  REAL NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS charging_lat_lon ON charging (lat, lon);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -287,6 +295,27 @@ class Database:
 
     def parking_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM parking").fetchone()[0]
+
+    # --- laadpalen ---------------------------------------------------------
+
+    def replace_charging(self, stations: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM charging")
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO charging (id, lat, lon, data) VALUES (?, ?, ?, ?)",
+                [(s["id"], s["lat"], s["lon"], json.dumps(s, ensure_ascii=False)) for s in stations],
+            )
+
+    def charging_in_bbox(self, south: float, west: float, north: float,
+                         east: float) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT data FROM charging WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
+            (south, north, west, east),
+        ).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def charging_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM charging").fetchone()[0]
 
     # --- meta -------------------------------------------------------------
 

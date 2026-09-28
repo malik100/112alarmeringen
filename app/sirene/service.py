@@ -18,6 +18,7 @@ from . import news as news_matcher
 from .notifier import Notifier
 from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
+from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import fetch_zones
 from .sources.speedcams import fetch_speedcams
 from .sources.statiegeld import DEFAULT_URL as STATIEGELD_URL
@@ -53,9 +54,14 @@ class Service:
             "statiegeld": {"last_ok": None, "last_error": None, "count": 0},
             "parking": {"last_ok": None, "last_error": None, "count": 0},
             "news": {"last_ok": None, "last_error": None},
+            "charging": {"last_ok": None, "last_error": None, "count": 0},
+            "charging_status": {"last_ok": None, "last_error": None},
             "homeassistant": {"last_ok": None, "last_error": None},
         }
         self._tasks: list[asyncio.Task] = []
+        # Beschikbaarheid van laadpalen: alleen in het geheugen (vluchtig, elk kwartier nieuw).
+        self.charging_status: dict[str, dict[str, Any]] = {}
+        self.charging_status_ts: float | None = None
         # Per feed: (aantal fouten op rij, niet opnieuw proberen voor dit tijdstip).
         self._feed_backoff: dict[str, tuple[int, float]] = {}
 
@@ -288,6 +294,33 @@ class Service:
         self.bus.publish("parking", {"count": len(zones)})
         return True
 
+    # --- laadpalen ---------------------------------------------------------
+
+    async def refresh_charging_once(self) -> bool:
+        try:
+            stations = await fetch_stations(self.client)
+        except (httpx.HTTPError, ValueError, OSError) as exc:
+            log.warning("Laadpalen ophalen mislukt: %s", exc)
+            self.status["charging"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        self.db.replace_charging(stations)
+        self.db.meta_set("charging_updated", time.time())
+        self.status["charging"].update(last_ok=time.time(), count=len(stations))
+        self.bus.publish("charging", {"count": len(stations)})
+        return True
+
+    async def refresh_charging_status_once(self) -> None:
+        try:
+            status = await fetch_availability(self.client)
+        except (httpx.HTTPError, ValueError, OSError) as exc:
+            log.warning("Beschikbaarheid laadpalen ophalen mislukt: %s", exc)
+            self.status["charging_status"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return
+        self.charging_status = status
+        self.charging_status_ts = time.time()
+        self.status["charging_status"]["last_ok"] = self.charging_status_ts
+        self.bus.publish("charging_status", {"ts": self.charging_status_ts})
+
     # --- achtergrondtaken -------------------------------------------------
 
     async def _loop(self, name: str, interval_s: float, func) -> None:
@@ -328,6 +361,14 @@ class Service:
         if self.cfg["news"]["enabled"]:
             self._tasks.append(asyncio.create_task(
                 self._loop("nieuws", self.cfg["news"]["poll_interval_s"], self.poll_news_once)))
+        if self.cfg["charging"]["enabled"]:
+            self.status["charging"]["count"] = self.db.charging_count()
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "charging", self.cfg["charging"]["refresh_hours"] * 3600,
+                self.refresh_charging_once)))
+            self._tasks.append(asyncio.create_task(self._loop(
+                "laadstatus", self.cfg["charging"]["status_interval_s"],
+                self.refresh_charging_status_once)))
         if self.cfg["parking"]["enabled"]:
             self.status["parking"]["count"] = self.db.parking_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(

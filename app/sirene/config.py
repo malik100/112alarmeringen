@@ -88,6 +88,16 @@ DEFAULTS: dict[str, Any] = {
             {"name": "112Ede", "url": "https://www.112ede.nl/feed/"},
         ],
     },
+    "charging": {
+        "enabled": True,
+        # Details (stekkers, tarieven, toegang) één keer per dag; beschikbaarheid vaker.
+        "refresh_hours": 24,
+        "status_interval_s": 900,
+        # Pas vanaf dit zoomniveau laadpalen op de kaart tekenen (er zijn er ~79.000).
+        "min_zoom": 13,
+        # Straal voor de lijst "laden in de buurt".
+        "list_radius_m": 3000,
+    },
     "map": {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",

@@ -42,6 +42,13 @@ news:
   #   - {name: NH Nieuws, url: "https://rss.nhnieuws.nl/rss"}
   #   - {name: NOS, url: "https://feeds.nos.nl/nosnieuwsbinnenland"}
 
+charging:
+  enabled: true
+  refresh_hours: 24         # details: stekkers, tarieven, toegang
+  status_interval_s: 900    # beschikbaarheid: elke 15 min (~470 MB/dag); 1800 = helft
+  min_zoom: 13
+  list_radius_m: 3000
+
 parking:
   enabled: true
   refresh_hours: 24

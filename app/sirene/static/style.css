@@ -1,4 +1,5 @@
 :root {
+  --charging: #0d9488;
   --statiegeld: #15803d;
   --bg: #ffffff;
   --bg-soft: #f3f4f6;
@@ -171,6 +172,22 @@ html, body {
 .chip.onbekend, .chip.cam { color: var(--fg-muted); }
 .chip.statiegeld { color: var(--statiegeld); }
 .chip.parking { color: var(--politie); }
+.chip.charging { color: var(--charging); font-weight: 600; }
+.hint { font-size: 12px; color: var(--fg-muted); margin: 0 0 6px; }
+.ch-filters { margin: 0 0 8px; font-size: 13px; }
+.ch-filters summary { cursor: pointer; color: var(--fg-muted); margin-bottom: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.ch-marker { background: none; border: 0; }
+.ch-sign {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font: 700 11px/1 system-ui, sans-serif;
+  color: #fff; background: var(--c, #9ca3af); border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+.ch-sign.dc { width: 26px; height: 26px; font-size: 14px; border-color: #111827; }
+.ch-status { font-weight: 600; color: var(--c, inherit); }
+.ch-conn { margin: 4px 0; padding-left: 16px; font-size: 12px; }
+.ch-warn { color: #b45309; font-size: 12px; }
 .legend { font-size: 11px; color: var(--fg-muted); margin: 0 0 8px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .legend > span { white-space: nowrap; }
 .swatch { display: inline-block; width: 12px; height: 10px; border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 25%, transparent); border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
@@ -205,7 +222,7 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
 .item.statiegeld .bar { background: var(--fg-muted); }
 .item.statiegeld .bar.open { background: var(--statiegeld); }
 .sg-open { color: var(--statiegeld); font-weight: 600; }
-.item.parking .bar { background: var(--c, var(--fg-muted)); }
+.item.parking .bar, .item.charging .bar { background: var(--c, var(--fg-muted)); }
 .pk-status { font-weight: 600; color: var(--c, var(--fg)); }
 .pk-marker { background: none; border: 0; }
 .pk-sign {

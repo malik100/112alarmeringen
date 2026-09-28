@@ -18,12 +18,15 @@ from .config import load_config
 from .events import format_sse
 from .location import Location
 from .service import Service
+from .geo import haversine_m
+from .sources.charging import matches as charging_matches
 from .sources.npr import contains
 
 STATIC_DIR = Path(__file__).parent / "static"
 HEARTBEAT_S = 20
 STATIEGELD_LIMIT = 2000
 PARKING_LIMIT = 800
+CHARGING_LIMIT = 1500
 PARKING_KINDS = {"betaald", "blauw", "vergunning", "garage"}
 
 logging.basicConfig(
@@ -63,6 +66,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "speedcams_enabled": cfg["speedcams"]["enabled"],
             "statiegeld": {k: cfg["statiegeld"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "parking": {k: cfg["parking"][k] for k in ("enabled", "min_zoom")},
+            "charging": {k: cfg["charging"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
         }
 
     @app.get("/api/status")
@@ -132,6 +136,41 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             return []
         candidates = svc.db.parking_in_bbox(lat, lon, lat, lon, parse_kinds(kinds), PARKING_LIMIT)
         return [z for z in candidates if contains(z["geometry"], lon, lat)]
+
+    @app.get("/api/charging")
+    def get_charging(bbox: str = Query(description="west,zuid,oost,noord in graden"),
+                     plugs: str | None = Query(default=None, description="bijv. 'CCS,CHAdeMO'"),
+                     min_kw: float = Query(default=0, ge=0, le=1000),
+                     available: bool = False, card: bool = False, public: bool = False,
+                     always_open: bool = False,
+                     near: str | None = Query(default=None, description="lat,lon: sorteer op afstand"),
+                     limit: int = Query(default=CHARGING_LIMIT, ge=1, le=CHARGING_LIMIT)):
+        """Laadlocaties in een gebied, gefilterd op de wensen van de gebruiker (profiel)."""
+        if not svc.cfg["charging"]["enabled"]:
+            return {"stations": [], "status_ts": None}
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > 0.6 or north - south > 0.6:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        wanted = {p.strip() for p in plugs.split(",") if p.strip()} if plugs else None
+        stations = []
+        for s in svc.db.charging_in_bbox(south, west, north, east):
+            status = svc.charging_status.get(s["id"])
+            if charging_matches(s, status, plugs=wanted, min_kw=min_kw, available=available,
+                                card=card, public=public, always_open=always_open):
+                stations.append({**s, "status": status})
+        if near:
+            try:
+                lat, lon = (float(v) for v in near.split(","))
+            except ValueError:
+                raise HTTPException(422, "near moet 'lat,lon' zijn")
+            for s in stations:
+                s["distance_m"] = round(haversine_m(lat, lon, s["lat"], s["lon"]))
+            stations.sort(key=lambda s: s["distance_m"])
+        return {"stations": stations[:limit], "status_ts": svc.charging_status_ts,
+                "truncated": len(stations) > limit}
 
     @app.get("/api/events")
     async def events(request: Request):

@@ -16,6 +16,8 @@ op je eigen server of Raspberry Pi. Pushmeldingen zijn optioneel en staan standa
 - **Parkeerzones** met tarieven en tijden: betaald parkeren (gekleurd naar de prijs van dit moment),
   blauwe zones, vergunningzones en garages/P+R. Het paneel toont wat er **op jouw plek** geldt,
   bijvoorbeeld "Nu €8,05 per uur (tot middernacht)".
+- **Laadpalen** met live beschikbaarheid, vermogen en tarief, met **profielen voor verschillende
+  gebruikers** (snelladen onderweg, laden in de straat, bestemmingsladen, zonder laadpas, CHAdeMO).
 - **Nieuws bij meldingen**: verschijnt er een nieuwsartikel over een melding (regionale omroep,
   NOS, 112-site), dan staat dat bij de melding, met "📰 NIEUWS" in de lijst.
 - **Live**: nieuwe incidenten verschijnen binnen ongeveer een minuut, zonder dat je de pagina
@@ -155,6 +157,46 @@ Beperkingen:
 
 Uitzetten kan met `parking.enabled: false` in `config.yaml`.
 
+## Laadpalen
+
+Bron: [NDW open data](https://opendata.ndw.nu): alle ~79.000 openbare laadlocaties in Nederland.
+
+- **Details** (stekkers, vermogen, tarieven, betaalmogelijkheden, toegang): één keer per dag,
+  ~22 MB.
+- **Beschikbaarheid** (vrij/bezet): elke 15 minuten, ~5 MB per keer, ~470 MB per dag. Instelbaar
+  met `charging.status_interval_s`; 1800 halveert het dataverbruik.
+- De bestanden worden in stukjes verwerkt (streaming), zodat het ook op een Raspberry Pi weinig
+  geheugen kost. De beschikbaarheid staat alleen in het geheugen en wordt na een herstart direct
+  opnieuw opgehaald.
+
+De laadlaag staat standaard uit. Zet hem aan met **⚡ Laadpalen** en kies een profiel:
+
+| Profiel                  | Voor wie                                   | Filter                                              |
+|--------------------------|--------------------------------------------|-----------------------------------------------------|
+| ⚡ Snelladen onderweg     | lange rit                                  | CCS, ≥ 50 kW, nu vrij                               |
+| 🏠 Laden in de straat     | bewoner zonder eigen oprit                 | Type 2, nu vrij; waarschuwt voor kosten per uur     |
+| 🛒 Bestemmingsladen       | werk, winkel, uitje                        | Type 2, ≥ 11 kW; popup toont ook het parkeertarief  |
+| 💳 Zonder laadpas         | huurauto, gast, buitenlandse bezoeker      | betalen met creditcard of pinpas, nu vrij           |
+| 🔌 CHAdeMO                | bijv. een oudere Nissan Leaf               | CHAdeMO, nu vrij                                    |
+| ⚙️ Eigen instellingen     | iedereen                                   | stekker, vermogen, nu vrij, zonder laadpas, niet alleen klanten, 24/7 |
+
+- **Per apparaat:** het profiel wordt op het apparaat onthouden, zodat ieder gezinslid op de
+  eigen telefoon een ander profiel kan gebruiken, zonder accounts.
+- **Stekker en vermogen** moeten op dezelfde aansluiting kloppen: een paal met Type 2 11 kW en
+  CCS 150 kW telt wel voor "CCS ≥ 50 kW", maar niet voor "Type 2 ≥ 50 kW".
+- **"Nu vrij"** kijkt naar de gekozen stekker: als de CCS vrij is maar de CHAdeMO bezet, ziet
+  een CHAdeMO-rijder de paal niet.
+
+Kanttekeningen:
+
+- **Tarieven** zijn het losse tarief van de exploitant. Met je eigen laadpas kan de prijs anders
+  zijn. Prijzen die duidelijk fout zijn (bijv. €54.974 per kWh) of alleen nullen worden niet
+  getoond.
+- **"Vrij" is geen garantie:** de status kan tot een kwartier oud zijn, en een plek kan bezet zijn
+  door een auto die niet laadt.
+- **Vermogen:** bij veel palen staat het niet ingevuld. Een snellader (DC) zonder opgegeven
+  vermogen telt mee als snellader.
+
 ## Nieuws bij meldingen
 
 Elke 5 minuten worden de RSS-feeds van regionale omroepen (NH Nieuws, Rijnmond, Omroep West,
@@ -231,6 +273,8 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
 | `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
 | `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen                  |
+| `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
+| `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
 | `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
 | `app/sirene/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |
 
@@ -240,6 +284,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 - Adressen: [PDOK Locatieserver](https://www.pdok.nl), op basis van de BAG.
 - Statiegeld-inleverpunten: [Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer).
 - Nieuws: RSS-feeds van de genoemde omroepen en sites; we tonen alleen titel, bron en link.
+- Laadpalen: [NDW open data](https://opendata.ndw.nu) (OCPI).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - [Leaflet](https://leafletjs.com): BSD-2-licentie, meegeleverd in `app/sirene/static/vendor/leaflet`.
