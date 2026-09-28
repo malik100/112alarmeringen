@@ -1,6 +1,7 @@
 # Sirene Radar
 
-Een live kaart van P2000-alarmeringen, flitsers en statiegeld-inleverpunten rond je eigen locatie. Het draait volledig
+Een live kaart van P2000-alarmeringen, flitsers, statiegeld-inleverpunten en parkeerzones rond je
+eigen locatie. Het draait volledig
 op je eigen server of Raspberry Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
@@ -12,6 +13,9 @@ op je eigen server of Raspberry Pi. Pushmeldingen zijn optioneel en staan standa
 - **Statiegeld-inleverpunten** (supermarkten, automaten) met openingstijden, wat ze innemen
   en hoe je je geld krijgt. Een filter **"Alleen nu open"** toont alleen wat op dit moment
   open is, en een lijst toont de dichtstbijzijnde punten.
+- **Parkeerzones** met tarieven en tijden: betaald parkeren (gekleurd naar de prijs van dit moment),
+  blauwe zones, vergunningzones en garages/P+R. Het paneel toont wat er **op jouw plek** geldt,
+  bijvoorbeeld "Nu €8,05 per uur (tot middernacht)".
 - **Live**: nieuwe incidenten verschijnen binnen ongeveer een minuut, zonder dat je de pagina
   hoeft te verversen.
 - **Optionele meldingen** via Home Assistant of een eigen ntfy-server.
@@ -24,6 +28,7 @@ Flexflitsers zitten er (nog) niet in: daar bestaat geen open databron voor.
 alarmeringen.nl (RSS) ──┐
 OpenStreetMap (flitsers)├─► sirene-container ─► SQLite
 Statiegeld Nederland ───┤        │   ▲
+RDW (parkeren) ─────────┤        │   │
 PDOK (adres → GPS)  ────┘        │   │
                                  │   └── jouw locatie: Home Assistant-app of de browser
                                  ▼
@@ -32,7 +37,8 @@ PDOK (adres → GPS)  ────┘        │   │
 
 - Alle verwerking gebeurt op je eigen server. Je eigen locatie verlaat je server nooit.
 - Naar buiten gaan alleen: het ophalen van de P2000-feed, het adres van een incident naar
-  PDOK (gecachet), één keer per dag de flitsers en de statiegeldpunten, en de kaarttegels.
+  PDOK (gecachet), één keer per dag de flitsers, statiegeldpunten en parkeergegevens, en de
+  kaarttegels.
 
 ## Installatie
 
@@ -113,6 +119,40 @@ ongeveer 8.700 punten, één keer per dag opgehaald (circa 7 MB, een paar second
 
 Uitzetten kan met `statiegeld.enabled: false` in `config.yaml`.
 
+## Parkeerzones, tarieven en tijden
+
+Bron: [RDW Open Data Parkeren](https://opendata.rdw.nl), de openbare kant van het Nationaal
+Parkeerregister (NPR). Daarin registreren gemeenten hun zones, tijden en tarieven voor parkeerapps.
+Eén keer per dag worden negen datasets opgehaald (circa 35 MB, zo'n 15 seconden). Daaruit worden
+zo'n 5.900 zones opgebouwd.
+
+| Soort             | Op de kaart                                                      |
+|-------------------|------------------------------------------------------------------|
+| Betaald parkeren  | vlak, gekleurd naar het uurtarief van dit moment; gestippeld = nu gratis |
+| Blauwe zone       | blauw vlak; parkeerschijf verplicht, met maximale duur           |
+| Vergunningzone    | grijs gestippeld vlak (standaard uit)                            |
+| Garage / P+R      | blauwe **P**, of een vlak                                        |
+
+- Klik op een zone voor het weekoverzicht met tijden en tarieven, eventuele dag- en avondkaarten,
+  capaciteit en maximale hoogte (garages).
+- *Parkeren op jouw plek* toont de zones waarin je locatie ligt, met wat er nu geldt en tot wanneer.
+- Vlakken verschijnen vanaf zoomniveau 14 (instelbaar met `parking.min_zoom`).
+- Uurprijzen komen uit de tariefdelen: bijvoorbeeld €0,134 per minuut is €8,05 per uur. Tarieven
+  die in delen oplopen worden als "eerste 1 uur …; daarna …" getoond.
+
+Beperkingen:
+
+- **Feestdagen en evenementen** (Koningsdag, voetbalwedstrijden, koopzondagen) staan in de data als
+  losse "dagen" zonder datum. Die worden niet doorgerekend. De popup waarschuwt als een zone zulke
+  uitzonderingen heeft.
+- **Niet elke gemeente** levert een vlak aan: zones zonder geometrie of zonder geldige regeling
+  ontbreken op de kaart.
+- **Zones die dubbel zijn geregistreerd** (bijv. een aparte bezoekersregeling met dezelfde tijden en
+  hetzelfde uurtarief) worden samengevoegd tot één zone.
+- **De borden ter plaatse gaan altijd voor.** Dit is een hulpmiddel, geen juridische bron.
+
+Uitzetten kan met `parking.enabled: false` in `config.yaml`.
+
 ## Nauwkeurigheid van de locatie
 
 P2000-berichten bevatten geen coördinaten. De locatie wordt bepaald uit postcode, straat en
@@ -156,16 +196,19 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 |----------------------------|---------------------------------------------------------|
 | `app/sirene/parser.py`     | P2000-tekst → dienst, prioriteit, straat, plaats, postcode |
 | `app/sirene/geocoder.py`   | adres → coördinaten (cache + PDOK)                      |
-| `app/sirene/sources/`      | P2000-feed, flitsers (Overpass), statiegeldpunten (WFS) |
+| `app/sirene/sources/`      | P2000-feed, flitsers, statiegeld, parkeren (RDW)        |
 | `app/sirene/service.py`    | ophalen, opslaan, live doorsturen, meldingen            |
 | `app/sirene/main.py`       | API en webserver                                        |
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
 | `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
+| `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
+| `app/sirene/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |
 
 ## Bronnen en licenties
 
 - P2000-berichten: [alarmeringen.nl](https://alarmeringen.nl) (RSS).
 - Adressen: [PDOK Locatieserver](https://www.pdok.nl), op basis van de BAG.
 - Statiegeld-inleverpunten: [Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer).
+- Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - [Leaflet](https://leafletjs.com): BSD-2-licentie, meegeleverd in `app/sirene/static/vendor/leaflet`.

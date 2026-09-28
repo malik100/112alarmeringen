@@ -34,6 +34,11 @@ statiegeld:
   min_zoom: 12          # pas vanaf dit zoomniveau punten op de kaart tonen
   list_radius_m: 2000   # straal voor de lijst "statiegeld in de buurt"
 
+parking:
+  enabled: true
+  refresh_hours: 24
+  min_zoom: 14          # pas vanaf dit zoomniveau zones op de kaart tonen
+
 map:
   # Standaard OpenStreetMap-tegels. De tegelserver ziet welk kaartgebied je bekijkt,
   # niet je locatie of de incidenten. Later kun je hier een eigen tegelserver invullen.

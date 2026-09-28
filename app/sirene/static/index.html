@@ -69,12 +69,33 @@
             <input type="checkbox" id="sg-show" checked> ♻ Statiegeld</label>
           <label class="chip statiegeld"><input type="checkbox" id="sg-open"> Alleen nu open</label>
         </div>
+        <div id="pk-controls" hidden>
+          <div class="chips">
+            <label class="chip parking" title="Betaald parkeren en blauwe zones (zichtbaar vanaf ingezoomd niveau)">
+              <input type="checkbox" data-pk="betaald,blauw" checked> 🅿 Parkeerzones</label>
+            <label class="chip parking"><input type="checkbox" data-pk="garage" checked> Garages &amp; P+R</label>
+            <label class="chip parking"><input type="checkbox" data-pk="vergunning"> Vergunningzones</label>
+          </div>
+          <p class="legend">
+            <span><span class="swatch" style="--c:#16a34a"></span>&lt; €2,50/u</span>
+            <span><span class="swatch" style="--c:#d97706"></span>&lt; €5/u</span>
+            <span><span class="swatch" style="--c:#dc2626"></span>≥ €5/u</span>
+            <span><span class="swatch dashed" style="--c:#16a34a"></span>nu gratis</span>
+            <span><span class="swatch" style="--c:#2563eb"></span>blauwe zone</span>
+          </p>
+        </div>
       </fieldset>
 
       <section>
         <h2 id="near-title">In de buurt</h2>
         <ol class="list" id="list-near"></ol>
         <p class="empty" id="empty-near" hidden>Niets binnen je straal. 👍</p>
+      </section>
+
+      <section id="pk-section" hidden>
+        <h2>Parkeren op jouw plek</h2>
+        <ol class="list" id="list-pk"></ol>
+        <p class="empty" id="empty-pk" hidden></p>
       </section>
 
       <section id="sg-section" hidden>
@@ -90,13 +111,14 @@
       </section>
 
       <footer class="credits">
-        P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL) · statiegeld via Statiegeld Nederland
+        P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL) · statiegeld via Statiegeld Nederland · parkeren via RDW (NPR)
       </footer>
     </div>
   </aside>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>
   <script src="/static/openinghours.js"></script>
+  <script src="/static/parking.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

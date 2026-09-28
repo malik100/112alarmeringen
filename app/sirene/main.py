@@ -18,10 +18,13 @@ from .config import load_config
 from .events import format_sse
 from .location import Location
 from .service import Service
+from .sources.npr import contains
 
 STATIC_DIR = Path(__file__).parent / "static"
 HEARTBEAT_S = 20
 STATIEGELD_LIMIT = 2000
+PARKING_LIMIT = 800
+PARKING_KINDS = {"betaald", "blauw", "vergunning", "garage"}
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -59,6 +62,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "notifications_enabled": cfg["notifications"]["enabled"],
             "speedcams_enabled": cfg["speedcams"]["enabled"],
             "statiegeld": {k: cfg["statiegeld"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
+            "parking": {k: cfg["parking"][k] for k in ("enabled", "min_zoom")},
         }
 
     @app.get("/api/status")
@@ -98,6 +102,34 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         if east - west > 1.5 or north - south > 1.5:
             raise HTTPException(422, "Gebied te groot: zoom verder in")
         return svc.db.statiegeld_in_bbox(south, west, north, east, STATIEGELD_LIMIT)
+
+    def parse_kinds(kinds: str | None) -> list[str] | None:
+        if not kinds:
+            return None
+        wanted = [k for k in kinds.split(",") if k in PARKING_KINDS]
+        return wanted or None
+
+    @app.get("/api/parking")
+    def get_parking(bbox: str = Query(description="west,zuid,oost,noord in graden"),
+                    kinds: str | None = Query(default=None, description="bijv. betaald,garage")):
+        if not svc.cfg["parking"]["enabled"]:
+            return []
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > 0.5 or north - south > 0.5:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        return svc.db.parking_in_bbox(south, west, north, east, parse_kinds(kinds), PARKING_LIMIT)
+
+    @app.get("/api/parking/at")
+    def get_parking_at(lat: float = Query(ge=-90, le=90), lon: float = Query(ge=-180, le=180),
+                       kinds: str | None = None):
+        """Zones waarin dit punt ligt (bijv. jouw huidige locatie)."""
+        if not svc.cfg["parking"]["enabled"]:
+            return []
+        candidates = svc.db.parking_in_bbox(lat, lon, lat, lon, parse_kinds(kinds), PARKING_LIMIT)
+        return [z for z in candidates if contains(z["geometry"], lon, lat)]
 
     @app.get("/api/events")
     async def events(request: Request):

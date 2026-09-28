@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS statiegeld (
 );
 CREATE INDEX IF NOT EXISTS statiegeld_lat_lon ON statiegeld (lat, lon);
 
+CREATE TABLE IF NOT EXISTS parking (
+    id    TEXT PRIMARY KEY,
+    kind  TEXT NOT NULL,
+    west  REAL NOT NULL,
+    south REAL NOT NULL,
+    east  REAL NOT NULL,
+    north REAL NOT NULL,
+    data  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS parking_bbox ON parking (south, north);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -180,6 +191,31 @@ class Database:
 
     def statiegeld_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM statiegeld").fetchone()[0]
+
+    # --- parkeerzones -----------------------------------------------------
+
+    def replace_parking(self, zones: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM parking")
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO parking (id, kind, west, south, east, north, data) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [(z["id"], z["kind"], *z["bbox"], json.dumps(z, ensure_ascii=False)) for z in zones],
+            )
+
+    def parking_in_bbox(self, south: float, west: float, north: float, east: float,
+                        kinds: list[str] | None, limit: int) -> list[dict[str, Any]]:
+        """Zones waarvan de omhullende rechthoek het gevraagde gebied raakt."""
+        sql = "SELECT data FROM parking WHERE north >= ? AND south <= ? AND east >= ? AND west <= ?"
+        params: list[Any] = [south, north, west, east]
+        if kinds:
+            sql += f" AND kind IN ({', '.join('?' * len(kinds))})"
+            params += kinds
+        rows = self.conn.execute(sql + " LIMIT ?", (*params, limit)).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def parking_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM parking").fetchone()[0]
 
     # --- meta -------------------------------------------------------------
 

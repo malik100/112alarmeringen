@@ -17,6 +17,7 @@ from .location import Location, LocationStore, fetch_ha_location
 from .notifier import Notifier
 from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
+from .sources.npr import fetch_zones
 from .sources.speedcams import fetch_speedcams
 from .sources.statiegeld import DEFAULT_URL as STATIEGELD_URL
 from .sources.statiegeld import fetch_statiegeld
@@ -49,6 +50,7 @@ class Service:
             "p2000": {"last_ok": None, "last_error": None},
             "speedcams": {"last_ok": None, "last_error": None, "count": 0},
             "statiegeld": {"last_ok": None, "last_error": None, "count": 0},
+            "parking": {"last_ok": None, "last_error": None, "count": 0},
             "homeassistant": {"last_ok": None, "last_error": None},
         }
         self._tasks: list[asyncio.Task] = []
@@ -203,6 +205,21 @@ class Service:
         self.bus.publish("statiegeld", {"count": len(points)})
         return True
 
+    # --- parkeerzones -----------------------------------------------------
+
+    async def refresh_parking_once(self) -> bool:
+        try:
+            zones = await fetch_zones(self.client)
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
+            log.warning("Parkeerzones ophalen mislukt: %s", exc)
+            self.status["parking"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        self.db.replace_parking(zones)
+        self.db.meta_set("parking_updated", time.time())
+        self.status["parking"].update(last_ok=time.time(), count=len(zones))
+        self.bus.publish("parking", {"count": len(zones)})
+        return True
+
     # --- achtergrondtaken -------------------------------------------------
 
     async def _loop(self, name: str, interval_s: float, func) -> None:
@@ -240,6 +257,11 @@ class Service:
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "statiegeld", self.cfg["statiegeld"]["refresh_hours"] * 3600,
                 self.refresh_statiegeld_once)))
+        if self.cfg["parking"]["enabled"]:
+            self.status["parking"]["count"] = self.db.parking_count()
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "parking", self.cfg["parking"]["refresh_hours"] * 3600,
+                self.refresh_parking_once)))
         ha = self.cfg["location"]["homeassistant"]
         if ha["enabled"]:
             if not ha["token"]:

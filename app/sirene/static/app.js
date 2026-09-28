@@ -24,6 +24,7 @@ const state = {
   onlySirene: false,
   alerted: new Set(),
   sg: { points: [], near: [], show: true, onlyOpen: false, nearFrom: null },
+  pk: { zones: [], here: [], kinds: new Set(["betaald", "blauw", "garage"]), hereFrom: null },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -89,6 +90,9 @@ const incidentLayer = L.layerGroup().addTo(map);
 const camLayer = L.layerGroup().addTo(map);
 const sgLayer = L.layerGroup().addTo(map);
 const sgMarkers = new Map();
+map.createPane("parking").style.zIndex = 350; // onder markers en popups
+const pkLayer = L.layerGroup().addTo(map);
+const pkShapes = new Map();
 const meLayer = L.layerGroup().addTo(map);
 const markers = new Map();
 
@@ -507,6 +511,197 @@ function initStatiegeld() {
   loadSgNear(true).catch(console.error);
 }
 
+// ---------- parkeren ----------
+
+const PK_COLORS = { free: "#16a34a", permit: "#6b7280", disc: "#2563eb", unknown: "#9ca3af" };
+
+function pkColor(st) {
+  if (st.state === "paid") {
+    if (st.rate == null) return "#9ca3af";
+    return st.rate < 2.5 ? "#16a34a" : st.rate < 5 ? "#d97706" : "#dc2626";
+  }
+  return PK_COLORS[st.state] || "#9ca3af";
+}
+
+function pkPopup(zone) {
+  const st = Parking.status(zone);
+  const today = OpeningHours.amsterdamNow().day;
+  const rows = Parking.weekLines(zone).map((l, i) =>
+    `<tr${i === today ? ' class="today"' : ""}><td>${esc(l.day)}</td><td>${esc(l.text)}</td></tr>`).join("");
+  const extras = (zone.extras || []).map((x) => {
+    const p = x.schedule.flat()[0];
+    const fare = p && p.fare && zone.fares[p.fare];
+    return `<li>${esc(x.name)}${fare ? ` · ${esc(fare.text)}` : ""}</li>`;
+  }).join("");
+  const facts = [
+    zone.capacity ? `${zone.capacity} plaatsen` : "",
+    zone.max_height_cm ? `max. hoogte ${(zone.max_height_cm / 100).toFixed(2).replace(".", ",")} m` : "",
+  ].filter(Boolean).join(" · ");
+  return `
+    <b>${esc(zone.name)}</b><br>
+    ${esc(Parking.KIND_LABEL[zone.kind])} · ${esc(zone.manager)}<br>
+    <span class="pk-status" style="--c:${pkColor(st)}">${esc(st.text)}</span>
+    <table class="pk-week">${rows}</table>
+    ${extras ? `<div><small>Ook mogelijk:</small><ul class="pk-extras">${extras}</ul></div>` : ""}
+    ${facts ? `<div><small>${esc(facts)}</small></div>` : ""}
+    ${zone.special_days ? '<div class="pk-note">Op feestdagen en bij evenementen kunnen andere tijden gelden.</div>' : ""}
+    <div class="pk-note">Bron: RDW/NPR. Borden ter plaatse gaan altijd voor.</div>
+    ${zone.url ? `<a href="${esc(/^https?:/.test(zone.url) ? zone.url : "https://" + zone.url)}" target="_blank" rel="noopener noreferrer">${esc(zone.manager)} ↗</a>` : ""}`;
+}
+
+let pkPendingPopup = null;
+
+function renderParking() {
+  let reopen = pkPendingPopup;
+  for (const [id, shape] of pkShapes) if (shape.isPopupOpen()) reopen = reopen ?? id;
+  pkLayer.clearLayers();
+  pkShapes.clear();
+  if (map.getZoom() < state.config.parking.min_zoom) return;
+  // Grote vlakken eerst, zodat kleinere (bijv. garages) erbovenop klikbaar blijven.
+  const area = (z) => (z.bbox[2] - z.bbox[0]) * (z.bbox[3] - z.bbox[1]);
+  const zones = state.pk.zones.filter((z) => state.pk.kinds.has(z.kind)).sort((a, b) => area(b) - area(a));
+  for (const zone of zones) {
+    const st = Parking.status(zone);
+    const color = pkColor(st);
+    let shape;
+    if (zone.geometry.type === "Point") {
+      const [lon, lat] = zone.geometry.coordinates;
+      shape = L.marker([lat, lon], {
+        icon: L.divIcon({ className: "pk-marker", html: '<div class="pk-sign">P</div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+        keyboard: false,
+        zIndexOffset: -600,
+      });
+    } else {
+      shape = L.geoJSON(zone.geometry, {
+        pane: "parking",
+        style: {
+          color,
+          weight: zone.kind === "vergunning" ? 1 : 2,
+          opacity: 0.8,
+          dashArray: st.state === "free" || zone.kind === "vergunning" ? "5 5" : null,
+          fillColor: color,
+          fillOpacity: st.state === "free" ? 0.04 : zone.kind === "vergunning" ? 0.06 : 0.15,
+        },
+      });
+    }
+    shape.bindPopup(() => pkPopup(zone), { maxWidth: 320 }).addTo(pkLayer);
+    pkShapes.set(zone.id, shape);
+  }
+  if (reopen != null && pkShapes.has(reopen)) {
+    const shape = pkShapes.get(reopen);
+    const zone = state.pk.zones.find((z) => z.id === reopen);
+    if (zone && zone.geometry.type !== "Point" && state.location) {
+      shape.openPopup([state.location.lat, state.location.lon]);
+    } else {
+      shape.openPopup();
+    }
+    pkPendingPopup = null;
+  }
+}
+
+function renderParkingHere() {
+  const cfg = state.config.parking;
+  $("pk-section").hidden = !cfg.enabled;
+  if (!cfg.enabled) return;
+  const empty = $("empty-pk");
+  if (!state.location) {
+    $("list-pk").replaceChildren();
+    empty.textContent = "Nog geen locatie bekend.";
+    empty.hidden = false;
+    return;
+  }
+  const order = { betaald: 0, blauw: 1, garage: 2, vergunning: 3 };
+  const zones = [...state.pk.here].sort((a, b) => order[a.kind] - order[b.kind]);
+  $("list-pk").replaceChildren(...zones.map((zone) => {
+    const st = Parking.status(zone);
+    const li = document.createElement("li");
+    li.className = "item parking";
+    li.style.setProperty("--c", pkColor(st));
+    li.tabIndex = 0;
+    const bar = document.createElement("span");
+    bar.className = "bar";
+    const what = document.createElement("span");
+    what.className = "what";
+    what.textContent = zone.name;
+    const kind = document.createElement("span");
+    kind.className = "dist";
+    kind.textContent = Parking.KIND_LABEL[zone.kind].split(" ")[0];
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    const status = document.createElement("span");
+    status.className = "pk-status";
+    status.textContent = st.text;
+    meta.append(status, ` · ${zone.manager}`);
+    li.append(bar, what, kind, meta);
+    const open = () => {
+      pkPendingPopup = zone.id;
+      state.pk.kinds.add(zone.kind);
+      document.querySelectorAll("[data-pk]").forEach((el) => {
+        if (el.dataset.pk.split(",").includes(zone.kind)) el.checked = true;
+      });
+      map.setView([state.location.lat, state.location.lon], Math.max(map.getZoom(), state.config.parking.min_zoom, 16));
+      scheduleParkingViewport();
+      if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
+    };
+    li.addEventListener("click", open);
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+    return li;
+  }));
+  empty.textContent = "Geen parkeerregeling bekend op deze plek (of vrij parkeren).";
+  empty.hidden = zones.length > 0;
+}
+
+let pkSeq = 0;
+let pkTimer = null;
+function scheduleParkingViewport() {
+  clearTimeout(pkTimer);
+  pkTimer = setTimeout(async () => {
+    const cfg = state.config.parking;
+    if (!cfg.enabled || !state.pk.kinds.size || map.getZoom() < cfg.min_zoom) {
+      state.pk.zones = [];
+      renderParking();
+      return;
+    }
+    const b = map.getBounds();
+    const seq = ++pkSeq;
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(5)).join(",");
+    try {
+      const zones = await api(`/api/parking?bbox=${bbox}&kinds=${[...state.pk.kinds].join(",")}`);
+      if (seq !== pkSeq) return;
+      state.pk.zones = zones;
+      renderParking();
+    } catch (err) { console.warn("Parkeren:", err.message); }
+  }, 300);
+}
+
+async function loadParkingHere(force) {
+  const loc = state.location;
+  if (!state.config.parking.enabled || !loc) return renderParkingHere();
+  const from = state.pk.hereFrom;
+  if (!force && from && haversine(from.lat, from.lon, loc.lat, loc.lon) < 30) return renderParkingHere();
+  state.pk.hereFrom = { lat: loc.lat, lon: loc.lon };
+  state.pk.here = await api(`/api/parking/at?lat=${loc.lat.toFixed(6)}&lon=${loc.lon.toFixed(6)}`);
+  renderParkingHere();
+}
+
+function initParking() {
+  if (!state.config.parking.enabled) return;
+  $("pk-controls").hidden = false;
+  const saved = store.get("pkKinds");
+  if (saved != null) state.pk.kinds = new Set(saved.split(",").filter(Boolean));
+  document.querySelectorAll("[data-pk]").forEach((el) => {
+    const kinds = el.dataset.pk.split(",");
+    el.checked = kinds.every((k) => state.pk.kinds.has(k));
+    el.addEventListener("change", () => {
+      kinds.forEach((k) => (el.checked ? state.pk.kinds.add(k) : state.pk.kinds.delete(k)));
+      store.set("pkKinds", [...state.pk.kinds].join(","));
+      scheduleParkingViewport();
+    });
+  });
+  scheduleParkingViewport();
+  loadParkingHere(true).catch(console.error);
+}
+
 // ---------- data ----------
 
 async function loadIncidents() {
@@ -539,6 +734,11 @@ function connectEvents() {
     renderList();
     renderStatus();
     loadSgNear().catch(console.error);
+    loadParkingHere().catch(console.error);
+  });
+  es.addEventListener("parking", () => {
+    scheduleParkingViewport();
+    loadParkingHere(true).catch(console.error);
   });
   es.addEventListener("speedcams", () => loadCams().catch(console.error));
   es.addEventListener("statiegeld", () => {
@@ -600,6 +800,7 @@ async function init() {
   renderAll();
   loadCams().catch(console.error);
   initStatiegeld();
+  initParking();
   connectEvents();
 
   if (state.config.browser_location) {
@@ -638,7 +839,7 @@ $("window").addEventListener("change", async (e) => {
   renderIncidents();
   renderList();
 });
-map.on("moveend", () => { renderCams(); renderList(); scheduleSgViewport(); });
+map.on("moveend", () => { renderCams(); renderList(); scheduleSgViewport(); scheduleParkingViewport(); });
 
 // Relatieve tijden bijwerken en verlopen incidenten laten verdwijnen.
 // Open/gesloten van statiegeldpunten verandert ook met de tijd.
@@ -646,7 +847,7 @@ setInterval(() => {
   renderIncidents();
   renderList();
   renderStatus();
-  if (state.config) { renderSg(); renderSgList(); }
+  if (state.config) { renderSg(); renderSgList(); renderParking(); renderParkingHere(); }
 }, 30000);
 
 init().catch((err) => {

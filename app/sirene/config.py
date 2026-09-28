@@ -58,6 +58,12 @@ DEFAULTS: dict[str, Any] = {
         # Straal voor de lijst "statiegeld in de buurt".
         "list_radius_m": 2000,
     },
+    "parking": {
+        "enabled": True,
+        "refresh_hours": 24,
+        # Pas vanaf dit zoomniveau zones op de kaart tekenen (vlakken zijn zwaar).
+        "min_zoom": 14,
+    },
     "map": {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",
