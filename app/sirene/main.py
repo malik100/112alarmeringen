@@ -85,7 +85,9 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
     def get_incidents(minutes: int = Query(default=None, ge=1, le=24 * 60)):
         minutes = minutes or svc.cfg["map"]["default_window_minutes"]
         loc = svc.locations.current
-        return [svc.enrich(i, loc) for i in svc.db.incidents_since(time.time() - minutes * 60)]
+        incidents = svc.db.incidents_since(time.time() - minutes * 60)
+        news = svc.db.news_for_incidents([i["id"] for i in incidents])
+        return [svc.enrich(i, loc, news.get(i["id"], [])) for i in incidents]
 
     @app.get("/api/speedcams")
     def get_speedcams():

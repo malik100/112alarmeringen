@@ -67,6 +67,23 @@ CREATE TABLE IF NOT EXISTS parking (
 );
 CREATE INDEX IF NOT EXISTS parking_bbox ON parking (south, north);
 
+CREATE TABLE IF NOT EXISTS news (
+    guid    TEXT PRIMARY KEY,
+    ts      REAL NOT NULL,
+    source  TEXT NOT NULL,
+    title   TEXT NOT NULL,
+    summary TEXT,
+    link    TEXT
+);
+CREATE INDEX IF NOT EXISTS news_ts ON news (ts);
+
+CREATE TABLE IF NOT EXISTS incident_news (
+    incident_id INTEGER NOT NULL,
+    news_guid   TEXT NOT NULL,
+    score       INTEGER NOT NULL,
+    PRIMARY KEY (incident_id, news_guid)
+);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -134,7 +151,61 @@ class Database:
     def purge_incidents(self, older_than_ts: float) -> int:
         with self.conn:
             cur = self.conn.execute("DELETE FROM incidents WHERE ts < ?", (older_than_ts,))
+            self.conn.execute("DELETE FROM news WHERE ts < ?", (older_than_ts,))
+            self.conn.execute(
+                "DELETE FROM incident_news WHERE incident_id NOT IN (SELECT id FROM incidents) "
+                "OR news_guid NOT IN (SELECT guid FROM news)"
+            )
         return cur.rowcount
+
+    def incidents_between(self, start_ts: float, end_ts: float) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM incidents WHERE ts BETWEEN ? AND ?", (start_ts, end_ts)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # --- nieuws -----------------------------------------------------------
+
+    def has_news(self, guid: str) -> bool:
+        return self.conn.execute("SELECT 1 FROM news WHERE guid = ?", (guid,)).fetchone() is not None
+
+    def insert_news(self, article: dict[str, Any]) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO news (guid, ts, source, title, summary, link) "
+                "VALUES (:guid, :ts, :source, :title, :summary, :link)", article,
+            )
+
+    def news_between(self, start_ts: float, end_ts: float) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM news WHERE ts BETWEEN ? AND ?", (start_ts, end_ts)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def link_news(self, incident_id: int, guid: str, score: int) -> bool:
+        """Koppelt een artikel aan een melding; True als de koppeling nieuw is."""
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT OR IGNORE INTO incident_news (incident_id, news_guid, score) VALUES (?, ?, ?)",
+                (incident_id, guid, score),
+            )
+        return cur.rowcount > 0
+
+    def news_for_incidents(self, incident_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+        result: dict[int, list[dict[str, Any]]] = {}
+        for start in range(0, len(incident_ids), 500):  # SQLite-limiet op parameters
+            chunk = incident_ids[start:start + 500]
+            rows = self.conn.execute(
+                "SELECT l.incident_id, l.score, n.* FROM incident_news l "
+                "JOIN news n ON n.guid = l.news_guid "
+                f"WHERE l.incident_id IN ({', '.join('?' * len(chunk))}) "
+                "ORDER BY l.score DESC, n.ts",
+                chunk,
+            ).fetchall()
+            for r in rows:
+                item = dict(r)
+                result.setdefault(item.pop("incident_id"), []).append(item)
+        return result
 
     # --- geocode-cache ----------------------------------------------------
 

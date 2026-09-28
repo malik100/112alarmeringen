@@ -64,6 +64,30 @@ DEFAULTS: dict[str, Any] = {
         # Pas vanaf dit zoomniveau zones op de kaart tekenen (vlakken zijn zwaar).
         "min_zoom": 14,
     },
+    "news": {
+        "enabled": True,
+        "poll_interval_s": 300,
+        # Regionale omroepen, landelijke nieuwssites en 112-sites met een RSS-feed.
+        "feeds": [
+            {"name": "NOS", "url": "https://feeds.nos.nl/nosnieuwsbinnenland"},
+            {"name": "NU.nl", "url": "https://www.nu.nl/rss/Binnenland"},
+            {"name": "NH Nieuws", "url": "https://rss.nhnieuws.nl/rss"},
+            {"name": "Rijnmond", "url": "https://www.rijnmond.nl/rss/index.xml"},
+            {"name": "Omroep West", "url": "https://www.omroepwest.nl/rss/index.xml"},
+            {"name": "RTV Utrecht", "url": "https://www.rtvutrecht.nl/rss/nieuws.xml"},
+            {"name": "Omroep Brabant", "url": "https://www.omroepbrabant.nl/rss"},
+            {"name": "Omroep Gelderland", "url": "https://www.gld.nl/rss"},
+            {"name": "RTV Noord", "url": "https://www.rtvnoord.nl/rss"},
+            {"name": "RTV Oost", "url": "https://www.rtvoost.nl/rss"},
+            {"name": "RTV Drenthe", "url": "https://www.rtvdrenthe.nl/rss/index.xml"},
+            {"name": "L1", "url": "https://www.l1.nl/rss/index.xml"},
+            {"name": "Omroep Zeeland", "url": "https://www.omroepzeeland.nl/rss/index.xml"},
+            {"name": "Omroep Flevoland", "url": "https://www.omroepflevoland.nl/RSS"},
+            {"name": "112Brabant", "url": "https://www.112brabant.nl/feed/"},
+            {"name": "112Groningen", "url": "https://www.112groningen.nl/feed/"},
+            {"name": "112Ede", "url": "https://www.112ede.nl/feed/"},
+        ],
+    },
     "map": {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",

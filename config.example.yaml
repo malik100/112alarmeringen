@@ -34,6 +34,14 @@ statiegeld:
   min_zoom: 12          # pas vanaf dit zoomniveau punten op de kaart tonen
   list_radius_m: 2000   # straal voor de lijst "statiegeld in de buurt"
 
+news:
+  enabled: true
+  poll_interval_s: 300  # elke 5 minuten
+  # Eigen lijst? Dan vervangt die de standaardlijst (zie app/sirene/config.py), bijv.:
+  # feeds:
+  #   - {name: NH Nieuws, url: "https://rss.nhnieuws.nl/rss"}
+  #   - {name: NOS, url: "https://feeds.nos.nl/nosnieuwsbinnenland"}
+
 parking:
   enabled: true
   refresh_hours: 24

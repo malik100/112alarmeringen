@@ -14,6 +14,7 @@ from .events import EventBus
 from .geo import haversine_m
 from .geocoder import PRECISION_RANK, Geocoder
 from .location import Location, LocationStore, fetch_ha_location
+from . import news as news_matcher
 from .notifier import Notifier
 from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
@@ -51,6 +52,7 @@ class Service:
             "speedcams": {"last_ok": None, "last_error": None, "count": 0},
             "statiegeld": {"last_ok": None, "last_error": None, "count": 0},
             "parking": {"last_ok": None, "last_error": None, "count": 0},
+            "news": {"last_ok": None, "last_error": None},
             "homeassistant": {"last_ok": None, "last_error": None},
         }
         self._tasks: list[asyncio.Task] = []
@@ -59,9 +61,17 @@ class Service:
 
     # --- incidenten -------------------------------------------------------
 
-    def enrich(self, incident: dict[str, Any], loc: Location | None = None) -> dict[str, Any]:
+    def enrich(self, incident: dict[str, Any], loc: Location | None = None,
+               news: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """Incident voor de kaart: met sirene-vlag, afstand en gekoppeld nieuws.
+
+        `news` = al opgehaalde artikelen voor dit incident (scheelt een query per incident).
+        """
         loc = loc or self.locations.current
+        if news is None:
+            news = self.db.news_for_incidents([incident["id"]]).get(incident["id"], [])
         out = dict(incident)
+        out["news"] = [self._news_out(n) for n in news]
         out["sirene"] = incident["priority"] is not None and incident["priority"] <= 1
         out["distance_m"] = (
             round(haversine_m(loc.lat, loc.lon, incident["lat"], incident["lon"]))
@@ -92,34 +102,92 @@ class Service:
         }
         incident_id = self.db.insert_incident(incident)
         stored = self.db.get_incident(incident_id)
+        # Soms verscheen het nieuws al (bijv. bij een late of herhaalde melding).
+        for article in self.db.news_between(stored["ts"] - news_matcher.BEFORE_S,
+                                            stored["ts"] + news_matcher.AFTER_S):
+            m = news_matcher.match(stored, article)
+            if m:
+                self.db.link_news(stored["id"], article["guid"], m.score)
         self.bus.publish("incident", self.enrich(stored))
         await self.maybe_notify(stored)
         return stored
+
+    async def _fetch_feed_with_backoff(self, url: str, interval: float,
+                                       status_key: str) -> list[FeedItem] | None:
+        """Haalt een RSS-feed op; None als die nog in backoff zit of faalde."""
+        failures, retry_at = self._feed_backoff.get(url, (0, 0.0))
+        if time.time() < retry_at:
+            return None
+        try:
+            items = await fetch_feed(self.client, url)
+        except (httpx.HTTPError, ValueError) as exc:
+            failures += 1
+            # Bij fouten steeds langer wachten (max. 15 min) om de bron niet te belasten.
+            delay = min(FEED_MAX_BACKOFF_S, interval * 2 ** failures)
+            self._feed_backoff[url] = (failures, time.time() + delay)
+            log.warning("Feed %s faalde (%s), volgende poging over %d s", url, exc, delay)
+            self.status[status_key]["last_error"] = f"{time.time():.0f}: {url}: {exc}"
+            return None
+        self._feed_backoff.pop(url, None)
+        return items
 
     async def poll_p2000_once(self) -> int:
         new = 0
         interval = self.cfg["p2000"]["poll_interval_s"]
         for url in self.cfg["p2000"]["feeds"]:
-            failures, retry_at = self._feed_backoff.get(url, (0, 0.0))
-            if time.time() < retry_at:
+            items = await self._fetch_feed_with_backoff(url, interval, "p2000")
+            if items is None:
                 continue
-            try:
-                items = await fetch_feed(self.client, url)
-            except (httpx.HTTPError, ValueError) as exc:
-                failures += 1
-                # Bij fouten steeds langer wachten (max. 15 min) om de bron niet te belasten.
-                delay = min(FEED_MAX_BACKOFF_S, interval * 2 ** failures)
-                self._feed_backoff[url] = (failures, time.time() + delay)
-                log.warning("Feed %s faalde (%s), volgende poging over %d s", url, exc, delay)
-                self.status["p2000"]["last_error"] = f"{time.time():.0f}: {exc}"
-                continue
-            self._feed_backoff.pop(url, None)
             for item in sorted(items, key=lambda i: i.ts):
                 if await self.process_item(item):
                     new += 1
             self.status["p2000"]["last_ok"] = time.time()
         self.db.purge_incidents(time.time() - self.cfg["p2000"]["keep_hours"] * 3600)
         return new
+
+    # --- nieuws -----------------------------------------------------------
+
+    @staticmethod
+    def _news_out(article: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "title": article["title"], "link": article["link"], "source": article["source"],
+            "ts": article["ts"], "score": article["score"],
+            "label": "waarschijnlijk" if article["score"] >= news_matcher.LIKELY_SCORE else "mogelijk",
+        }
+
+    def process_article(self, source: str, item: FeedItem) -> list[int]:
+        """Slaat een nieuw artikel op en koppelt het; geeft de ids van gekoppelde meldingen."""
+        if self.db.has_news(item.guid):
+            return []
+        if item.ts < time.time() - self.cfg["p2000"]["keep_hours"] * 3600:
+            return []  # ouder dan alle bewaarde meldingen
+        summary = news_matcher.normalize(item.description)
+        article = {"guid": item.guid, "ts": item.ts, "source": source, "title": item.title.strip(),
+                   "summary": summary[:500], "link": item.link}
+        self.db.insert_news(article)
+        linked = []
+        for incident in self.db.incidents_between(item.ts - news_matcher.AFTER_S,
+                                                  item.ts + news_matcher.BEFORE_S):
+            m = news_matcher.match(incident, article)
+            if m and self.db.link_news(incident["id"], item.guid, m.score):
+                linked.append(incident["id"])
+        return linked
+
+    async def poll_news_once(self) -> int:
+        linked_total = 0
+        interval = self.cfg["news"]["poll_interval_s"]
+        for feed in self.cfg["news"]["feeds"]:
+            items = await self._fetch_feed_with_backoff(feed["url"], interval, "news")
+            if items is None:
+                continue
+            for item in sorted(items, key=lambda i: i.ts):
+                for incident_id in self.process_article(feed["name"], item):
+                    linked_total += 1
+                    incident = self.db.get_incident(incident_id)
+                    if incident:
+                        self.bus.publish("incident", self.enrich(incident))
+        self.status["news"]["last_ok"] = time.time()
+        return linked_total
 
     # --- meldingen --------------------------------------------------------
 
@@ -257,6 +325,9 @@ class Service:
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "statiegeld", self.cfg["statiegeld"]["refresh_hours"] * 3600,
                 self.refresh_statiegeld_once)))
+        if self.cfg["news"]["enabled"]:
+            self._tasks.append(asyncio.create_task(
+                self._loop("nieuws", self.cfg["news"]["poll_interval_s"], self.poll_news_once)))
         if self.cfg["parking"]["enabled"]:
             self.status["parking"]["count"] = self.db.parking_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(

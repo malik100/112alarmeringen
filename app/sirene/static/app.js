@@ -124,7 +124,23 @@ function incidentPopup(inc) {
     ${esc(fmtTime(inc.ts))} (${esc(fmtAgo(inc.ts))})${d != null ? ` · ${esc(fmtDistance(d))} van jou` : ""}<br>
     <small>${esc(PRECISION_TEXT[inc.precision] || "locatie onbekend")}</small>
     <div class="popup-raw">${esc(inc.title)}</div>
+    ${newsHtml(inc)}
     ${inc.link ? `<a href="${esc(inc.link)}" target="_blank" rel="noopener noreferrer">Meer informatie ↗</a>` : ""}`;
+}
+
+function newsDelay(inc, article) {
+  const min = Math.round((article.ts - inc.ts) / 60);
+  if (min < 0) return `${-min} min vóór de melding`;
+  if (min < 60) return `${min} min na de melding`;
+  return `${Math.round(min / 60)} uur na de melding`;
+}
+
+function newsHtml(inc) {
+  if (!inc.news || !inc.news.length) return "";
+  const items = inc.news.slice(0, 3).map((n) => `
+    <li><a href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a><br>
+      <small>${esc(n.source)} · ${esc(newsDelay(inc, n))} · ${esc(n.label)} gerelateerd</small></li>`).join("");
+  return `<div class="news"><b>📰 Nieuws</b><ul>${items}</ul></div>`;
 }
 
 function renderIncidents() {
@@ -225,7 +241,14 @@ function listItem(inc, dist) {
     const tag = document.createElement("span");
     tag.className = "tag sirene";
     tag.textContent = "SIRENE";
-    meta.append(tag);
+    meta.append(tag, " ");
+  }
+  if (inc.news && inc.news.length) {
+    const tag = document.createElement("span");
+    tag.className = "tag news";
+    tag.textContent = "📰 NIEUWS";
+    tag.title = inc.news[0].title;
+    meta.append(tag, " ");
   }
   meta.append(`${LABEL[inc.discipline] || inc.discipline} · ${fmtTime(inc.ts)} · ${fmtAgo(inc.ts)}` +
     (inc.precision === "plaats" ? " · locatie ≈ plaats" : "") +

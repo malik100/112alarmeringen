@@ -16,6 +16,8 @@ op je eigen server of Raspberry Pi. Pushmeldingen zijn optioneel en staan standa
 - **Parkeerzones** met tarieven en tijden: betaald parkeren (gekleurd naar de prijs van dit moment),
   blauwe zones, vergunningzones en garages/P+R. Het paneel toont wat er **op jouw plek** geldt,
   bijvoorbeeld "Nu €8,05 per uur (tot middernacht)".
+- **Nieuws bij meldingen**: verschijnt er een nieuwsartikel over een melding (regionale omroep,
+  NOS, 112-site), dan staat dat bij de melding, met "📰 NIEUWS" in de lijst.
 - **Live**: nieuwe incidenten verschijnen binnen ongeveer een minuut, zonder dat je de pagina
   hoeft te verversen.
 - **Optionele meldingen** via Home Assistant of een eigen ntfy-server.
@@ -153,6 +155,33 @@ Beperkingen:
 
 Uitzetten kan met `parking.enabled: false` in `config.yaml`.
 
+## Nieuws bij meldingen
+
+Elke 5 minuten worden de RSS-feeds van regionale omroepen (NH Nieuws, Rijnmond, Omroep West,
+RTV Utrecht, Omroep Brabant, Omroep Gelderland, RTV Noord, RTV Oost, RTV Drenthe, L1, Omroep
+Zeeland, Omroep Flevoland), NOS, NU.nl en een paar 112-sites opgehaald. Een artikel wordt aan een
+melding gekoppeld als het tussen 30 minuten vóór en 6 uur na de melding verschijnt en genoeg
+overeenkomt:
+
+| Overeenkomst                                            | Punten |
+|---------------------------------------------------------|--------|
+| zelfde straat                                           | 3      |
+| zelfde weg (A/N-nummer)                                 | 3 (2 zonder plaats of straat) |
+| zelfde plaats                                           | 2      |
+| zelfde soort incident (brand, ongeval, te water, …)     | 1      |
+| verschenen binnen 2 uur na de melding                   | 1      |
+
+Vanaf 4 punten tonen we het artikel als "mogelijk gerelateerd", vanaf 5 als "waarschijnlijk
+gerelateerd". Zonder plaats, straat of weg wordt nooit gekoppeld. Een straat zonder plaatsnaam telt
+alleen als het herkenbaar een straatnaam is (…straat, …weg, …laan), zodat "TU Delft" niet aan de
+straat "Delft" wordt gekoppeld.
+
+Een koppeling is een inschatting, geen zekerheid. Getest op een dag echte meldingen en artikelen:
+de koppelingen met 5+ punten klopten, bij 4 punten zat af en toe een twijfelgeval.
+
+Feeds toevoegen of weghalen kan in `config.yaml` onder `news.feeds`. Uitzetten kan met
+`news.enabled: false`. Artikelen worden net zo lang bewaard als meldingen (`p2000.keep_hours`).
+
 ## Nauwkeurigheid van de locatie
 
 P2000-berichten bevatten geen coördinaten. De locatie wordt bepaald uit postcode, straat en
@@ -201,6 +230,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/main.py`       | API en webserver                                        |
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
 | `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
+| `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen                  |
 | `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
 | `app/sirene/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |
 
@@ -209,6 +239,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 - P2000-berichten: [alarmeringen.nl](https://alarmeringen.nl) (RSS).
 - Adressen: [PDOK Locatieserver](https://www.pdok.nl), op basis van de BAG.
 - Statiegeld-inleverpunten: [Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer).
+- Nieuws: RSS-feeds van de genoemde omroepen en sites; we tonen alleen titel, bron en link.
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - [Leaflet](https://leafletjs.com): BSD-2-licentie, meegeleverd in `app/sirene/static/vendor/leaflet`.

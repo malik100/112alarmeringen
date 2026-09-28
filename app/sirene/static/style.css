@@ -228,6 +228,10 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
   background: var(--bg-soft); color: var(--fg-muted);
 }
 .tag.sirene { background: var(--brandweer); color: #fff; }
+.tag.news { background: var(--politie); color: #fff; }
+.news { margin: 6px 0; }
+.news ul { margin: 2px 0 0 16px; padding: 0; }
+.news li { margin-bottom: 4px; }
 .empty { color: var(--fg-muted); font-size: 13px; margin: 4px 6px; }
 .credits { margin-top: 20px; font-size: 11px; color: var(--fg-muted); }
 
