@@ -1,4 +1,4 @@
-# Sirene Radar – kopieer naar config.yaml en pas aan.
+# Buurtradar – kopieer naar config.yaml en pas aan.
 # Alles wat je weglaat krijgt de standaardwaarde (zie app/sirene/config.py).
 
 # Straal rond jouw locatie in meters: voor de lijst "in de buurt" en voor meldingen.
@@ -69,4 +69,4 @@ notifications:
   homeassistant_service: notify.mobile_app_telefoon
   ntfy:
     url: http://ntfy
-    topic: sirene
+    topic: buurtradar

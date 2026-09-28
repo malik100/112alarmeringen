@@ -26,7 +26,7 @@ from .sources.statiegeld import fetch_statiegeld
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = "SireneRadar/0.1 (self-hosted, persoonlijk gebruik)"
+USER_AGENT = "Buurtradar/0.1 (self-hosted, persoonlijk gebruik)"
 # Alleen verse incidenten leiden tot een melding (niet de backlog na een herstart).
 NOTIFY_MAX_INCIDENT_AGE_S = 15 * 60
 FEED_MAX_BACKOFF_S = 15 * 60

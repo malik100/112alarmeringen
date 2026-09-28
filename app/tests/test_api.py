@@ -15,7 +15,7 @@ def client(service):
 def test_config_and_index(client):
     cfg = client.get("/api/config").json()
     assert cfg["radius_m"] == 1000 and cfg["notifications_enabled"] is False
-    assert "Sirene Radar" in client.get("/").text
+    assert "Buurtradar" in client.get("/").text
     assert client.get("/static/vendor/leaflet/leaflet.js").status_code == 200
 
 

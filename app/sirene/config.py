@@ -12,7 +12,7 @@ import yaml
 DEFAULTS: dict[str, Any] = {
     "radius_m": 1000,
     "database": "/data/sirene.db",
-    # Leeg = "SireneRadar/<versie> (self-hosted, persoonlijk gebruik)".
+    # Leeg = "Buurtradar/<versie> (self-hosted, persoonlijk gebruik)".
     "user_agent": "",
     "p2000": {
         "feeds": ["https://alarmeringen.nl/feeds/all.rss"],
@@ -110,7 +110,7 @@ DEFAULTS: dict[str, Any] = {
         # Minimale nauwkeurigheid van de geocoding: "postcode", "straat" of "plaats".
         "min_precision": "straat",
         "homeassistant_service": "notify.mobile_app_telefoon",
-        "ntfy": {"url": "http://ntfy", "topic": "sirene", "token": ""},
+        "ntfy": {"url": "http://ntfy", "topic": "buurtradar", "token": ""},
     },
 }
 

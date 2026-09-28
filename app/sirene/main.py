@@ -51,7 +51,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         yield
         await svc.stop()
 
-    app = FastAPI(title="Sirene Radar", lifespan=lifespan)
+    app = FastAPI(title="Buurtradar", lifespan=lifespan)
     app.state.service = svc
 
     @app.get("/api/config")

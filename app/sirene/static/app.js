@@ -1,4 +1,4 @@
-/* Sirene Radar – live kaart met P2000-incidenten en flitsers. */
+/* Buurtradar – live kaart van wat er in je buurt gebeurt: 112-meldingen, flitsers, parkeren, laden en meer. */
 "use strict";
 
 const NL_CENTER = [52.2, 5.3];

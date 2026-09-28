@@ -1,7 +1,7 @@
 services:
-  sirene:
+  buurtradar:
     build: ./app
-    container_name: sirene-radar
+    container_name: buurtradar
     restart: unless-stopped
     ports:
       - "8080:8080"

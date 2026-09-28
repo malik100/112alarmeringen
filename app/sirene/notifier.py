@@ -40,7 +40,7 @@ class Notifier:
             json={
                 "title": title,
                 "message": body,
-                "data": {"tag": f"sirene-{incident['id']}", "url": incident.get("link") or ""},
+                "data": {"tag": f"buurtradar-{incident['id']}", "url": incident.get("link") or ""},
             },
             timeout=10,
         )

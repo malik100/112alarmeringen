@@ -1,8 +1,8 @@
-# Sirene Radar
+# Buurtradar
 
-Een live kaart van P2000-alarmeringen, flitsers, statiegeld-inleverpunten en parkeerzones rond je
-eigen locatie. Het draait volledig
-op je eigen server of Raspberry Pi. Pushmeldingen zijn optioneel en staan standaard uit.
+Een live kaart van wat er in je buurt gebeurt: 112-meldingen, flitsers, parkeerzones, laadpalen,
+statiegeld-inleverpunten en het nieuws erbij. Het draait volledig op je eigen server of Raspberry
+Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
   met sirene (A0/A1/P1) pulseren.
@@ -29,14 +29,16 @@ Flexflitsers zitten er (nog) niet in: daar bestaat geen open databron voor.
 ## Hoe de data stroomt
 
 ```
-alarmeringen.nl (RSS) ──┐
-OpenStreetMap (flitsers)├─► sirene-container ─► SQLite
-Statiegeld Nederland ───┤        │   ▲
-RDW (parkeren) ─────────┤        │   │
-PDOK (adres → GPS)  ────┘        │   │
-                                 │   └── jouw locatie: Home Assistant-app of de browser
-                                 ▼
-                     webkaart (live) ──► (optioneel) melding
+alarmeringen.nl (P2000) ─┐
+Nieuwsfeeds (RSS) ───────┤
+OpenStreetMap (flitsers) ├─► Buurtradar ─► SQLite
+Statiegeld Nederland ────┤        │   ▲
+RDW (parkeren) ──────────┤        │   │
+NDW (laadpalen) ─────────┤        │   │
+PDOK (adres → GPS) ──────┘        │   │
+                                  │   └── jouw locatie: Home Assistant-app of de browser
+                                  ▼
+                      webkaart (live) ──► (optioneel) melding
 ```
 
 - Alle verwerking gebeurt op je eigen server. Je eigen locatie verlaat je server nooit.
@@ -49,8 +51,8 @@ PDOK (adres → GPS)  ────┘        │   │
 Je hebt Docker en Docker Compose nodig. Een Raspberry Pi 4 of 5 is ruim voldoende.
 
 ```bash
-git clone https://github.com/malik100/112alarmeringen.git sirene-radar
-cd sirene-radar
+git clone https://github.com/malik100/112alarmeringen.git buurtradar
+cd buurtradar
 cp config.example.yaml config.yaml
 cp .env.example .env
 docker compose up -d --build
@@ -277,6 +279,10 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
 | `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
 | `app/sirene/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |
+
+De code gebruikt intern nog de oorspronkelijke werknaam `sirene` (de map `app/sirene`, de
+database `sirene.db` en het Docker-volume `sirene-data`). Dat is bewust: zo blijven bestaande
+installaties en hun gegevens werken.
 
 ## Bronnen en licenties
 
