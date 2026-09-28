@@ -272,7 +272,9 @@ Het tabblad **Nieuws** heeft twee delen.
 
 **Nieuws uit je buurt.** Uit dezelfde nieuwsfeeds als hierboven, alleen artikelen van de
 afgelopen 48 uur die een plaats noemen binnen 5 km van je locatie (`news.local_radius_m`), met de
-dichtstbijzijnde plaats erbij. Welke plaatsen dat zijn, komt van de PDOK Locatieserver: rond
+dichtstbijzijnde plaats erbij. Actueel nieuws staat bovenaan: de volgorde is vooral op versheid,
+met een voorsprong voor je eigen plaats, voor artikelen met de plaats in de kop en voor regionale
+omroepen (landelijke media noemen een stad vaak terloops). Welke plaatsen dat zijn, komt van de PDOK Locatieserver: rond
 Utrecht-centrum bijvoorbeeld Utrecht, De Bilt, Bunnik, Nieuwegein, Houten en Zeist. Plaatsnamen die
 ook een gewoon woord zijn ("Houten", "Best", "Putten") tellen alleen met een voorzetsel ervoor
 ("in Houten"), zodat "houten vloer" niet meetelt.
@@ -280,15 +282,33 @@ ook een gewoon woord zijn ("Houten", "Best", "Putten") tellen alleen met een voo
 **Bekendmakingen.** De officiële publicaties van je gemeente, dezelfde als op
 [officielebekendmakingen.nl](https://www.officielebekendmakingen.nl) en in de app *Berichten over
 je Buurt*. Ze komen uit de open zoekdienst van overheid.nl (SRU). Getoond worden de publicaties van
-de afgelopen 30 dagen binnen 1,5 km (`announcements.radius_m`), nieuwste eerst, met filters:
+de afgelopen 30 dagen binnen 1,5 km (`announcements.radius_m`).
 
-| Filter       | Bijvoorbeeld                                                      |
-|--------------|-------------------------------------------------------------------|
-| Bouwen       | aanvraag of besluit omgevingsvergunning, omgevingsmelding, bestemmingsplan |
-| Verkeer      | verkeersbesluit (afsluiting, parkeerplaats, eenrichtingsverkeer)  |
-| Evenementen  | evenementenvergunning                                             |
-| Vergunningen | andere vergunningen (horeca, standplaats, …)                      |
-| Overig       | beleidsregels en verordeningen van je gemeente (zonder plek: "hele gemeente") |
+**Standaard zie je alleen wat je op straat merkt**: verkeer en evenementen, en alleen de
+belangrijke. Bouwaanvragen en vergunningen zet je aan met het filter *Bouw & vergunningen*;
+beleidsregels en verordeningen onder *Overig*.
+
+| Filter               | Bijvoorbeeld                                                      | Standaard |
+|----------------------|-------------------------------------------------------------------|-----------|
+| Verkeer              | verkeersbesluit (afsluiting, parkeerplaats, eenrichtingsverkeer)  | aan       |
+| Evenementen          | evenementenvergunning                                             | aan       |
+| Bouw & vergunningen  | omgevingsvergunning, omgevingsmelding, horeca, standplaats, …     | uit       |
+| Overig               | beleidsregels en verordeningen van je gemeente ("hele gemeente")  | uit       |
+
+**Belangrijkst eerst.** Elke bekendmaking krijgt een score:
+
+| Wat                                                                  | Punten           |
+|----------------------------------------------------------------------|------------------|
+| soort: evenement / verkeer / bouwen / vergunning / overig            | 3 / 2 / 1 / 0,5 / 0 |
+| merkbaar: afsluiting, omleiding, parkeerverbod, sloop, nieuwbouw, woningen, bomen kappen, horeca, terras, markt, … | +1 tot +2 |
+| klein of administratief: dakkapel, kozijn, reclame, kadastraal splitsen, gehandicaptenparkeerplaats, mandaatregeling, begroting, … | −0,5 tot −3 |
+| je kunt nog reageren of bezwaar maken                                | +1               |
+| afstand: pal naast je tot aan de rand van de straal                  | +2 tot 0         |
+| leeftijd                                                             | −1 per 10 dagen  |
+
+Met *Alleen belangrijk* (standaard aan) verdwijnt alles onder 1,5 punt. Sorteren kan ook op
+*Nieuwste* of *Dichtstbij*. Rond Utrecht-centrum blijven zo standaard ~12 van de ~190
+bekendmakingen over. Je keuzes worden per apparaat onthouden.
 
 - Loopt er een reactie- of bezwaartermijn, dan staat erbij tot wanneer ("reageren t/m 18 nov").
 - Tik op een bekendmaking om hem op de kaart te zien; het pijltje opent de volledige tekst.

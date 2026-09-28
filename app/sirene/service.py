@@ -21,6 +21,7 @@ from .notifier import Notifier
 from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
 from .sources.bekendmakingen import fetch_announcements, fetch_area
+from .sources.bekendmakingen import relevance as announcement_relevance
 from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import fetch_zones
 from .sources.shops import fetch_shops, is_late, same_store
@@ -290,16 +291,19 @@ class Service:
                                "news": [], "announcements": []}
         if self.cfg["news"]["enabled"]:
             near = [p for p in places if p["distance_m"] <= self.cfg["news"]["local_radius_m"]]
-            for article in self.db.news_since(time.time() - self.cfg["news"]["keep_hours"] * 3600):
+            now = time.time()
+            for article in self.db.news_since(now - self.cfg["news"]["keep_hours"] * 3600):
                 place = news_matcher.local_place(article, near)
                 if place:
                     out["news"].append({
                         "title": article["title"], "link": article["link"],
                         "source": article["source"], "ts": article["ts"],
                         "place": place["name"], "distance_m": place["distance_m"],
+                        "relevance": news_matcher.local_relevance(article, place, now),
                     })
-                    if len(out["news"]) >= LOCAL_NEWS_LIMIT:
-                        break
+            # Actueel en dichtbij eerst.
+            out["news"].sort(key=lambda n: (n["relevance"], n["ts"]), reverse=True)
+            del out["news"][LOCAL_NEWS_LIMIT:]
         acfg = self.cfg["announcements"]
         if acfg["enabled"] and places:
             gemeenten = self.gemeenten_near(places)
@@ -314,10 +318,10 @@ class Service:
                     a["distance_m"] = round(haversine_m(lat, lon, a["lat"], a["lon"]))
                     if a["distance_m"] > acfg["radius_m"]:
                         continue
+                a["relevance"] = announcement_relevance(a, acfg["radius_m"])
                 out["announcements"].append(a)
-            # Nieuwste dag eerst, binnen een dag dichtbij eerst (regels zonder plek als laatste).
-            out["announcements"].sort(key=lambda a: (
-                a["date"], -(a["distance_m"] if a["distance_m"] is not None else 10**9)), reverse=True)
+            # Nuttigste eerst; de app kan ook op datum of afstand sorteren.
+            out["announcements"].sort(key=lambda a: (a["relevance"], a["date"]), reverse=True)
             del out["announcements"][ANNOUNCEMENTS_LIMIT:]
         return out
 

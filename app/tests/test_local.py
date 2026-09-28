@@ -197,3 +197,53 @@ async def test_area_lookup_sends_rounded_location(service):
     await service.area_for(52.09753, 5.12341)
     assert route.calls.last.request.url.params["lat"] == "52.10"
     assert route.calls.last.request.url.params["lon"] == "5.12"
+
+
+# --- relevantie --------------------------------------------------------------
+
+def ann(title, category, distance_m=500, date="2026-09-28", deadline=None, abstract=""):
+    return {"title": title, "abstract": abstract, "category": category, "distance_m": distance_m,
+            "date": date, "deadline": deadline}
+
+
+def test_relevance_prefers_noticeable_nearby_and_fresh():
+    import datetime
+    from sirene.sources.bekendmakingen import relevance
+    today = datetime.date(2026, 9, 28)
+    r = lambda a: relevance(a, 1500, today)  # noqa: E731
+    event = r(ann("Aangevraagde evenementenvergunningen, Wintermarkt", "evenementen"))
+    closure = r(ann("Verkeersbesluit: afsluiten van de Oudegracht voor autoverkeer", "verkeer"))
+    dakkapel = r(ann("Aanvraag omgevingsvergunning, dakkapel", "bouwen"))
+    sloop = r(ann("Aanvraag omgevingsvergunning, slopen en nieuwbouw van 40 woningen", "bouwen"))
+    gpp = r(ann("Verkeersbesluit: aanleggen gehandicaptenparkeerplaats", "verkeer"))
+    mandaat = r(ann("Mandaatregeling college", "overig", distance_m=None))
+    assert event > dakkapel and closure > gpp and sloop > dakkapel and mandaat < 0
+    assert closure >= 1.5 > gpp
+    # Dichterbij, verser en nog open voor reacties scoort hoger.
+    assert r(ann("x", "bouwen", distance_m=50)) > r(ann("x", "bouwen", distance_m=1400))
+    assert r(ann("x", "bouwen")) > r(ann("x", "bouwen", date="2026-09-01"))
+    assert r(ann("x", "bouwen", deadline="2026-11-01")) > r(ann("x", "bouwen", deadline="2026-09-01"))
+
+
+def test_provincial_publications_are_skipped():
+    xml = sru(record("gmb-1", "Dakkapel")).replace(
+        'scheme="OVERHEID.Gemeente">Utrecht', 'scheme="OVERHEID.Provincie">Utrecht')
+    assert parse_sru(xml)[1] == []
+
+
+def test_local_news_relevance_fresh_and_close_first():
+    now = time.time()
+    own = {"name": "Utrecht", "distance_m": 0}
+    far = {"name": "Zeist", "distance_m": 4900}
+    fresh = news.local_relevance({"title": "Brand in Utrecht", "ts": now - 600, "source": "RTV Utrecht"}, own, now)
+    old = news.local_relevance({"title": "Brand in Utrecht", "ts": now - 30 * 3600, "source": "RTV Utrecht"}, own, now)
+    farther = news.local_relevance({"title": "Brand in Zeist", "ts": now - 600, "source": "RTV Utrecht"}, far, now)
+    only_summary = news.local_relevance({"title": "Brand", "ts": now - 600, "source": "RTV Utrecht"}, own, now)
+    national = news.local_relevance({"title": "Brand in Utrecht", "ts": now - 600, "source": "NOS"}, own, now)
+    assert fresh > old and fresh > farther and fresh > only_summary and fresh > national
+
+
+def test_placeholder_label_dropped():
+    _, [a] = parse_sru(sru(record("gmb-1", "Aangevraagde evenementenvergunningen, Wintermarkt, Molenpark",
+                                  kind="evenementenvergunning", label="Handmatig 1")))
+    assert a["label"] is None and a["lat"] is not None

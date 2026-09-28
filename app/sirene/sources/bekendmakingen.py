@@ -49,6 +49,7 @@ CATEGORIES = {
 
 _COORD_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)")
 _LATLON_RE = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
+_JUNK_LABEL_RE = re.compile(r"^\s*(handmatig|gebied|locatie|vlak|geometrie)\b[\s\d]*$", re.I)
 _ZAAK_RE = re.compile(r",?\s*\b[A-Z]{1,5}-?Z?\d{4}-\d{3,}\S*$")
 
 
@@ -62,6 +63,43 @@ def category_of(kind: str, title: str = "") -> str:
     if "evenement" in t:
         return "evenementen"
     return "overig"
+
+
+# Hoe nuttig is een bekendmaking voor iemand in de buurt? Basis per categorie, plus/min
+# voor woorden die op iets merkbaars (afsluiting, sloop, evenement) of iets
+# administratiefs (kadastraal splitsen, mandaatregeling) wijzen.
+CATEGORY_WEIGHT = {"evenementen": 3.0, "verkeer": 2.0, "bouwen": 1.0, "vergunning": 0.5, "overig": 0.0}
+KEYWORD_WEIGHTS = [
+    (re.compile(r"afsluit|afgesloten|omleiding|eenrichting|snelheid|km/u|parkeerverbod|stopverbod|"
+                r"fietsstraat|autoluw|verkeerslicht|werkzaamheden|opheffen van parkeerplaatsen|onttrekking|"
+                r"betaald parkeren|vergunningparkeren|laden en lossen|zone"), 2.0),
+    (re.compile(r"sloop|slopen|nieuwbouw|woningen|appartementen|bomen|kappen|kap van|horeca|terras|"
+                r"zendmast|antenne|windturbine|windpark|zonnepark|school|supermarkt|hotel|"
+                r"transformatie|bedrijf|standplaats|markt|drank|geluid|bodem|grondwerk|toepassen van grond"), 1.5),
+    (re.compile(r"omgevingsplan|bestemmingsplan|afval|parkeer|evenement"), 1.0),
+    (re.compile(r"gehandicaptenparkeerplaats"), -3.0),  # heft ook de "parkeer"-bonus op
+    (re.compile(r"dakkapel|kozijn|reclame|zonnepanelen|stuclaag|dakopbouw|uitbouw|aanbouw|schuur|"
+                r"erfafscheiding|kadastraal|splitsen|opkoopbescherming|overname bestaande zaak"), -0.5),
+    (re.compile(r"arbeidsvoorwaarden|mandaat|delegatie|begroting|benoeming|jaarrekening|jaarverslag|"
+                r"subsidie|legesverordening|belasting|reglement van orde|rechtspositie"), -1.5),
+]
+
+
+def relevance(a: dict[str, Any], radius_m: float, today: dt.date | None = None) -> float:
+    """Score: hoger = nuttiger. Soort, onderwerp, afstand, versheid en of je nog kunt reageren."""
+    today = today or dt.date.today()
+    text = f"{a['title']} {a.get('abstract') or ''}".lower()
+    score = CATEGORY_WEIGHT.get(a["category"], 0.0)
+    score += sum(w for pattern, w in KEYWORD_WEIGHTS if pattern.search(text))
+    if a.get("deadline") and a["deadline"] >= today.isoformat():
+        score += 1.0  # je kunt nog reageren of bezwaar maken
+    if a.get("distance_m") is not None:
+        score += 2.0 * max(0.0, 1 - a["distance_m"] / radius_m)
+    try:
+        days = (today - dt.date.fromisoformat(a["date"])).days
+    except (KeyError, ValueError):
+        days = 30
+    return round(score - max(days, 0) / 10, 2)
 
 
 def point_of(locatiegebied: str | None) -> tuple[float, float] | None:
@@ -127,11 +165,16 @@ def parse_sru(xml: bytes | str) -> tuple[int, list[dict[str, Any]]]:
             if point:
                 lat, lon = point
                 label = _text(mark, "ow:geometrielabel")
+                if label and _JUNK_LABEL_RE.match(label):
+                    label = None  # bijv. "Handmatig 1": zelf getekend vlak zonder naam
                 break
         abstract = _text(meta, ".//dcterms:abstract") or ""
         abstract = re.sub(r"^Toelichting:\s*", "", abstract)
         url = (_text(rec, ".//gzd:preferredUrl")
                or f"https://zoek.officielebekendmakingen.nl/{ident}.html")
+        creator = meta.find(".//dcterms:creator", NS)
+        if creator is not None and creator.get("scheme", "OVERHEID.Gemeente") != "OVERHEID.Gemeente":
+            continue  # bijv. Gedeputeerde Staten van de provincie met dezelfde naam
         out.append({
             "id": ident,
             "gemeente": _text(meta, ".//dcterms:creator") or "",

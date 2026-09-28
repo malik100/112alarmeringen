@@ -83,11 +83,21 @@
         <section id="bk-section">
           <h2 id="bk-title">Bekendmakingen</h2>
           <div class="chips">
-            <label class="chip"><input type="checkbox" data-bk="bouwen" checked> Bouwen</label>
-            <label class="chip"><input type="checkbox" data-bk="verkeer" checked> Verkeer</label>
-            <label class="chip"><input type="checkbox" data-bk="evenementen" checked> Evenementen</label>
-            <label class="chip"><input type="checkbox" data-bk="vergunning" checked> Vergunningen</label>
-            <label class="chip"><input type="checkbox" data-bk="overig" checked> Overig</label>
+            <label class="chip"><input type="checkbox" data-bk="verkeer"> Verkeer</label>
+            <label class="chip"><input type="checkbox" data-bk="evenementen"> Evenementen</label>
+            <label class="chip"><input type="checkbox" data-bk="bouwen,vergunning"> Bouw &amp; vergunningen</label>
+            <label class="chip"><input type="checkbox" data-bk="overig"> Overig</label>
+          </div>
+          <div class="row">
+            <label class="switch" title="Verberg administratieve en kleine zaken (dakkapel, kozijn, mandaatregeling)">
+              <input type="checkbox" id="bk-important"> Alleen belangrijk</label>
+            <label class="select">Sorteren
+              <select id="bk-sort">
+                <option value="relevant">Belangrijkst</option>
+                <option value="new">Nieuwste</option>
+                <option value="near">Dichtstbij</option>
+              </select>
+            </label>
           </div>
           <ol class="list" id="list-bk"></ol>
           <button type="button" class="more-btn" id="bk-more" hidden>Meer tonen</button>

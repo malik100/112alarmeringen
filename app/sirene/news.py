@@ -162,3 +162,20 @@ def local_place(article: dict[str, Any], places: list[dict[str, Any]]) -> dict[s
         if any(p.search(text) for p in place_patterns(place["name"])):
             return place
     return None
+
+
+# Landelijke media noemen een stad vaak terloops; regionale omroepen gaan echt over de buurt.
+NATIONAL_SOURCES = {"NOS", "NU.nl"}
+
+
+def local_relevance(article: dict[str, Any], place: dict[str, Any], now: float) -> float:
+    """Score voor lokaal nieuws: vooral versheid, daarna hoe dichtbij en hoe prominent."""
+    hours = max(0.0, (now - article["ts"]) / 3600)
+    score = 3.0 - hours / 8
+    d = place.get("distance_m") or 0
+    score += 1.5 if d == 0 else 1.0 if d <= 3000 else 0.5
+    if any(p.search(normalize(article["title"])) for p in place_patterns(place["name"])):
+        score += 1.0  # plaats in de kop
+    if article.get("source") in NATIONAL_SOURCES:
+        score -= 0.5
+    return round(score, 2)

@@ -32,7 +32,9 @@ const state = {
   sh: { show: false, points: [], near: [], kinds: new Set(["supermarkt", "buurtwinkel", "markt"]),
         onlyOpen: false, lateOnly: false, nearFrom: null },
   nw: { items: [], showAll: false, place: null, from: null, loading: false },
-  bk: { show: false, focus: null, items: [], cats: new Set(["bouwen", "verkeer", "evenementen", "vergunning", "overig"]), showAll: false },
+  // Standaard wat je merkt op straat (verkeer, evenementen); bouw en vergunningen zijn een optie.
+  bk: { show: false, focus: null, items: [], cats: new Set(["verkeer", "evenementen"]), important: true,
+        sort: "relevant", showAll: false },
   ch: { show: false, profile: "snel", custom: null, stations: [], near: [], statusTs: null, nearFrom: null },
 };
 
@@ -1206,6 +1208,13 @@ const BK_LABEL = { bouwen: "Bouwen", verkeer: "Verkeer", evenementen: "Evenement
   overig: "Bekendmaking" };
 const BK_PAGE = 15;
 const NW_PAGE = 5;
+// Vanaf deze score telt een bekendmaking als "belangrijk" (zie relevance() op de server).
+const BK_IMPORTANT = 1.5;
+const BK_SORT = {
+  relevant: (a, b) => b.relevance - a.relevance,
+  new: (a, b) => (b.date || "").localeCompare(a.date || "") || b.relevance - a.relevance,
+  near: (a, b) => (a.distance_m ?? 1e9) - (b.distance_m ?? 1e9),
+};
 const LOCAL_REFRESH_MS = 10 * 60 * 1000;
 const bkLayer = L.layerGroup().addTo(map);
 const bkMarkers = new Map();
@@ -1228,10 +1237,20 @@ function fmtDay(iso) {
 /** Kop en soort uit een bekendmaking: "Het bouwen van een dakkapel" + "Aanvraag omgevingsvergunning". */
 function bkParts(a) {
   const comma = a.title.indexOf(",");
-  const kind = comma > 0 && comma < 60 ? a.title.slice(0, comma) : BK_LABEL[a.category];
+  let kind = comma > 0 && comma < 60 ? a.title.slice(0, comma) : BK_LABEL[a.category];
+  if (/^aangevraagde evenementenvergunning/i.test(kind)) kind = "Evenement aangevraagd";
   let head = a.abstract && a.abstract.length > 8 ? a.abstract : (comma > 0 && comma < 60 ? a.title.slice(comma + 1) : a.title);
   head = head.trim();
   return { kind, head: head.charAt(0).toUpperCase() + head.slice(1) };
+}
+
+/** Waar: het adreslabel, anders het laatste deel van de titel ("…, Domplein te Utrecht"). */
+function bkPlace(a) {
+  // Oudere opgeslagen items kunnen nog een plaatshouder als "Handmatig 1" hebben.
+  if (a.label && !/^\s*(handmatig|gebied|locatie|vlak|geometrie)\b[\s\d]*$/i.test(a.label)) return a.label;
+  if (a.distance_m == null) return `hele gemeente ${a.gemeente}`;
+  const parts = a.title.split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.length >= 3 ? parts[parts.length - 1] : "";
 }
 
 function bkDeadline(a) {
@@ -1239,7 +1258,7 @@ function bkDeadline(a) {
 }
 
 function bkVisible(a) {
-  return state.bk.cats.has(a.category);
+  return state.bk.cats.has(a.category) && (!state.bk.important || a.relevance >= BK_IMPORTANT);
 }
 
 function bkPopup(a) {
@@ -1248,7 +1267,7 @@ function bkPopup(a) {
   return `
     <b>${esc(head)}</b><br>
     <small>${esc(kind)} · ${esc(fmtDay(a.date))}${dl ? ` · ${esc(dl)}` : ""}</small><br>
-    ${a.label ? `${esc(a.label)}<br>` : ""}
+    ${bkPlace(a) ? `${esc(bkPlace(a))}<br>` : ""}
     <div class="popup-links">
       <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${icon("external-link")}Bekijken</a>
       ${a.lat != null ? routeLink(a.lat, a.lon) : ""}
@@ -1312,7 +1331,7 @@ function bkListItem(a) {
   const meta = document.createElement("span");
   meta.className = "meta";
   const dl = bkDeadline(a);
-  meta.textContent = [kind, a.label || (a.distance_m == null ? `hele gemeente ${a.gemeente}` : ""),
+  meta.textContent = [kind, bkPlace(a),
     fmtDay(a.date), dl].filter(Boolean).join(" · ");
   const link = document.createElement("a");
   link.href = a.url;
@@ -1338,7 +1357,7 @@ function bkListItem(a) {
 }
 
 function bkItems() {
-  return state.bk.items.filter(bkVisible);
+  return state.bk.items.filter(bkVisible).sort(BK_SORT[state.bk.sort] || BK_SORT.relevant);
 }
 
 function renderLocal() {
@@ -1366,8 +1385,11 @@ function renderLocal() {
   $("bk-more").hidden = shown.length >= items.length;
   $("bk-more").textContent = `Alle ${items.length} tonen`;
   const emptyBk = $("empty-bk");
+  const hidden = state.bk.items.length - items.length;
   emptyBk.textContent = noLoc ? "Nog geen locatie bekend."
-    : state.nw.loading ? "Laden…" : "Geen bekendmakingen in de afgelopen 30 dagen.";
+    : state.nw.loading ? "Laden…"
+      : hidden ? `Niets met deze filters. ${hidden} andere bekendmaking${hidden === 1 ? "" : "en"} verborgen.`
+        : "Geen bekendmakingen in de afgelopen 30 dagen.";
   emptyBk.hidden = items.length > 0;
   renderBkLayer();
   renderOverview();
@@ -1404,15 +1426,31 @@ function initLocal() {
     $("bk-show").checked = state.bk.show;
     $("bk-show").addEventListener("change", (e) => setLayer("announcements", e.target.checked));
   }
-  const saved = store.get("bkCats");
+  const saved = store.get("bkCats2");
   if (saved != null) state.bk.cats = new Set(saved.split(",").filter(Boolean));
+  state.bk.important = store.get("bkImportant") !== "0";
+  state.bk.sort = store.get("bkSort") || "relevant";
   document.querySelectorAll("[data-bk]").forEach((el) => {
-    el.checked = state.bk.cats.has(el.dataset.bk);
+    const cats = el.dataset.bk.split(",");
+    el.checked = cats.every((c) => state.bk.cats.has(c));
     el.addEventListener("change", () => {
-      el.checked ? state.bk.cats.add(el.dataset.bk) : state.bk.cats.delete(el.dataset.bk);
-      store.set("bkCats", [...state.bk.cats].join(","));
+      cats.forEach((c) => (el.checked ? state.bk.cats.add(c) : state.bk.cats.delete(c)));
+      store.set("bkCats2", [...state.bk.cats].join(","));
+      state.bk.showAll = false;
       renderLocal();
     });
+  });
+  $("bk-important").checked = state.bk.important;
+  $("bk-important").addEventListener("change", (e) => {
+    state.bk.important = e.target.checked;
+    store.set("bkImportant", state.bk.important ? "1" : "0");
+    renderLocal();
+  });
+  $("bk-sort").value = state.bk.sort;
+  $("bk-sort").addEventListener("change", (e) => {
+    state.bk.sort = e.target.value;
+    store.set("bkSort", state.bk.sort);
+    renderLocal();
   });
   $("nw-more").addEventListener("click", () => { state.nw.showAll = true; renderLocal(); });
   $("bk-more").addEventListener("click", () => { state.bk.showAll = true; renderLocal(); });
@@ -1589,10 +1627,10 @@ function renderOverview() {
   const lc = state.config.local;
   if (lc.news || lc.announcements) {
     const nws = state.nw.items;
-    const bks = bkItems();
+    const bks = bkItems().sort(BK_SORT.relevant);
     const parts = [];
     if (lc.news) parts.push(`${nws.length || "Geen"} bericht${nws.length === 1 ? "" : "en"} uit de buurt`);
-    if (lc.announcements) parts.push(`${bks.length} bekendmaking${bks.length === 1 ? "" : "en"} binnen ${fmtDistance(lc.radius_m)}`);
+    if (lc.announcements) parts.push(`${bks.length} ${state.bk.important ? "belangrijke " : ""}bekendmaking${bks.length === 1 ? "" : "en"} binnen ${fmtDistance(lc.radius_m)}`);
     const show = [...nws.slice(0, 2).map(nwListItem), ...bks.slice(0, nws.length ? 1 : 2).map(bkListItem)];
     topical.push(card("nieuws", "Nieuws & bekendmakingen", state.nw.loading ? "Laden…" : parts.join(" · "), show));
   }
