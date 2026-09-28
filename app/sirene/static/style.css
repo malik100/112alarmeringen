@@ -141,6 +141,38 @@ html, body {
 .panel-body { overflow-y: auto; overflow-x: hidden; padding: 12px 16px 16px; }
 
 .actions { display: flex; gap: 8px; margin-bottom: 12px; }
+
+/* --- tabbladen --- */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.tabs button {
+  flex: 0 0 auto;
+  font: inherit; font-size: 13px;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+  cursor: pointer; white-space: nowrap;
+}
+.tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
+.tabs button[hidden] { display: none; }
+
+/* --- overzicht --- */
+.card {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px 4px; margin-bottom: 10px;
+}
+.card.urgent { border-color: var(--brandweer); box-shadow: 0 0 0 1px var(--brandweer) inset; }
+.card h2 { margin: 0; text-transform: none; letter-spacing: 0; font-size: 14px; }
+.card-link {
+  border: 0; background: none; padding: 0; font: inherit; font-weight: 700;
+  color: var(--fg); cursor: pointer;
+}
+.card-link:hover, .card-link:focus-visible { text-decoration: underline; }
+.card-sum { margin: 2px 0 4px; font-size: 13px; color: var(--fg-muted); }
+.card .list .item { padding: 6px 4px; }
+
+/* --- samenvatting in de kop van het paneel --- */
+#summary { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sum-part { white-space: nowrap; }
+.sum-part.urgent { color: var(--brandweer); }
 .btn {
   flex: 1;
   border: 1px solid var(--border);
@@ -340,3 +372,5 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
   .status .pill { font-size: 11px; }
   .leaflet-bottom { bottom: 64px; }
 }
+.ch-profile-select { display: flex; width: 100%; margin-bottom: 6px; }
+.ch-profile-select select { flex: 1; width: 100%; }

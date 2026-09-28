@@ -23,8 +23,11 @@ const state = {
   camKinds: new Set(["flitser", "roodlicht", "traject"]),
   onlySirene: false,
   alerted: new Set(),
+  tab: "overzicht",
+  showIncidents: true,
+  showCams: true,
   sg: { points: [], near: [], show: true, onlyOpen: false, nearFrom: null },
-  pk: { zones: [], here: [], kinds: new Set(["betaald", "blauw", "garage"]), hereFrom: null },
+  pk: { show: true, zones: [], here: [], kinds: new Set(["betaald", "blauw", "garage"]), hereFrom: null },
   ch: { show: false, profile: "snel", custom: null, stations: [], near: [], statusTs: null, nearFrom: null },
 };
 
@@ -150,6 +153,7 @@ function renderIncidents() {
   const reopen = openPopupId(markers);
   incidentLayer.clearLayers();
   markers.clear();
+  if (!state.showIncidents) return;
   // Oudste eerst tekenen, zodat nieuwe incidenten bovenop liggen.
   const list = [...state.incidents.values()]
     .filter((i) => i.lat != null && isVisible(i))
@@ -185,7 +189,7 @@ function camPopup(cam) {
 
 function renderCams() {
   camLayer.clearLayers();
-  if (map.getZoom() < CAM_MIN_ZOOM) return;
+  if (!state.showCams || map.getZoom() < CAM_MIN_ZOOM) return;
   const bounds = map.getBounds().pad(0.2);
   for (const cam of state.cams) {
     if (!state.camKinds.has(cam.kind)) continue;
@@ -260,6 +264,7 @@ function listItem(inc, dist) {
   li.append(bar, what, distEl, meta);
   const open = () => {
     if (inc.lat == null) return;
+    setLayer("incidents", true);
     map.setView([inc.lat, inc.lon], Math.max(map.getZoom(), 15));
     markers.get(inc.id)?.openPopup();
     if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
@@ -290,10 +295,7 @@ function renderList() {
   $("list-view").replaceChildren(...inView.map((x) => listItem(x.inc, x.d)));
   $("empty-view").hidden = inView.length > 0;
 
-  const sirenesNear = near.filter((x) => x.inc.sirene).length;
-  $("summary").textContent = state.location
-    ? `${sirenesNear} met sirene · ${near.length} totaal binnen ${fmtDistance(radius)}`
-    : `${visible.length} incidenten · locatie nog onbekend`;
+  renderOverview();
 }
 
 function renderStatus(live) {
@@ -437,6 +439,7 @@ function sgListItem(point, st, dist) {
   const open = () => {
     // De marker bestaat mogelijk pas na het laden van dit kaartgebied.
     sgPendingPopup = point.id;
+    setLayer("statiegeld", true);
     map.setView([point.lat, point.lon], Math.max(map.getZoom(), state.config.statiegeld.min_zoom, 16));
     if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
   };
@@ -447,8 +450,7 @@ function sgListItem(point, st, dist) {
 
 function renderSgList() {
   const cfg = state.config.statiegeld;
-  $("sg-section").hidden = !cfg.enabled || !state.sg.show;
-  if ($("sg-section").hidden) return;
+  if (!cfg.enabled) return;
   $("sg-title").textContent = `Statiegeld binnen ${fmtDistance(cfg.list_radius_m)}`;
   const empty = $("empty-sg");
   if (!state.location) {
@@ -465,6 +467,7 @@ function renderSgList() {
   $("list-sg").replaceChildren(...items.map((x) => sgListItem(x.p, x.st, x.d)));
   empty.textContent = state.sg.onlyOpen ? "Geen open inleverpunt in de buurt." : "Geen inleverpunten in de buurt.";
   empty.hidden = items.length > 0;
+  renderOverview();
 }
 
 function bboxAround(lat, lon, radiusM) {
@@ -502,7 +505,7 @@ function scheduleSgViewport() {
 async function loadSgNear(force) {
   const cfg = state.config.statiegeld;
   const loc = state.location;
-  if (!cfg.enabled || !state.sg.show || !loc) return renderSgList();
+  if (!cfg.enabled || !loc) return renderSgList();
   const from = state.sg.nearFrom;
   // Pas opnieuw ophalen als je een flink stuk bent verplaatst.
   if (!force && from && haversine(from.lat, from.lon, loc.lat, loc.lon) < cfg.list_radius_m / 4) {
@@ -516,17 +519,13 @@ async function loadSgNear(force) {
 
 function initStatiegeld() {
   if (!state.config.statiegeld.enabled) return;
-  $("sg-controls").hidden = false;
-  state.sg.show = store.get("sgShow") !== "0";
+  document.querySelector('[data-tab="statiegeld"]').hidden = false;
+  $("sg-show-chip").hidden = false;
+  state.sg.show = store.get("sgShow") === "1";
   state.sg.onlyOpen = store.get("sgOnlyOpen") === "1";
   $("sg-show").checked = state.sg.show;
   $("sg-open").checked = state.sg.onlyOpen;
-  $("sg-show").addEventListener("change", (e) => {
-    state.sg.show = e.target.checked;
-    store.set("sgShow", state.sg.show ? "1" : "0");
-    scheduleSgViewport();
-    loadSgNear(true).catch(console.error);
-  });
+  $("sg-show").addEventListener("change", (e) => setLayer("statiegeld", e.target.checked));
   $("sg-open").addEventListener("change", (e) => {
     state.sg.onlyOpen = e.target.checked;
     store.set("sgOnlyOpen", state.sg.onlyOpen ? "1" : "0");
@@ -582,7 +581,7 @@ function renderParking() {
   for (const [id, shape] of pkShapes) if (shape.isPopupOpen()) reopen = reopen ?? id;
   pkLayer.clearLayers();
   pkShapes.clear();
-  if (map.getZoom() < state.config.parking.min_zoom) return;
+  if (!state.pk.show || map.getZoom() < state.config.parking.min_zoom) return;
   // Grote vlakken eerst, zodat kleinere (bijv. garages) erbovenop klikbaar blijven.
   const area = (z) => (z.bbox[2] - z.bbox[0]) * (z.bbox[3] - z.bbox[1]);
   const zones = state.pk.zones.filter((z) => state.pk.kinds.has(z.kind)).sort((a, b) => area(b) - area(a));
@@ -627,7 +626,6 @@ function renderParking() {
 
 function renderParkingHere() {
   const cfg = state.config.parking;
-  $("pk-section").hidden = !cfg.enabled;
   if (!cfg.enabled) return;
   const empty = $("empty-pk");
   if (!state.location) {
@@ -638,43 +636,47 @@ function renderParkingHere() {
   }
   const order = { betaald: 0, blauw: 1, garage: 2, vergunning: 3 };
   const zones = [...state.pk.here].sort((a, b) => order[a.kind] - order[b.kind]);
-  $("list-pk").replaceChildren(...zones.map((zone) => {
-    const st = Parking.status(zone);
-    const li = document.createElement("li");
-    li.className = "item parking";
-    li.style.setProperty("--c", pkColor(st));
-    li.tabIndex = 0;
-    const bar = document.createElement("span");
-    bar.className = "bar";
-    const what = document.createElement("span");
-    what.className = "what";
-    what.textContent = zone.name;
-    const kind = document.createElement("span");
-    kind.className = "dist";
-    kind.textContent = Parking.KIND_LABEL[zone.kind].split(" ")[0];
-    const meta = document.createElement("span");
-    meta.className = "meta";
-    const status = document.createElement("span");
-    status.className = "pk-status";
-    status.textContent = st.text;
-    meta.append(status, ` · ${zone.manager}`);
-    li.append(bar, what, kind, meta);
-    const open = () => {
-      pkPendingPopup = zone.id;
-      state.pk.kinds.add(zone.kind);
-      document.querySelectorAll("[data-pk]").forEach((el) => {
-        if (el.dataset.pk.split(",").includes(zone.kind)) el.checked = true;
-      });
-      map.setView([state.location.lat, state.location.lon], Math.max(map.getZoom(), state.config.parking.min_zoom, 16));
-      scheduleParkingViewport();
-      if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
-    };
-    li.addEventListener("click", open);
-    li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
-    return li;
-  }));
+  $("list-pk").replaceChildren(...zones.map(pkListItem));
   empty.textContent = "Geen parkeerregeling bekend op deze plek (of vrij parkeren).";
   empty.hidden = zones.length > 0;
+  renderOverview();
+}
+
+function pkListItem(zone) {
+  const st = Parking.status(zone);
+  const li = document.createElement("li");
+  li.className = "item parking";
+  li.style.setProperty("--c", pkColor(st));
+  li.tabIndex = 0;
+  const bar = document.createElement("span");
+  bar.className = "bar";
+  const what = document.createElement("span");
+  what.className = "what";
+  what.textContent = zone.name;
+  const kind = document.createElement("span");
+  kind.className = "dist";
+  kind.textContent = Parking.KIND_LABEL[zone.kind].split(" ")[0];
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  const status = document.createElement("span");
+  status.className = "pk-status";
+  status.textContent = st.text;
+  meta.append(status, ` · ${zone.manager}`);
+  li.append(bar, what, kind, meta);
+  const open = () => {
+    pkPendingPopup = zone.id;
+    state.pk.kinds.add(zone.kind);
+    document.querySelectorAll("[data-pk]").forEach((el) => {
+      if (el.dataset.pk.split(",").includes(zone.kind)) el.checked = true;
+    });
+    setLayer("parking", true);
+    map.setView([state.location.lat, state.location.lon], Math.max(map.getZoom(), state.config.parking.min_zoom, 16));
+    scheduleParkingViewport();
+    if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
+  };
+  li.addEventListener("click", open);
+  li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  return li;
 }
 
 let pkSeq = 0;
@@ -683,7 +685,7 @@ function scheduleParkingViewport() {
   clearTimeout(pkTimer);
   pkTimer = setTimeout(async () => {
     const cfg = state.config.parking;
-    if (!cfg.enabled || !state.pk.kinds.size || map.getZoom() < cfg.min_zoom) {
+    if (!cfg.enabled || !state.pk.show || !state.pk.kinds.size || map.getZoom() < cfg.min_zoom) {
       state.pk.zones = [];
       renderParking();
       return;
@@ -712,7 +714,11 @@ async function loadParkingHere(force) {
 
 function initParking() {
   if (!state.config.parking.enabled) return;
-  $("pk-controls").hidden = false;
+  document.querySelector('[data-tab="parkeren"]').hidden = false;
+  $("pk-show-chip").hidden = false;
+  state.pk.show = store.get("pkShow") !== "0";
+  $("pk-show").checked = state.pk.show;
+  $("pk-show").addEventListener("change", (e) => setLayer("parking", e.target.checked));
   const saved = store.get("pkKinds");
   if (saved != null) state.pk.kinds = new Set(saved.split(",").filter(Boolean));
   document.querySelectorAll("[data-pk]").forEach((el) => {
@@ -813,8 +819,7 @@ function renderChargingLayer() {
 
 function renderChargingList() {
   const cfg = state.config.charging;
-  $("ch-section").hidden = !cfg.enabled || !state.ch.show;
-  if ($("ch-section").hidden) return;
+  if (!cfg.enabled) return;
   $("ch-title").textContent = `Laden binnen ${fmtDistance(cfg.list_radius_m)} · ${chProfile().label}`;
   const empty = $("empty-ch");
   if (!state.location) {
@@ -823,40 +828,44 @@ function renderChargingList() {
     empty.hidden = false;
     return;
   }
-  $("list-ch").replaceChildren(...state.ch.near.map((station) => {
-    const av = Charging.availability(station);
-    const li = document.createElement("li");
-    li.className = "item charging";
-    li.style.setProperty("--c", CH_COLORS[av.state]);
-    li.tabIndex = 0;
-    const bar = document.createElement("span");
-    bar.className = "bar";
-    const what = document.createElement("span");
-    what.className = "what";
-    what.textContent = Charging.displayName(station);
-    const dist = document.createElement("span");
-    dist.className = "dist";
-    dist.textContent = fmtDistance(station.distance_m);
-    const meta = document.createElement("span");
-    meta.className = "meta";
-    const status = document.createElement("span");
-    status.className = "ch-status";
-    status.textContent = av.text;
-    meta.append(status, ` · ${Charging.summary(station)}`);
-    for (const w of Charging.warnings(station, chProfile()).slice(0, 1)) meta.append(` · ⚠ ${w}`);
-    li.append(bar, what, dist, meta);
-    const open = () => {
-      chPendingPopup = station.id;
-      map.setView([station.lat, station.lon], Math.max(map.getZoom(), state.config.charging.min_zoom, 16));
-      scheduleChargingViewport();
-      if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
-    };
-    li.addEventListener("click", open);
-    li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
-    return li;
-  }));
+  $("list-ch").replaceChildren(...state.ch.near.map(chListItem));
   empty.textContent = "Geen laadpunten die bij dit profiel passen. Probeer een ander profiel of minder filters.";
   empty.hidden = state.ch.near.length > 0;
+  renderOverview();
+}
+
+function chListItem(station) {
+  const av = Charging.availability(station);
+  const li = document.createElement("li");
+  li.className = "item charging";
+  li.style.setProperty("--c", CH_COLORS[av.state]);
+  li.tabIndex = 0;
+  const bar = document.createElement("span");
+  bar.className = "bar";
+  const what = document.createElement("span");
+  what.className = "what";
+  what.textContent = Charging.displayName(station);
+  const dist = document.createElement("span");
+  dist.className = "dist";
+  dist.textContent = fmtDistance(station.distance_m);
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  const status = document.createElement("span");
+  status.className = "ch-status";
+  status.textContent = av.text;
+  meta.append(status, ` · ${Charging.summary(station)}`);
+  for (const w of Charging.warnings(station, chProfile()).slice(0, 1)) meta.append(` · ⚠ ${w}`);
+  li.append(bar, what, dist, meta);
+  const open = () => {
+    chPendingPopup = station.id;
+    setLayer("charging", true);
+    map.setView([station.lat, station.lon], Math.max(map.getZoom(), state.config.charging.min_zoom, 16));
+    scheduleChargingViewport();
+    if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
+  };
+  li.addEventListener("click", open);
+  li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  return li;
 }
 
 let chSeq = 0;
@@ -886,7 +895,7 @@ function scheduleChargingViewport() {
 async function loadChargingNear(force) {
   const cfg = state.config.charging;
   const loc = state.location;
-  if (!cfg.enabled || !state.ch.show || !loc) return renderChargingList();
+  if (!cfg.enabled || !loc) return renderChargingList();
   const from = state.ch.nearFrom;
   if (!force && from && haversine(from.lat, from.lon, loc.lat, loc.lon) < cfg.list_radius_m / 6) {
     return renderChargingList();
@@ -923,7 +932,8 @@ function chReadFilters() {
 
 function initCharging() {
   if (!state.config.charging.enabled) return;
-  $("ch-controls").hidden = false;
+  document.querySelector('[data-tab="laden"]').hidden = false;
+  $("ch-show-chip").hidden = false;
   state.ch.show = store.get("chShow") === "1";
   state.ch.profile = store.get("chProfile") || "snel";
   try { state.ch.custom = JSON.parse(store.get("chCustom") || "null"); } catch { state.ch.custom = null; }
@@ -933,11 +943,7 @@ function initCharging() {
   $("ch-show").checked = state.ch.show;
   chShowFilters();
 
-  $("ch-show").addEventListener("change", (e) => {
-    state.ch.show = e.target.checked;
-    store.set("chShow", state.ch.show ? "1" : "0");
-    chReload();
-  });
+  $("ch-show").addEventListener("change", (e) => setLayer("charging", e.target.checked));
   select.addEventListener("change", () => {
     state.ch.profile = select.value;
     store.set("chProfile", state.ch.profile);
@@ -955,6 +961,179 @@ function initCharging() {
     chReload();
   }));
   chReload();
+}
+
+// ---------- overzicht ----------
+
+/** Zet een kaartlaag aan of uit (en onthoud dat per apparaat). */
+function setLayer(layer, on) {
+  const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show",
+    charging: "ch-show", statiegeld: "sg-show" }[layer];
+  if ($(el)) $(el).checked = on;
+  if (layer === "incidents") { state.showIncidents = on; store.set("showIncidents", on ? "1" : "0"); renderIncidents(); }
+  if (layer === "cams") { state.showCams = on; store.set("showCams", on ? "1" : "0"); $("cam-layers").hidden = !on; renderCams(); }
+  if (layer === "parking") { state.pk.show = on; store.set("pkShow", on ? "1" : "0"); scheduleParkingViewport(); }
+  if (layer === "charging") { state.ch.show = on; store.set("chShow", on ? "1" : "0"); scheduleChargingViewport(); }
+  if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
+}
+
+function setTab(tab) {
+  const btn = document.querySelector(`[data-tab="${tab}"]`);
+  if (!btn || btn.hidden) tab = "overzicht";
+  state.tab = tab;
+  store.set("tab", tab);
+  document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+  document.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+  // Wie een onderwerp opent, wil het meestal ook op de kaart zien.
+  const layer = { 112: "incidents", parkeren: "parking", laden: "charging", statiegeld: "statiegeld" }[tab];
+  if (layer) setLayer(layer, true);
+  $("panel-body").scrollTop = 0;
+}
+
+function incidentsNear() {
+  if (!state.location) return [];
+  return [...state.incidents.values()].filter(isVisible)
+    .map((inc) => ({ inc, d: distanceTo(inc) }))
+    .filter((x) => x.d != null && x.d <= state.config.radius_m)
+    .sort((a, b) => a.d - b.d);
+}
+
+function sgNearItems() {
+  if (!state.location) return [];
+  return state.sg.near
+    .map((p) => ({ p, st: sgStatus(p), d: haversine(state.location.lat, state.location.lon, p.lat, p.lon) }))
+    .filter((x) => x.d <= state.config.statiegeld.list_radius_m)
+    .sort((a, b) => a.d - b.d);
+}
+
+function card(tab, title, summary, items, tone) {
+  const sec = document.createElement("section");
+  sec.className = `card${tone ? ` ${tone}` : ""}`;
+  const h = document.createElement("h2");
+  const link = document.createElement("button");
+  link.className = "card-link";
+  link.textContent = `${title} ›`;
+  link.addEventListener("click", () => setTab(tab));
+  h.append(link);
+  const p = document.createElement("p");
+  p.className = "card-sum";
+  p.textContent = summary;
+  const ol = document.createElement("ol");
+  ol.className = "list";
+  ol.append(...items);
+  sec.append(h, p, ol);
+  return sec;
+}
+
+/** Samenvatting per onderwerp, als losse stukjes tekst. */
+function summaryParts() {
+  const parts = [];
+  const near = incidentsNear();
+  const sirenes = near.filter((x) => x.inc.sirene && Date.now() / 1000 - x.inc.ts < OLD_INCIDENT_S).length;
+  parts.push({ text: sirenes ? `🚨 ${sirenes} sirene${sirenes > 1 ? "s" : ""} dichtbij` : `🚨 ${near.length}`,
+    alert: sirenes > 0, title: "112-meldingen binnen je straal" });
+  if (state.config.parking.enabled && state.location) {
+    const zone = state.pk.here.find((z) => z.kind === "betaald" || z.kind === "blauw");
+    const st = zone && Parking.status(zone);
+    const text = !st ? "🅿 vrij" : st.state === "paid" && st.rate != null
+      ? `🅿 ${fmtEur(st.rate)}/u` : st.state === "disc" ? "🅿 schijf" : st.state === "free" ? "🅿 gratis" : "🅿 ?";
+    parts.push({ text, title: "Parkeren op jouw plek" });
+  }
+  if (state.config.charging.enabled && state.location) {
+    const free = state.ch.near.filter((s) => Charging.availability(s).state === "free").length;
+    parts.push({ text: `⚡ ${free} vrij`, title: `Laadpunten in de buurt (${chProfile().label})` });
+  }
+  if (state.config.statiegeld.enabled && state.location) {
+    const open = sgNearItems().filter((x) => x.st.state === "open").length;
+    parts.push({ text: `♻ ${open} open`, title: "Statiegeldpunten die nu open zijn" });
+  }
+  return parts;
+}
+
+function fmtEur(v) {
+  return `€${v.toFixed(2).replace(".", ",")}`;
+}
+
+function renderSummary() {
+  const el = $("summary");
+  if (!state.location) {
+    el.textContent = "Buurtoverzicht · locatie nog onbekend";
+    return;
+  }
+  el.replaceChildren(...summaryParts().map((p) => {
+    const span = document.createElement("span");
+    span.className = `sum-part${p.alert ? " urgent" : ""}`;
+    span.textContent = p.text;
+    span.title = p.title;
+    return span;
+  }));
+}
+
+function renderOverview() {
+  if (!state.config) return;
+  renderSummary();
+  const cards = [];
+  if (!state.location) {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "Deel je locatie (knop hierboven) of stel een vaste locatie in, dan zie je hier wat er in je buurt speelt.";
+    $("ov-cards").replaceChildren(p);
+    return;
+  }
+  const radius = fmtDistance(state.config.radius_m);
+
+  // 112: bovenaan bij een recente sirene dichtbij, anders onderaan.
+  const near = incidentsNear();
+  const recentSirene = near.some((x) => x.inc.sirene && Date.now() / 1000 - x.inc.ts < OLD_INCIDENT_S);
+  const inc112 = card("112", "🚨 112-meldingen",
+    near.length
+      ? `${near.length} melding${near.length > 1 ? "en" : ""} binnen ${radius} (${fmtWindow(state.windowMin)})`
+      : `Rustig: geen meldingen binnen ${radius} (${fmtWindow(state.windowMin)}).`,
+    near.slice(0, 2).map((x) => listItem(x.inc, x.d)), recentSirene ? "urgent" : "");
+
+  const topical = [];
+  if (state.config.parking.enabled) {
+    const zones = state.pk.here.filter((z) => z.kind !== "vergunning");
+    const permit = state.pk.here.some((z) => z.kind === "vergunning");
+    const first = zones[0] && Parking.status(zones[0]);
+    topical.push(card("parkeren", "🅿 Parkeren hier",
+      first ? first.text : permit ? "Alleen vergunninghouders op deze plek." : "Geen parkeerregeling bekend: meestal vrij parkeren.",
+      zones.slice(0, 1).map(pkListItem)));
+  }
+  if (state.config.charging.enabled) {
+    const free = state.ch.near.filter((s) => Charging.availability(s).state === "free").length;
+    topical.push(card("laden", "⚡ Laden",
+      state.ch.near.length
+        ? `${free} van ${state.ch.near.length} dichtstbijzijnde vrij · ${chProfile().label}`
+        : `Niets gevonden binnen ${fmtDistance(state.config.charging.list_radius_m)} · ${chProfile().label}`,
+      state.ch.near.slice(0, 2).map(chListItem)));
+  }
+  if (state.config.statiegeld.enabled) {
+    const items = sgNearItems();
+    const open = items.filter((x) => x.st.state === "open");
+    const show = (open.length ? open : items).slice(0, 2);
+    topical.push(card("statiegeld", "♻ Statiegeld",
+      items.length ? `${open.length} van ${items.length} punten binnen ${fmtDistance(state.config.statiegeld.list_radius_m)} nu open`
+        : "Geen inleverpunten in de buurt.",
+      show.map((x) => sgListItem(x.p, x.st, x.d))));
+  }
+  cards.push(...(recentSirene ? [inc112, ...topical] : [...topical, inc112]));
+  $("ov-cards").replaceChildren(...cards);
+}
+
+function fmtWindow(min) {
+  return min < 60 ? `${min} min` : `${min / 60} uur`;
+}
+
+function initOverview() {
+  state.showIncidents = store.get("showIncidents") !== "0";
+  state.showCams = store.get("showCams") !== "0";
+  $("layer-incidents").checked = state.showIncidents;
+  $("layer-cams").checked = state.showCams;
+  $("cam-layers").hidden = !state.showCams;
+  $("layer-incidents").addEventListener("change", (e) => setLayer("incidents", e.target.checked));
+  $("layer-cams").addEventListener("change", (e) => setLayer("cams", e.target.checked));
+  document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
 }
 
 // ---------- data ----------
@@ -1055,11 +1234,13 @@ async function init() {
   const [loc] = await Promise.all([api("/api/location"), loadIncidents()]);
   state.location = loc;
   if (loc) map.setView([loc.lat, loc.lon], 14);
+  initOverview();
   renderAll();
   loadCams().catch(console.error);
   initStatiegeld();
   initParking();
   initCharging();
+  setTab(store.get("tab") || "overzicht");
   connectEvents();
 
   if (state.config.browser_location) {

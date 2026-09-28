@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div id="map" aria-label="Kaart met incidenten en flitsers"></div>
+  <div id="map" aria-label="Kaart van je buurt"></div>
 
   <header class="topbar">
     <div class="brand">
@@ -38,45 +38,101 @@
         <button id="btn-center" class="btn">Centreer op mij</button>
       </div>
 
-      <fieldset class="filters">
-        <legend>Tonen</legend>
-        <div class="chips">
-          <label class="chip brandweer"><input type="checkbox" data-disc="brandweer" checked> Brandweer</label>
-          <label class="chip ambulance"><input type="checkbox" data-disc="ambulance" checked> Ambulance</label>
-          <label class="chip politie"><input type="checkbox" data-disc="politie" checked> Politie</label>
-          <label class="chip onbekend"><input type="checkbox" data-disc="onbekend" checked> Overig</label>
-        </div>
-        <div class="row">
-          <label class="switch"><input type="checkbox" id="only-sirene"> Alleen met sirene</label>
-          <label class="select">
-            Periode
-            <select id="window">
-              <option value="30">30 min</option>
-              <option value="60">1 uur</option>
-              <option value="120">2 uur</option>
-              <option value="360">6 uur</option>
-              <option value="1440">24 uur</option>
-            </select>
-          </label>
-        </div>
-        <div class="chips" id="cam-layers">
-          <label class="chip cam"><input type="checkbox" data-cam="flitser" checked> Flitsers</label>
-          <label class="chip cam"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
-          <label class="chip cam"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
-        </div>
-        <div class="chips" id="sg-controls" hidden>
-          <label class="chip statiegeld" title="Inleverpunten van Statiegeld Nederland (zichtbaar vanaf ingezoomd niveau)">
-            <input type="checkbox" id="sg-show" checked> ♻ Statiegeld</label>
-          <label class="chip statiegeld"><input type="checkbox" id="sg-open"> Alleen nu open</label>
-        </div>
-        <div id="ch-controls" hidden>
+      <nav class="tabs" role="tablist" aria-label="Onderwerpen">
+        <button role="tab" data-tab="overzicht">Overzicht</button>
+        <button role="tab" data-tab="112">🚨 112</button>
+        <button role="tab" data-tab="parkeren" hidden>🅿 Parkeren</button>
+        <button role="tab" data-tab="laden" hidden>⚡ Laden</button>
+        <button role="tab" data-tab="statiegeld" hidden>♻ Statiegeld</button>
+      </nav>
+
+      <!-- Overzicht: per onderwerp het belangrijkste op jouw plek -->
+      <div data-panel="overzicht" role="tabpanel">
+        <div id="ov-cards"></div>
+        <fieldset class="filters">
+          <legend>Op de kaart</legend>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" id="layer-incidents"> 🚨 Meldingen</label>
+            <label class="chip"><input type="checkbox" id="layer-cams"> 📷 Flitsers</label>
+            <label class="chip parking" id="pk-show-chip" hidden><input type="checkbox" id="pk-show"> 🅿 Parkeren</label>
+            <label class="chip charging" id="ch-show-chip" hidden><input type="checkbox" id="ch-show"> ⚡ Laadpalen</label>
+            <label class="chip statiegeld" id="sg-show-chip" hidden><input type="checkbox" id="sg-show"> ♻ Statiegeld</label>
+          </div>
+          <div class="chips" id="cam-layers">
+            <label class="chip cam"><input type="checkbox" data-cam="flitser" checked> Flitsers</label>
+            <label class="chip cam"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
+            <label class="chip cam"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
+          </div>
+        </fieldset>
+      </div>
+
+      <!-- 112-meldingen -->
+      <div data-panel="112" role="tabpanel" hidden>
+        <fieldset class="filters">
+          <legend>Meldingen</legend>
+          <div class="chips">
+            <label class="chip brandweer"><input type="checkbox" data-disc="brandweer" checked> Brandweer</label>
+            <label class="chip ambulance"><input type="checkbox" data-disc="ambulance" checked> Ambulance</label>
+            <label class="chip politie"><input type="checkbox" data-disc="politie" checked> Politie</label>
+            <label class="chip onbekend"><input type="checkbox" data-disc="onbekend" checked> Overig</label>
+          </div>
           <div class="row">
-            <label class="chip charging"><input type="checkbox" id="ch-show"> ⚡ Laadpalen</label>
+            <label class="switch"><input type="checkbox" id="only-sirene"> Alleen met sirene</label>
             <label class="select">
-              <span class="sr-only">Laadprofiel</span>
-              <select id="ch-profile" aria-label="Laadprofiel"></select>
+              Periode
+              <select id="window">
+                <option value="30">30 min</option>
+                <option value="60">1 uur</option>
+                <option value="120">2 uur</option>
+                <option value="360">6 uur</option>
+                <option value="1440">24 uur</option>
+              </select>
             </label>
           </div>
+        </fieldset>
+        <section>
+          <h2 id="near-title">In de buurt</h2>
+          <ol class="list" id="list-near"></ol>
+          <p class="empty" id="empty-near" hidden>Niets binnen je straal. 👍</p>
+        </section>
+        <section>
+          <h2>In beeld op de kaart</h2>
+          <ol class="list" id="list-view"></ol>
+          <p class="empty" id="empty-view" hidden>Geen meldingen in dit kaartgebied.</p>
+        </section>
+      </div>
+
+      <!-- Parkeren -->
+      <div data-panel="parkeren" role="tabpanel" hidden>
+        <div id="pk-controls">
+          <div class="chips">
+            <label class="chip parking" title="Betaald parkeren en blauwe zones (zichtbaar vanaf ingezoomd niveau)">
+              <input type="checkbox" data-pk="betaald,blauw" checked> Parkeerzones</label>
+            <label class="chip parking"><input type="checkbox" data-pk="garage" checked> Garages &amp; P+R</label>
+            <label class="chip parking"><input type="checkbox" data-pk="vergunning"> Vergunningzones</label>
+          </div>
+          <p class="legend">
+            <span><span class="swatch" style="--c:#16a34a"></span>&lt; €2,50/u</span>
+            <span><span class="swatch" style="--c:#d97706"></span>&lt; €5/u</span>
+            <span><span class="swatch" style="--c:#dc2626"></span>≥ €5/u</span>
+            <span><span class="swatch dashed" style="--c:#16a34a"></span>nu gratis</span>
+            <span><span class="swatch" style="--c:#2563eb"></span>blauwe zone</span>
+          </p>
+        </div>
+        <section id="pk-section">
+          <h2>Parkeren op jouw plek</h2>
+          <ol class="list" id="list-pk"></ol>
+          <p class="empty" id="empty-pk" hidden></p>
+        </section>
+      </div>
+
+      <!-- Laden -->
+      <div data-panel="laden" role="tabpanel" hidden>
+        <div id="ch-controls">
+          <label class="select ch-profile-select">
+            Profiel
+            <select id="ch-profile" aria-label="Laadprofiel"></select>
+          </label>
           <p class="hint" id="ch-hint"></p>
           <details class="ch-filters">
             <summary>Filters aanpassen</summary>
@@ -104,52 +160,24 @@
             </div>
           </details>
         </div>
-        <div id="pk-controls" hidden>
-          <div class="chips">
-            <label class="chip parking" title="Betaald parkeren en blauwe zones (zichtbaar vanaf ingezoomd niveau)">
-              <input type="checkbox" data-pk="betaald,blauw" checked> 🅿 Parkeerzones</label>
-            <label class="chip parking"><input type="checkbox" data-pk="garage" checked> Garages &amp; P+R</label>
-            <label class="chip parking"><input type="checkbox" data-pk="vergunning"> Vergunningzones</label>
-          </div>
-          <p class="legend">
-            <span><span class="swatch" style="--c:#16a34a"></span>&lt; €2,50/u</span>
-            <span><span class="swatch" style="--c:#d97706"></span>&lt; €5/u</span>
-            <span><span class="swatch" style="--c:#dc2626"></span>≥ €5/u</span>
-            <span><span class="swatch dashed" style="--c:#16a34a"></span>nu gratis</span>
-            <span><span class="swatch" style="--c:#2563eb"></span>blauwe zone</span>
-          </p>
+        <section id="ch-section">
+          <h2 id="ch-title">Laden in de buurt</h2>
+          <ol class="list" id="list-ch"></ol>
+          <p class="empty" id="empty-ch" hidden></p>
+        </section>
+      </div>
+
+      <!-- Statiegeld -->
+      <div data-panel="statiegeld" role="tabpanel" hidden>
+        <div class="chips">
+          <label class="chip statiegeld"><input type="checkbox" id="sg-open"> Alleen nu open</label>
         </div>
-      </fieldset>
-
-      <section>
-        <h2 id="near-title">In de buurt</h2>
-        <ol class="list" id="list-near"></ol>
-        <p class="empty" id="empty-near" hidden>Niets binnen je straal. 👍</p>
-      </section>
-
-      <section id="ch-section" hidden>
-        <h2 id="ch-title">Laden in de buurt</h2>
-        <ol class="list" id="list-ch"></ol>
-        <p class="empty" id="empty-ch" hidden></p>
-      </section>
-
-      <section id="pk-section" hidden>
-        <h2>Parkeren op jouw plek</h2>
-        <ol class="list" id="list-pk"></ol>
-        <p class="empty" id="empty-pk" hidden></p>
-      </section>
-
-      <section id="sg-section" hidden>
-        <h2 id="sg-title">Statiegeld in de buurt</h2>
-        <ol class="list" id="list-sg"></ol>
-        <p class="empty" id="empty-sg" hidden></p>
-      </section>
-
-      <section>
-        <h2>In beeld op de kaart</h2>
-        <ol class="list" id="list-view"></ol>
-        <p class="empty" id="empty-view" hidden>Geen incidenten in dit kaartgebied.</p>
-      </section>
+        <section id="sg-section">
+          <h2 id="sg-title">Statiegeld in de buurt</h2>
+          <ol class="list" id="list-sg"></ol>
+          <p class="empty" id="empty-sg" hidden></p>
+        </section>
+      </div>
 
       <footer class="credits">
         P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL) · statiegeld via Statiegeld Nederland · parkeren via RDW (NPR) · nieuws via regionale omroepen, NOS, NU.nl en 112-sites · laadpalen via NDW

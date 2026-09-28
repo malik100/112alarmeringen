@@ -4,6 +4,12 @@ Een live kaart van wat er in je buurt gebeurt: 112-meldingen, flitsers, parkeerz
 statiegeld-inleverpunten en het nieuws erbij. Het draait volledig op je eigen server of Raspberry
 Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
+- **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
+  `🚨 0 · 🅿 €8,01/u · ⚡ 5 vrij · ♻ 8 open`. Daaronder tabbladen (Overzicht, 112, Parkeren, Laden,
+  Statiegeld). Het overzicht toont per onderwerp het belangrijkste op jouw plek. Is er een
+  melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
+- **Kaartlagen** zet je los aan en uit (meldingen, flitsers, parkeren, laadpalen, statiegeld).
+  Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
   met sirene (A0/A1/P1) pulseren.
 - **Jouw locatie** met een instelbare straal (standaard 1 km). Wat daarbinnen gebeurt staat
