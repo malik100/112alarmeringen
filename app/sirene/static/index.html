@@ -34,6 +34,7 @@
     <div class="panel-body" id="panel-body">
       <nav class="tabs" role="tablist" aria-label="Onderwerpen">
         <button role="tab" data-tab="overzicht">Overzicht</button>
+        <button role="tab" data-tab="nieuws" hidden>Nieuws</button>
         <button role="tab" data-tab="winkels" hidden>Winkels</button>
         <button role="tab" data-tab="parkeren" hidden>Parkeren</button>
         <button role="tab" data-tab="laden" hidden>Laden</button>
@@ -48,6 +49,7 @@
           <legend>Op de kaart</legend>
           <div class="chips">
             <label class="chip"><input type="checkbox" id="layer-incidents"> 112-meldingen</label>
+            <label class="chip" id="bk-show-chip" hidden><input type="checkbox" id="bk-show"> Bekendmakingen</label>
             <label class="chip" id="sh-show-chip" hidden><input type="checkbox" id="sh-show"> Winkels</label>
             <label class="chip"><input type="checkbox" id="layer-cams"> Flitsers</label>
             <label class="chip" id="pk-show-chip" hidden><input type="checkbox" id="pk-show"> Parkeren</label>
@@ -68,6 +70,29 @@
           </label>
           <p class="hint">Reistijden zijn een schatting op basis van de afstand. <span id="notify-state"></span></p>
         </fieldset>
+      </div>
+
+      <!-- Nieuws en bekendmakingen uit je buurt -->
+      <div data-panel="nieuws" role="tabpanel" hidden>
+        <section id="nw-section">
+          <h2 id="nw-title">Nieuws uit je buurt</h2>
+          <ol class="list" id="list-nw"></ol>
+          <button type="button" class="more-btn" id="nw-more" hidden>Meer tonen</button>
+          <p class="empty" id="empty-nw" hidden></p>
+        </section>
+        <section id="bk-section">
+          <h2 id="bk-title">Bekendmakingen</h2>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" data-bk="bouwen" checked> Bouwen</label>
+            <label class="chip"><input type="checkbox" data-bk="verkeer" checked> Verkeer</label>
+            <label class="chip"><input type="checkbox" data-bk="evenementen" checked> Evenementen</label>
+            <label class="chip"><input type="checkbox" data-bk="vergunning" checked> Vergunningen</label>
+            <label class="chip"><input type="checkbox" data-bk="overig" checked> Overig</label>
+          </div>
+          <ol class="list" id="list-bk"></ol>
+          <button type="button" class="more-btn" id="bk-more" hidden>Meer tonen</button>
+          <p class="empty" id="empty-bk" hidden></p>
+        </section>
       </div>
 
       <!-- 112-meldingen -->
@@ -203,7 +228,7 @@
 
       <footer class="credits">
         Bronnen: alarmeringen.nl (P2000), PDOK, OpenStreetMap-bijdragers, Statiegeld Nederland, RDW,
-        NDW en regionale omroepen. Iconen: Lucide.
+        NDW, overheid.nl (bekendmakingen) en regionale omroepen. Iconen: Lucide.
       </footer>
     </div>
   </aside>

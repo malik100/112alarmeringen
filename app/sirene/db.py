@@ -101,6 +101,16 @@ CREATE TABLE IF NOT EXISTS shops (
 );
 CREATE INDEX IF NOT EXISTS shops_lat_lon ON shops (lat, lon);
 
+CREATE TABLE IF NOT EXISTS announcements (
+    id       TEXT PRIMARY KEY,
+    gemeente TEXT NOT NULL,
+    ts       REAL,
+    lat      REAL,
+    lon      REAL,
+    data     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS announcements_gemeente ON announcements (gemeente, ts);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -168,7 +178,6 @@ class Database:
     def purge_incidents(self, older_than_ts: float) -> int:
         with self.conn:
             cur = self.conn.execute("DELETE FROM incidents WHERE ts < ?", (older_than_ts,))
-            self.conn.execute("DELETE FROM news WHERE ts < ?", (older_than_ts,))
             self.conn.execute(
                 "DELETE FROM incident_news WHERE incident_id NOT IN (SELECT id FROM incidents) "
                 "OR news_guid NOT IN (SELECT guid FROM news)"
@@ -346,6 +355,42 @@ class Database:
 
     def shops_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM shops").fetchone()[0]
+
+    # --- lokaal nieuws ----------------------------------------------------
+
+    def purge_news(self, older_than_ts: float) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM news WHERE ts < ?", (older_than_ts,))
+            self.conn.execute("DELETE FROM incident_news WHERE news_guid NOT IN (SELECT guid FROM news)")
+
+    def news_since(self, since_ts: float) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM news WHERE ts >= ? ORDER BY ts DESC", (since_ts,)).fetchall()
+        return [dict(r) for r in rows]
+
+    # --- bekendmakingen ---------------------------------------------------
+
+    def upsert_announcements(self, items: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO announcements (id, gemeente, ts, lat, lon, data) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [(a["id"], a["gemeente"], a["ts"], a["lat"], a["lon"],
+                  json.dumps(a, ensure_ascii=False)) for a in items],
+            )
+
+    def announcements_for(self, gemeenten: list[str], since_ts: float) -> list[dict[str, Any]]:
+        if not gemeenten:
+            return []
+        marks = ",".join("?" * len(gemeenten))
+        rows = self.conn.execute(
+            f"SELECT data FROM announcements WHERE gemeente IN ({marks}) AND ts >= ? "
+            "ORDER BY ts DESC", (*gemeenten, since_ts)).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def purge_announcements(self, older_than_ts: float) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM announcements WHERE ts < ?", (older_than_ts,))
 
     # --- meta -------------------------------------------------------------
 

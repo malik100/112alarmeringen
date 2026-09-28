@@ -31,6 +31,8 @@ const state = {
   pk: { show: true, zones: [], here: [], kinds: new Set(["betaald", "blauw", "garage"]), hereFrom: null },
   sh: { show: false, points: [], near: [], kinds: new Set(["supermarkt", "buurtwinkel", "markt"]),
         onlyOpen: false, lateOnly: false, nearFrom: null },
+  nw: { items: [], showAll: false, place: null, from: null, loading: false },
+  bk: { show: false, focus: null, items: [], cats: new Set(["bouwen", "verkeer", "evenementen", "vergunning", "overig"]), showAll: false },
   ch: { show: false, profile: "snel", custom: null, stations: [], near: [], statusTs: null, nearFrom: null },
 };
 
@@ -1196,6 +1198,228 @@ function initShops() {
   loadShopsNear(true).catch(console.error);
 }
 
+// ---------- nieuws en bekendmakingen uit de buurt ----------
+
+const BK_ICON = { bouwen: "construction", verkeer: "traffic-cone", evenementen: "party-popper",
+  vergunning: "stamp", overig: "file-text" };
+const BK_LABEL = { bouwen: "Bouwen", verkeer: "Verkeer", evenementen: "Evenement", vergunning: "Vergunning",
+  overig: "Bekendmaking" };
+const BK_PAGE = 15;
+const NW_PAGE = 5;
+const LOCAL_REFRESH_MS = 10 * 60 * 1000;
+const bkLayer = L.layerGroup().addTo(map);
+const bkMarkers = new Map();
+let bkPendingPopup = null;
+
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** "2026-09-28" -> "vandaag", "gisteren" of "28 sep". */
+function fmtDay(iso) {
+  if (!iso) return "";
+  const today = new Date();
+  if (iso === isoDate(today)) return "vandaag";
+  if (iso === isoDate(new Date(today.getTime() - 86400000))) return "gisteren";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+}
+
+/** Kop en soort uit een bekendmaking: "Het bouwen van een dakkapel" + "Aanvraag omgevingsvergunning". */
+function bkParts(a) {
+  const comma = a.title.indexOf(",");
+  const kind = comma > 0 && comma < 60 ? a.title.slice(0, comma) : BK_LABEL[a.category];
+  let head = a.abstract && a.abstract.length > 8 ? a.abstract : (comma > 0 && comma < 60 ? a.title.slice(comma + 1) : a.title);
+  head = head.trim();
+  return { kind, head: head.charAt(0).toUpperCase() + head.slice(1) };
+}
+
+function bkDeadline(a) {
+  return a.deadline && a.deadline >= isoDate(new Date()) ? `reageren t/m ${fmtDay(a.deadline)}` : "";
+}
+
+function bkVisible(a) {
+  return state.bk.cats.has(a.category);
+}
+
+function bkPopup(a) {
+  const { kind, head } = bkParts(a);
+  const dl = bkDeadline(a);
+  return `
+    <b>${esc(head)}</b><br>
+    <small>${esc(kind)} · ${esc(fmtDay(a.date))}${dl ? ` · ${esc(dl)}` : ""}</small><br>
+    ${a.label ? `${esc(a.label)}<br>` : ""}
+    <div class="popup-links">
+      <a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${icon("external-link")}Bekijken</a>
+      ${a.lat != null ? routeLink(a.lat, a.lon) : ""}
+    </div>`;
+}
+
+function bkIcon(a) {
+  return L.divIcon({
+    className: "bk-marker",
+    html: `<div class="bk-sign ${a.category}">${icon(BK_ICON[a.category] || "file-text")}</div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+function renderBkLayer() {
+  const reopen = bkPendingPopup ?? openPopupId(bkMarkers);
+  bkLayer.clearLayers();
+  bkMarkers.clear();
+  for (const a of state.bk.items) {
+    // Standaard alleen de bekendmaking die je aantikte; de hele laag is optioneel.
+    if (a.lat == null || !(state.bk.show ? bkVisible(a) : a.id === state.bk.focus)) continue;
+    const marker = L.marker([a.lat, a.lon], { icon: bkIcon(a), keyboard: false, zIndexOffset: -400 })
+      .bindPopup(() => bkPopup(a), { maxWidth: 280 });
+    marker.addTo(bkLayer);
+    bkMarkers.set(a.id, marker);
+  }
+  if (reopen != null && bkMarkers.has(reopen)) {
+    bkMarkers.get(reopen).openPopup();
+    bkPendingPopup = null;
+  }
+}
+
+function nwListItem(n) {
+  const li = document.createElement("li");
+  li.className = "item nw-item";
+  const a = document.createElement("a");
+  a.href = n.link;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.className = "what";
+  a.textContent = n.title;
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.textContent = [n.source, fmtAgo(n.ts), n.place].filter(Boolean).join(" · ");
+  li.append(iconEl("newspaper", "lead"), a, meta);
+  return li;
+}
+
+function bkListItem(a) {
+  const { kind, head } = bkParts(a);
+  const li = document.createElement("li");
+  li.className = "item bk-item";
+  li.tabIndex = 0;
+  const what = document.createElement("span");
+  what.className = "what";
+  what.textContent = head;
+  const distEl = document.createElement("span");
+  distEl.className = "dist";
+  distEl.textContent = a.distance_m == null ? "" : fmtDistance(a.distance_m);
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  const dl = bkDeadline(a);
+  meta.textContent = [kind, a.label || (a.distance_m == null ? `hele gemeente ${a.gemeente}` : ""),
+    fmtDay(a.date), dl].filter(Boolean).join(" · ");
+  const link = document.createElement("a");
+  link.href = a.url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.className = "bk-link";
+  link.title = "Bekijk op officielebekendmakingen.nl";
+  link.setAttribute("aria-label", "Bekijken");
+  link.append(iconEl("external-link"));
+  link.addEventListener("click", (e) => e.stopPropagation());
+  li.append(iconEl(BK_ICON[a.category] || "file-text", `lead ${a.category}`), what, distEl, meta, link);
+  const open = () => {
+    if (a.lat == null) { window.open(a.url, "_blank", "noopener"); return; }
+    bkPendingPopup = a.id;
+    state.bk.focus = a.id;
+    map.setView([a.lat, a.lon], Math.max(map.getZoom(), 17));
+    renderBkLayer();
+    if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
+  };
+  li.addEventListener("click", open);
+  li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  return li;
+}
+
+function bkItems() {
+  return state.bk.items.filter(bkVisible);
+}
+
+function renderLocal() {
+  const cfg = state.config.local;
+  if (!cfg.news && !cfg.announcements) return;
+  const noLoc = !state.location;
+  $("nw-section").hidden = !cfg.news;
+  $("bk-section").hidden = !cfg.announcements;
+
+  const place = state.nw.place;
+  $("nw-title").textContent = place ? `Nieuws rond ${place}` : "Nieuws uit je buurt";
+  const news = state.nw.showAll ? state.nw.items : state.nw.items.slice(0, NW_PAGE);
+  $("list-nw").replaceChildren(...news.map(nwListItem));
+  $("nw-more").hidden = news.length >= state.nw.items.length;
+  $("nw-more").textContent = `Alle ${state.nw.items.length} tonen`;
+  const emptyNw = $("empty-nw");
+  emptyNw.textContent = noLoc ? "Nog geen locatie bekend."
+    : state.nw.loading ? "Laden…" : "Geen recent nieuws dat een plaats in je buurt noemt.";
+  emptyNw.hidden = state.nw.items.length > 0;
+
+  $("bk-title").textContent = `Bekendmakingen binnen ${fmtDistance(cfg.radius_m)}`;
+  const items = bkItems();
+  const shown = state.bk.showAll ? items : items.slice(0, BK_PAGE);
+  $("list-bk").replaceChildren(...shown.map(bkListItem));
+  $("bk-more").hidden = shown.length >= items.length;
+  $("bk-more").textContent = `Alle ${items.length} tonen`;
+  const emptyBk = $("empty-bk");
+  emptyBk.textContent = noLoc ? "Nog geen locatie bekend."
+    : state.nw.loading ? "Laden…" : "Geen bekendmakingen in de afgelopen 30 dagen.";
+  emptyBk.hidden = items.length > 0;
+  renderBkLayer();
+  renderOverview();
+}
+
+async function loadLocal(force) {
+  const cfg = state.config.local;
+  const loc = state.location;
+  if ((!cfg.news && !cfg.announcements) || !loc) return renderLocal();
+  const from = state.nw.from;
+  if (!force && from && haversine(from.lat, from.lon, loc.lat, loc.lon) < 300 &&
+      Date.now() - from.at < LOCAL_REFRESH_MS) return renderLocal();
+  state.nw.from = { lat: loc.lat, lon: loc.lon, at: Date.now() };
+  state.nw.loading = !state.nw.items.length && !state.bk.items.length;
+  renderLocal();
+  try {
+    const out = await api(`/api/local?lat=${loc.lat.toFixed(5)}&lon=${loc.lon.toFixed(5)}`);
+    state.nw.items = out.news;
+    state.nw.place = out.place;
+    state.bk.items = out.announcements;
+  } finally {
+    state.nw.loading = false;
+    renderLocal();
+  }
+}
+
+function initLocal() {
+  const cfg = state.config.local;
+  if (!cfg.news && !cfg.announcements) return;
+  document.querySelector('[data-tab="nieuws"]').hidden = false;
+  if (cfg.announcements) {
+    $("bk-show-chip").hidden = false;
+    state.bk.show = store.get("bkShow") === "1";
+    $("bk-show").checked = state.bk.show;
+    $("bk-show").addEventListener("change", (e) => setLayer("announcements", e.target.checked));
+  }
+  const saved = store.get("bkCats");
+  if (saved != null) state.bk.cats = new Set(saved.split(",").filter(Boolean));
+  document.querySelectorAll("[data-bk]").forEach((el) => {
+    el.checked = state.bk.cats.has(el.dataset.bk);
+    el.addEventListener("change", () => {
+      el.checked ? state.bk.cats.add(el.dataset.bk) : state.bk.cats.delete(el.dataset.bk);
+      store.set("bkCats", [...state.bk.cats].join(","));
+      renderLocal();
+    });
+  });
+  $("nw-more").addEventListener("click", () => { state.nw.showAll = true; renderLocal(); });
+  $("bk-more").addEventListener("click", () => { state.bk.showAll = true; renderLocal(); });
+  loadLocal(true).catch(console.error);
+  setInterval(() => loadLocal().catch(console.error), LOCAL_REFRESH_MS);
+}
+
 // ---------- navigatie ----------
 
 const ROUTE_ICON = icon("navigation-2");
@@ -1232,13 +1456,14 @@ function initNav() {
 /** Zet een kaartlaag aan of uit (en onthoud dat per apparaat). */
 function setLayer(layer, on) {
   const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show", shops: "sh-show",
-    charging: "ch-show", statiegeld: "sg-show" }[layer];
+    charging: "ch-show", statiegeld: "sg-show", announcements: "bk-show" }[layer];
   if ($(el)) $(el).checked = on;
   if (layer === "incidents") { state.showIncidents = on; store.set("showIncidents", on ? "1" : "0"); renderIncidents(); }
   if (layer === "cams") { state.showCams = on; store.set("showCams", on ? "1" : "0"); $("cam-layers").hidden = !on; renderCams(); }
   if (layer === "parking") { state.pk.show = on; store.set("pkShow", on ? "1" : "0"); scheduleParkingViewport(); }
   if (layer === "charging") { state.ch.show = on; store.set("chShow", on ? "1" : "0"); scheduleChargingViewport(); }
   if (layer === "shops") { state.sh.show = on; store.set("shShow", on ? "1" : "0"); scheduleShopsViewport(); }
+  if (layer === "announcements") { state.bk.show = on; store.set("bkShow", on ? "1" : "0"); renderBkLayer(); }
   if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
 }
 
@@ -1361,6 +1586,16 @@ function renderOverview() {
     near.slice(0, 2).map((x) => listItem(x.inc, x.d)), recentSirene ? "urgent" : "");
 
   const topical = [];
+  const lc = state.config.local;
+  if (lc.news || lc.announcements) {
+    const nws = state.nw.items;
+    const bks = bkItems();
+    const parts = [];
+    if (lc.news) parts.push(`${nws.length || "Geen"} bericht${nws.length === 1 ? "" : "en"} uit de buurt`);
+    if (lc.announcements) parts.push(`${bks.length} bekendmaking${bks.length === 1 ? "" : "en"} binnen ${fmtDistance(lc.radius_m)}`);
+    const show = [...nws.slice(0, 2).map(nwListItem), ...bks.slice(0, nws.length ? 1 : 2).map(bkListItem)];
+    topical.push(card("nieuws", "Nieuws & bekendmakingen", state.nw.loading ? "Laden…" : parts.join(" · "), show));
+  }
   if (state.config.shops.enabled) {
     const items = shNearItems().filter((x) => state.sh.kinds.has(x.p.kind));
     const open = items.filter((x) => x.st.state === "open");
@@ -1452,7 +1687,9 @@ function connectEvents() {
     loadParkingHere().catch(console.error);
     loadChargingNear().catch(console.error);
     loadShopsNear().catch(console.error);
+    loadLocal().catch(console.error);
   });
+  es.addEventListener("local", () => loadLocal(true).catch(console.error));
   es.addEventListener("shops", () => {
     scheduleShopsViewport();
     loadShopsNear(true).catch(console.error);
@@ -1552,6 +1789,7 @@ async function init() {
   initParking();
   initCharging();
   initShops();
+  initLocal();
   setTab(store.get("tab") || "overzicht");
   connectEvents();
 

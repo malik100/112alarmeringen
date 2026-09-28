@@ -1,14 +1,17 @@
 # Buurtradar
 
 Een live kaart van wat er in je buurt gebeurt: supermarkten en avondwinkels, parkeerzones,
-laadpalen, statiegeld-inleverpunten, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
+laadpalen, statiegeld-inleverpunten, lokaal nieuws en bekendmakingen van de gemeente, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
 Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
   "0 meldingen · 4 winkels open · €8,01/u parkeren · 5 laadpunten vrij · 8 statiegeldpunten open"
-  (met iconen). Daaronder tabbladen (Overzicht, Winkels,
+  (met iconen). Daaronder tabbladen (Overzicht, Nieuws, Winkels,
   Parkeren, Laden, Statiegeld, 112). Het overzicht toont per onderwerp het belangrijkste op jouw plek. Is er een
   melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
+- **Nieuws en bekendmakingen uit je buurt**: recente artikelen die je eigen of een nabije plaats
+  noemen, en officiële bekendmakingen van je gemeente binnen 1,5 km (bouwaanvragen, verkeersbesluiten,
+  evenementen, vergunningen), met de reactietermijn erbij.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
 - **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
@@ -21,7 +24,7 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   locatiewaarschuwing verschijnt alleen als er iets mis is.
 - **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
   `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
-- **Kaartlagen** zet je los aan en uit (meldingen, flitsers, parkeren, laadpalen, statiegeld).
+- **Kaartlagen** zet je los aan en uit (meldingen, bekendmakingen, winkels, flitsers, parkeren, laadpalen, statiegeld).
   Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
   met sirene (A0/A1/P1) pulseren.
@@ -50,6 +53,7 @@ Flexflitsers zitten er (nog) niet in: daar bestaat geen open databron voor.
 ```
 alarmeringen.nl (P2000) ─┐
 Nieuwsfeeds (RSS) ───────┤
+overheid.nl (bekendm.) ──┤
 OpenStreetMap (flitsers) ├─► Buurtradar ─► SQLite
 Statiegeld Nederland ────┤        │   ▲
 RDW (parkeren) ──────────┤        │   │
@@ -60,10 +64,12 @@ PDOK (adres → GPS) ──────┘        │   │
                       webkaart (live) ──► (optioneel) melding
 ```
 
-- Alle verwerking gebeurt op je eigen server. Je eigen locatie verlaat je server nooit.
+- Alle verwerking gebeurt op je eigen server. Je exacte locatie verlaat je server nooit.
 - Naar buiten gaan alleen: het ophalen van de P2000-feed, het adres van een incident naar
   PDOK (gecachet), één keer per dag de flitsers, statiegeldpunten en parkeergegevens, en de
-  kaarttegels.
+  kaarttegels. Voor nieuws en bekendmakingen vraagt de server bij PDOK welke plaatsen rond je
+  locatie liggen, met een op ~1 km afgerond punt (hooguit na elke ~750 m verplaatsing) en bij overheid.nl de
+  bekendmakingen van je gemeente. Overheid.nl ziet dus de naam van je gemeente, niet je locatie.
 
 ## Installatie
 
@@ -258,7 +264,41 @@ Een koppeling is een inschatting, geen zekerheid. Getest op een dag echte meldin
 de koppelingen met 5+ punten klopten, bij 4 punten zat af en toe een twijfelgeval.
 
 Feeds toevoegen of weghalen kan in `config.yaml` onder `news.feeds`. Uitzetten kan met
-`news.enabled: false`. Artikelen worden net zo lang bewaard als meldingen (`p2000.keep_hours`).
+`news.enabled: false`. Artikelen worden 48 uur bewaard (`news.keep_hours`).
+
+## Nieuws en bekendmakingen uit je buurt
+
+Het tabblad **Nieuws** heeft twee delen.
+
+**Nieuws uit je buurt.** Uit dezelfde nieuwsfeeds als hierboven, alleen artikelen van de
+afgelopen 48 uur die een plaats noemen binnen 5 km van je locatie (`news.local_radius_m`), met de
+dichtstbijzijnde plaats erbij. Welke plaatsen dat zijn, komt van de PDOK Locatieserver: rond
+Utrecht-centrum bijvoorbeeld Utrecht, De Bilt, Bunnik, Nieuwegein, Houten en Zeist. Plaatsnamen die
+ook een gewoon woord zijn ("Houten", "Best", "Putten") tellen alleen met een voorzetsel ervoor
+("in Houten"), zodat "houten vloer" niet meetelt.
+
+**Bekendmakingen.** De officiële publicaties van je gemeente, dezelfde als op
+[officielebekendmakingen.nl](https://www.officielebekendmakingen.nl) en in de app *Berichten over
+je Buurt*. Ze komen uit de open zoekdienst van overheid.nl (SRU). Getoond worden de publicaties van
+de afgelopen 30 dagen binnen 1,5 km (`announcements.radius_m`), nieuwste eerst, met filters:
+
+| Filter       | Bijvoorbeeld                                                      |
+|--------------|-------------------------------------------------------------------|
+| Bouwen       | aanvraag of besluit omgevingsvergunning, omgevingsmelding, bestemmingsplan |
+| Verkeer      | verkeersbesluit (afsluiting, parkeerplaats, eenrichtingsverkeer)  |
+| Evenementen  | evenementenvergunning                                             |
+| Vergunningen | andere vergunningen (horeca, standplaats, …)                      |
+| Overig       | beleidsregels en verordeningen van je gemeente (zonder plek: "hele gemeente") |
+
+- Loopt er een reactie- of bezwaartermijn, dan staat erbij tot wanneer ("reageren t/m 18 nov").
+- Tik op een bekendmaking om hem op de kaart te zien; het pijltje opent de volledige tekst.
+  De laag *Bekendmakingen* onder *Overzicht → Op de kaart* toont ze allemaal tegelijk.
+- Ligt je locatie binnen 1,5 km van een buurgemeente, dan worden ook diens bekendmakingen
+  opgehaald (maximaal 4 gemeenten).
+- Verversen: per gemeente hooguit elk uur (`announcements.refresh_minutes`). De eerste keer
+  30 dagen (voor een grote stad zoals Utrecht ~600 publicaties, ~4 MB), daarna alleen wat sinds
+  gisteren is gewijzigd.
+- Uitzetten kan met `announcements.enabled: false`.
 
 ## Nauwkeurigheid van de locatie
 
@@ -284,6 +324,11 @@ Een lange straat kan honderden meters afwijken. Houd daar rekening mee bij een s
 - **Flitsers uit OSM**: zo volledig als de vrijwilligers van OpenStreetMap ze bijhouden.
   Waarschuwen voor flitsers mag in Nederland, maar onder andere in Duitsland, Zwitserland en
   Frankrijk niet.
+- **Bekendmakingen**: alleen van gemeenten. Provincie, waterschap en Rijkswaterstaat publiceren
+  ook (bijv. wegwerkzaamheden op provinciale wegen), maar die zitten er nog niet in. Het punt op de
+  kaart is het midden van het aangegeven gebied; bij een lange straat kan dat een stuk verderop zijn.
+- **Lokaal nieuws**: alleen artikelen uit de ingestelde feeds, en herkend op plaatsnaam. Een artikel
+  over "Utrecht" kan ook over de provincie gaan.
 - **Statiegeld-kaartdienst**: dit is geen officieel gedocumenteerde API, maar de kaartdienst
   achter de openbare locatiewijzer. Verandert de URL, dan kun je een nieuwe opgeven met
   `statiegeld.url`. Bij een fout blijven de laatst opgehaalde punten staan en probeert de app
@@ -308,7 +353,8 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/main.py`       | API en webserver                                        |
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
 | `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
-| `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen                  |
+| `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen, lokaal nieuws herkennen |
+| `app/sirene/sources/bekendmakingen.py` | bekendmakingen (overheid.nl) en plaatsen rond je locatie (PDOK) |
 | `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
 | `app/sirene/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |
@@ -326,6 +372,7 @@ installaties en hun gegevens werken.
 - Adressen: [PDOK Locatieserver](https://www.pdok.nl), op basis van de BAG.
 - Statiegeld-inleverpunten: [Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer).
 - Nieuws: RSS-feeds van de genoemde omroepen en sites; we tonen alleen titel, bron en link.
+- Bekendmakingen: [overheid.nl](https://repository.overheid.nl/sru) (open data, officiële publicaties).
 - Winkels en markten: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Laadpalen: [NDW open data](https://opendata.ndw.nu) (OCPI).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).

@@ -69,6 +69,10 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "parking": {k: cfg["parking"][k] for k in ("enabled", "min_zoom")},
             "charging": {k: cfg["charging"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "shops": {k: cfg["shops"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
+            "local": {"news": cfg["news"]["enabled"],
+                      "announcements": cfg["announcements"]["enabled"],
+                      "radius_m": cfg["announcements"]["radius_m"],
+                      "news_radius_m": cfg["news"]["local_radius_m"]},
         }
 
     @app.get("/api/status")
@@ -186,6 +190,17 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             stations.sort(key=lambda s: s["distance_m"])
         return {"stations": stations[:limit], "status_ts": svc.charging_status_ts,
                 "truncated": len(stations) > limit}
+
+    @app.get("/api/local")
+    async def get_local(lat: float | None = Query(default=None, ge=-90, le=90),
+                        lon: float | None = Query(default=None, ge=-180, le=180)):
+        """Nieuws en bekendmakingen rond een punt (standaard: jouw locatie)."""
+        if lat is None or lon is None:
+            loc = svc.locations.current
+            if loc is None:
+                return {"place": None, "gemeente": None, "news": [], "announcements": []}
+            lat, lon = loc.lat, loc.lon
+        return await svc.local_overview(lat, lon)
 
     @app.get("/api/events")
     async def events(request: Request):

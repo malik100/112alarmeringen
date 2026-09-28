@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import logging
 import math
 import time
@@ -19,6 +20,7 @@ from . import news as news_matcher
 from .notifier import Notifier
 from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
+from .sources.bekendmakingen import fetch_announcements, fetch_area
 from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import fetch_zones
 from .sources.shops import fetch_shops, is_late, same_store
@@ -34,6 +36,14 @@ NOTIFY_MAX_INCIDENT_AGE_S = 15 * 60
 FEED_MAX_BACKOFF_S = 15 * 60
 # Na een mislukte dagelijkse verversing (flitsers, statiegeld) eerder opnieuw proberen.
 REFRESH_RETRY_S = 30 * 60
+# Omgeving (woonplaatsen/gemeenten) opnieuw bepalen na zoveel meter verplaatsing.
+AREA_MOVE_M = 750
+AREA_MAX_AGE_S = 7 * 24 * 3600
+AREA_SEARCH_M = 6000
+# Maximaal zoveel gemeenten tegelijk bevragen (je eigen + buren binnen de straal).
+MAX_GEMEENTEN = 4
+LOCAL_NEWS_LIMIT = 40
+ANNOUNCEMENTS_LIMIT = 300
 
 
 class Service:
@@ -58,6 +68,7 @@ class Service:
             "news": {"last_ok": None, "last_error": None},
             "charging": {"last_ok": None, "last_error": None, "count": 0},
             "shops": {"last_ok": None, "last_error": None, "count": 0},
+            "announcements": {"last_ok": None, "last_error": None, "gemeenten": []},
             "charging_status": {"last_ok": None, "last_error": None},
             "homeassistant": {"last_ok": None, "last_error": None},
         }
@@ -67,6 +78,10 @@ class Service:
         self.charging_status_ts: float | None = None
         # Per feed: (aantal fouten op rij, niet opnieuw proberen voor dit tijdstip).
         self._feed_backoff: dict[str, tuple[int, float]] = {}
+        # Woonplaatsen rond de laatst bekeken plek (PDOK), bewaard over herstarts heen.
+        self.area: dict[str, Any] | None = self.db.meta_get("area")
+        self._area_lock = asyncio.Lock()
+        self._announcements_lock = asyncio.Lock()
 
     # --- incidenten -------------------------------------------------------
 
@@ -168,15 +183,17 @@ class Service:
         """Slaat een nieuw artikel op en koppelt het; geeft de ids van gekoppelde meldingen."""
         if self.db.has_news(item.guid):
             return []
-        if item.ts < time.time() - self.cfg["p2000"]["keep_hours"] * 3600:
-            return []  # ouder dan alle bewaarde meldingen
+        if item.ts < time.time() - self._news_keep_s():
+            return []  # ouder dan we bewaren
         summary = news_matcher.normalize(item.description)
-        article = {"guid": item.guid, "ts": item.ts, "source": source, "title": item.title.strip(),
+        # Sommige feeds geven een tijd in de toekomst (verkeerde tijdzone): niet later dan nu.
+        ts = min(item.ts, time.time())
+        article = {"guid": item.guid, "ts": ts, "source": source, "title": item.title.strip(),
                    "summary": summary[:500], "link": item.link}
         self.db.insert_news(article)
         linked = []
-        for incident in self.db.incidents_between(item.ts - news_matcher.AFTER_S,
-                                                  item.ts + news_matcher.BEFORE_S):
+        for incident in self.db.incidents_between(ts - news_matcher.AFTER_S,
+                                                  ts + news_matcher.BEFORE_S):
             m = news_matcher.match(incident, article)
             if m and self.db.link_news(incident["id"], item.guid, m.score):
                 linked.append(incident["id"])
@@ -195,8 +212,114 @@ class Service:
                     incident = self.db.get_incident(incident_id)
                     if incident:
                         self.bus.publish("incident", self.enrich(incident))
+        self.db.purge_news(time.time() - self._news_keep_s())
         self.status["news"]["last_ok"] = time.time()
         return linked_total
+
+    def _news_keep_s(self) -> float:
+        return max(self.cfg["news"]["keep_hours"], self.cfg["p2000"]["keep_hours"]) * 3600
+
+    # --- jouw buurt: omgeving, lokaal nieuws, bekendmakingen ----------------
+
+    async def area_for(self, lat: float, lon: float) -> list[dict[str, Any]]:
+        """Woonplaatsen rond een punt (met gemeente en afstand); gecachet per ~750 m."""
+        async with self._area_lock:
+            a = self.area
+            if (a and haversine_m(lat, lon, a["lat"], a["lon"]) < AREA_MOVE_M
+                    and time.time() - a["ts"] < AREA_MAX_AGE_S):
+                return a["places"]
+            try:
+                places = await fetch_area(self.client, lat, lon, AREA_SEARCH_M)
+            except (httpx.HTTPError, ValueError) as exc:
+                log.warning("Omgeving bepalen mislukt: %s", exc)
+                return a["places"] if a else []
+            if places:
+                self.area = {"lat": lat, "lon": lon, "ts": time.time(), "places": places}
+                self.db.meta_set("area", self.area)
+            return places
+
+    def gemeenten_near(self, places: list[dict[str, Any]]) -> list[str]:
+        """Je eigen gemeente plus buurgemeenten die binnen de straal beginnen."""
+        radius = self.cfg["announcements"]["radius_m"]
+        out: list[str] = []
+        for i, p in enumerate(places):
+            if (i == 0 or p["distance_m"] <= radius) and p["gemeente"] not in out:
+                out.append(p["gemeente"])
+        return out[:MAX_GEMEENTEN]
+
+    async def refresh_announcements(self, gemeenten: list[str], force: bool = False) -> int:
+        """Haalt bekendmakingen op voor gemeenten waarvan de gegevens verouderd zijn."""
+        acfg = self.cfg["announcements"]
+        fetched = 0
+        async with self._announcements_lock:
+            for gemeente in gemeenten:
+                key = f"announcements_{gemeente}"
+                last = self.db.meta_get(key)
+                if not force and last and time.time() - last < acfg["refresh_minutes"] * 60:
+                    continue
+                # Eerste keer: de hele periode; daarna alleen wat sinds gisteren gewijzigd is.
+                since = dt.date.today() - (dt.timedelta(days=1) if last
+                                           else dt.timedelta(days=acfg["days"]))
+                try:
+                    items = await fetch_announcements(self.client, gemeente, since)
+                except (httpx.HTTPError, ValueError) as exc:  # ValueError: kapotte XML
+                    self.status["announcements"]["last_error"] = f"{time.time():.0f}: {gemeente}: {exc}"
+                    log.warning("Bekendmakingen voor %s ophalen mislukt: %s", gemeente, exc)
+                    continue
+                self.db.upsert_announcements(items)
+                self.db.meta_set(key, time.time())
+                fetched += len(items)
+                self.status["announcements"]["last_ok"] = time.time()
+            self.db.purge_announcements(time.time() - acfg["days"] * 86400)
+        self.status["announcements"]["gemeenten"] = gemeenten
+        return fetched
+
+    async def refresh_announcements_once(self) -> None:
+        loc = self.locations.current
+        if loc is None:
+            return
+        places = await self.area_for(loc.lat, loc.lon)
+        if await self.refresh_announcements(self.gemeenten_near(places)):
+            self.bus.publish("local", {"ts": time.time()})
+
+    async def local_overview(self, lat: float, lon: float) -> dict[str, Any]:
+        """Nieuws dat een plaats in de buurt noemt en bekendmakingen rond dit punt."""
+        places = await self.area_for(lat, lon)
+        out: dict[str, Any] = {"place": places[0]["name"] if places else None,
+                               "gemeente": places[0]["gemeente"] if places else None,
+                               "news": [], "announcements": []}
+        if self.cfg["news"]["enabled"]:
+            near = [p for p in places if p["distance_m"] <= self.cfg["news"]["local_radius_m"]]
+            for article in self.db.news_since(time.time() - self.cfg["news"]["keep_hours"] * 3600):
+                place = news_matcher.local_place(article, near)
+                if place:
+                    out["news"].append({
+                        "title": article["title"], "link": article["link"],
+                        "source": article["source"], "ts": article["ts"],
+                        "place": place["name"], "distance_m": place["distance_m"],
+                    })
+                    if len(out["news"]) >= LOCAL_NEWS_LIMIT:
+                        break
+        acfg = self.cfg["announcements"]
+        if acfg["enabled"] and places:
+            gemeenten = self.gemeenten_near(places)
+            await self.refresh_announcements(gemeenten)
+            own = places[0]["gemeente"]
+            for a in self.db.announcements_for(gemeenten, time.time() - acfg["days"] * 86400):
+                if a["lat"] is None:
+                    if a["gemeente"] != own:
+                        continue  # regels zonder plek: alleen die van je eigen gemeente
+                    a["distance_m"] = None
+                else:
+                    a["distance_m"] = round(haversine_m(lat, lon, a["lat"], a["lon"]))
+                    if a["distance_m"] > acfg["radius_m"]:
+                        continue
+                out["announcements"].append(a)
+            # Nieuwste dag eerst, binnen een dag dichtbij eerst (regels zonder plek als laatste).
+            out["announcements"].sort(key=lambda a: (
+                a["date"], -(a["distance_m"] if a["distance_m"] is not None else 10**9)), reverse=True)
+            del out["announcements"][ANNOUNCEMENTS_LIMIT:]
+        return out
 
     # --- meldingen --------------------------------------------------------
 
@@ -399,6 +522,11 @@ class Service:
         if self.cfg["news"]["enabled"]:
             self._tasks.append(asyncio.create_task(
                 self._loop("nieuws", self.cfg["news"]["poll_interval_s"], self.poll_news_once)))
+        if self.cfg["announcements"]["enabled"]:
+            # Elk kwartier kijken of je in een andere gemeente bent; ophalen per gemeente
+            # gebeurt hooguit elke `refresh_minutes`.
+            self._tasks.append(asyncio.create_task(
+                self._loop("bekendmakingen", 15 * 60, self.refresh_announcements_once)))
         if self.cfg["shops"]["enabled"]:
             self.status["shops"]["count"] = self.db.shops_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(

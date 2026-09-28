@@ -126,3 +126,39 @@ def match(incident: dict[str, Any], article: dict[str, Any]) -> Match | None:
         reasons.append("tijd")
 
     return Match(score, reasons) if score >= MIN_SCORE else None
+
+
+# --- nieuws uit de buurt ------------------------------------------------------
+
+# Plaatsnamen die ook een gewoon woord zijn ("in Houten" wel, "houten vloer" niet): die
+# tellen alleen met een voorzetsel ervoor.
+AMBIGUOUS_PLACES = {
+    "best", "mill", "son", "lent", "made", "echt", "beek", "dieren", "hoorn", "houten",
+    "duiven", "doorn", "heel", "loon", "berg", "meer", "laren", "haren", "wijk", "kamp",
+    "putten", "bergen", "born", "elst", "ens", "stad", "rijs", "boven", "oost", "west",
+    "noord", "zuid", "horn", "wolde", "hall", "veen", "hoek", "buren", "kerk", "sluis",
+}
+_PREPOSITIONS = r"(?:in|uit|bij|naar|rond|te|nabij|omgeving|centrum|gemeente)"
+
+
+def place_patterns(name: str) -> list[re.Pattern]:
+    key = normalize(name)
+    if len(key) < 3:
+        return []
+    variants = CITY_ALIASES.get(key.lstrip("'"), [key])
+    if key in AMBIGUOUS_PLACES:
+        return [re.compile(rf"\b{_PREPOSITIONS}\s+" + re.escape(v) + r"(?![a-z0-9])")
+                for v in variants]
+    return [_word(v) for v in variants]
+
+
+def local_place(article: dict[str, Any], places: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """De dichtstbijzijnde plaats uit `places` die het artikel noemt, of None.
+
+    `places`: [{"name", "gemeente", "distance_m"}], dichtstbijzijnde eerst.
+    """
+    text = normalize(f"{article['title']} {article.get('summary') or ''}")
+    for place in places:
+        if any(p.search(text) for p in place_patterns(place["name"])):
+            return place
+    return None

@@ -37,10 +37,18 @@ statiegeld:
 news:
   enabled: true
   poll_interval_s: 300  # elke 5 minuten
+  keep_hours: 48        # hoe lang artikelen bewaard blijven
+  local_radius_m: 5000  # "nieuws uit je buurt": artikelen die een plaats binnen deze straal noemen
   # Eigen lijst? Dan vervangt die de standaardlijst (zie app/sirene/config.py), bijv.:
   # feeds:
   #   - {name: NH Nieuws, url: "https://rss.nhnieuws.nl/rss"}
   #   - {name: NOS, url: "https://feeds.nos.nl/nosnieuwsbinnenland"}
+
+announcements:          # bekendmakingen van je gemeente (overheid.nl)
+  enabled: true
+  refresh_minutes: 60
+  days: 30
+  radius_m: 1500
 
 shops:
   enabled: true

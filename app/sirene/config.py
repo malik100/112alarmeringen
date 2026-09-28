@@ -67,6 +67,10 @@ DEFAULTS: dict[str, Any] = {
     "news": {
         "enabled": True,
         "poll_interval_s": 300,
+        # Hoe lang artikelen bewaard blijven (voor "nieuws uit de buurt").
+        "keep_hours": 48,
+        # Nieuws telt als "uit de buurt" als het een plaats binnen deze straal noemt.
+        "local_radius_m": 5000,
         # Regionale omroepen, landelijke nieuwssites en 112-sites met een RSS-feed.
         "feeds": [
             {"name": "NOS", "url": "https://feeds.nos.nl/nosnieuwsbinnenland"},
@@ -87,6 +91,15 @@ DEFAULTS: dict[str, Any] = {
             {"name": "112Groningen", "url": "https://www.112groningen.nl/feed/"},
             {"name": "112Ede", "url": "https://www.112ede.nl/feed/"},
         ],
+    },
+    "announcements": {
+        # Officiële bekendmakingen van je gemeente (overheid.nl): vergunningen,
+        # verkeersbesluiten, evenementen.
+        "enabled": True,
+        "refresh_minutes": 60,
+        "days": 30,
+        # Alleen bekendmakingen binnen deze straal van je locatie.
+        "radius_m": 1500,
     },
     "shops": {
         "enabled": True,
