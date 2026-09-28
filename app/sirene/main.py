@@ -21,6 +21,7 @@ from .service import Service
 
 STATIC_DIR = Path(__file__).parent / "static"
 HEARTBEAT_S = 20
+STATIEGELD_LIMIT = 2000
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -57,6 +58,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "homeassistant_location": cfg["location"]["homeassistant"]["enabled"],
             "notifications_enabled": cfg["notifications"]["enabled"],
             "speedcams_enabled": cfg["speedcams"]["enabled"],
+            "statiegeld": {k: cfg["statiegeld"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
         }
 
     @app.get("/api/status")
@@ -84,6 +86,18 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
     @app.get("/api/speedcams")
     def get_speedcams():
         return svc.db.speedcams() if svc.cfg["speedcams"]["enabled"] else []
+
+    @app.get("/api/statiegeld")
+    def get_statiegeld(bbox: str = Query(description="west,zuid,oost,noord in graden")):
+        if not svc.cfg["statiegeld"]["enabled"]:
+            return []
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > 1.5 or north - south > 1.5:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        return svc.db.statiegeld_in_bbox(south, west, north, east, STATIEGELD_LIMIT)
 
     @app.get("/api/events")
     async def events(request: Request):

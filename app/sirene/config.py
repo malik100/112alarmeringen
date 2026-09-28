@@ -49,6 +49,15 @@ DEFAULTS: dict[str, Any] = {
             "https://overpass.private.coffee/api/interpreter",
         ],
     },
+    "statiegeld": {
+        "enabled": True,
+        "url": "",  # leeg = openbare kaartdienst van Statiegeld Nederland
+        "refresh_hours": 24,
+        # Pas vanaf dit zoomniveau punten op de kaart tekenen (er zijn er ~8700).
+        "min_zoom": 12,
+        # Straal voor de lijst "statiegeld in de buurt".
+        "list_radius_m": 2000,
+    },
     "map": {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",

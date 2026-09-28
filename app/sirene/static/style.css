@@ -1,4 +1,5 @@
 :root {
+  --statiegeld: #15803d;
   --bg: #ffffff;
   --bg-soft: #f3f4f6;
   --fg: #111827;
@@ -168,6 +169,7 @@ html, body {
 .chip.ambulance { color: var(--ambulance); }
 .chip.politie { color: var(--politie); }
 .chip.onbekend, .chip.cam { color: var(--fg-muted); }
+.chip.statiegeld { color: var(--statiegeld); }
 .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
 .switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .select { display: inline-flex; align-items: center; gap: 6px; color: var(--fg-muted); }
@@ -195,6 +197,11 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
 .item .dist { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .item .meta { grid-column: 2 / span 2; font-size: 12px; color: var(--fg-muted); }
 .item.old { opacity: .6; }
+.item.statiegeld .bar { background: var(--fg-muted); }
+.item.statiegeld .bar.open { background: var(--statiegeld); }
+.sg-open { color: var(--statiegeld); font-weight: 600; }
+.sg-closed { color: var(--err); }
+.sg-unknown { color: var(--fg-muted); font-style: italic; }
 .tag {
   display: inline-block; font-size: 11px; font-weight: 700;
   padding: 0 6px; border-radius: 6px; margin-right: 4px;
@@ -229,6 +236,20 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
 }
 .cam-sign.roodlicht { border-color: #111; background: #fde047; }
 .cam-sign.traject { border-color: var(--traject); }
+
+.sg-marker { background: none; border: 0; }
+.sg-sign {
+  width: 22px; height: 22px; border-radius: 6px;
+  display: grid; place-items: center;
+  font: 700 13px/1 system-ui, sans-serif;
+  color: #fff; background: #15803d; border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+.sg-sign.closed { background: #9ca3af; }
+.sg-sign.unknown { background: #fff; color: #6b7280; border-color: #9ca3af; }
+.sg-hours { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+.sg-hours td { padding: 1px 8px 1px 0; }
+.sg-hours tr.today td { font-weight: 700; }
 
 .me-dot {
   width: 16px; height: 16px; border-radius: 50%;

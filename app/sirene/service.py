@@ -18,6 +18,8 @@ from .notifier import Notifier
 from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
 from .sources.speedcams import fetch_speedcams
+from .sources.statiegeld import DEFAULT_URL as STATIEGELD_URL
+from .sources.statiegeld import fetch_statiegeld
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +27,8 @@ USER_AGENT = "SireneRadar/0.1 (self-hosted, persoonlijk gebruik)"
 # Alleen verse incidenten leiden tot een melding (niet de backlog na een herstart).
 NOTIFY_MAX_INCIDENT_AGE_S = 15 * 60
 FEED_MAX_BACKOFF_S = 15 * 60
+# Na een mislukte dagelijkse verversing (flitsers, statiegeld) eerder opnieuw proberen.
+REFRESH_RETRY_S = 30 * 60
 
 
 class Service:
@@ -44,6 +48,7 @@ class Service:
         self.status: dict[str, Any] = {
             "p2000": {"last_ok": None, "last_error": None},
             "speedcams": {"last_ok": None, "last_error": None, "count": 0},
+            "statiegeld": {"last_ok": None, "last_error": None, "count": 0},
             "homeassistant": {"last_ok": None, "last_error": None},
         }
         self._tasks: list[asyncio.Task] = []
@@ -170,16 +175,33 @@ class Service:
 
     # --- flitsers ---------------------------------------------------------
 
-    async def refresh_speedcams_once(self) -> None:
+    async def refresh_speedcams_once(self) -> bool:
         try:
             cams = await fetch_speedcams(self.client, self.cfg["speedcams"]["overpass_urls"])
         except RuntimeError as exc:
             self.status["speedcams"]["last_error"] = f"{time.time():.0f}: {exc}"
-            return
+            return False
         self.db.replace_speedcams(cams)
         self.db.meta_set("speedcams_updated", time.time())
         self.status["speedcams"].update(last_ok=time.time(), count=len(cams))
         self.bus.publish("speedcams", {"count": len(cams)})
+        return True
+
+    # --- statiegeld -------------------------------------------------------
+
+    async def refresh_statiegeld_once(self) -> bool:
+        url = self.cfg["statiegeld"]["url"] or STATIEGELD_URL
+        try:
+            points = await fetch_statiegeld(self.client, url)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("Statiegeldpunten ophalen mislukt: %s", exc)
+            self.status["statiegeld"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        self.db.replace_statiegeld(points)
+        self.db.meta_set("statiegeld_updated", time.time())
+        self.status["statiegeld"].update(last_ok=time.time(), count=len(points))
+        self.bus.publish("statiegeld", {"count": len(points)})
+        return True
 
     # --- achtergrondtaken -------------------------------------------------
 
@@ -191,21 +213,33 @@ class Service:
                 log.exception("Taak %s faalde", name)
             await asyncio.sleep(interval_s)
 
-    async def _speedcam_loop(self) -> None:
-        interval = self.cfg["speedcams"]["refresh_hours"] * 3600
-        updated = self.db.meta_get("speedcams_updated") or 0
-        self.status["speedcams"]["count"] = len(self.db.speedcams())
-        wait = max(0, updated + interval - time.time())
+    async def _refresh_loop(self, name: str, interval_s: float, func) -> None:
+        """Ververst een dataset periodiek; na een fout eerder opnieuw proberen."""
+        updated = self.db.meta_get(f"{name}_updated") or 0
         if updated:
-            self.status["speedcams"]["last_ok"] = updated
-        await asyncio.sleep(wait)
-        await self._loop("flitsers", interval, self.refresh_speedcams_once)
+            self.status[name]["last_ok"] = updated
+        await asyncio.sleep(max(0, updated + interval_s - time.time()))
+        while True:
+            try:
+                ok = await func()
+            except Exception:  # een taak mag nooit de hele service stoppen
+                log.exception("Verversen van %s faalde", name)
+                ok = False
+            await asyncio.sleep(interval_s if ok else min(interval_s, REFRESH_RETRY_S))
 
     def start(self) -> None:
         self._tasks.append(asyncio.create_task(
             self._loop("p2000", self.cfg["p2000"]["poll_interval_s"], self.poll_p2000_once)))
         if self.cfg["speedcams"]["enabled"]:
-            self._tasks.append(asyncio.create_task(self._speedcam_loop()))
+            self.status["speedcams"]["count"] = len(self.db.speedcams())
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "speedcams", self.cfg["speedcams"]["refresh_hours"] * 3600,
+                self.refresh_speedcams_once)))
+        if self.cfg["statiegeld"]["enabled"]:
+            self.status["statiegeld"]["count"] = self.db.statiegeld_count()
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "statiegeld", self.cfg["statiegeld"]["refresh_hours"] * 3600,
+                self.refresh_statiegeld_once)))
         ha = self.cfg["location"]["homeassistant"]
         if ha["enabled"]:
             if not ha["token"]:

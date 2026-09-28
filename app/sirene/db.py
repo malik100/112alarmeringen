@@ -48,6 +48,14 @@ CREATE TABLE IF NOT EXISTS speedcams (
     geometry TEXT
 );
 
+CREATE TABLE IF NOT EXISTS statiegeld (
+    id   TEXT PRIMARY KEY,
+    lat  REAL NOT NULL,
+    lon  REAL NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS statiegeld_lat_lon ON statiegeld (lat, lon);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -151,6 +159,27 @@ class Database:
             item["geometry"] = json.loads(item["geometry"]) if item["geometry"] else None
             result.append(item)
         return result
+
+    # --- statiegeld -------------------------------------------------------
+
+    def replace_statiegeld(self, points: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM statiegeld")
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO statiegeld (id, lat, lon, data) VALUES (?, ?, ?, ?)",
+                [(p["id"], p["lat"], p["lon"], json.dumps(p, ensure_ascii=False)) for p in points],
+            )
+
+    def statiegeld_in_bbox(self, south: float, west: float, north: float, east: float,
+                           limit: int) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT data FROM statiegeld WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT ?",
+            (south, north, west, east, limit),
+        ).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def statiegeld_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM statiegeld").fetchone()[0]
 
     # --- meta -------------------------------------------------------------
 

@@ -23,6 +23,7 @@ const state = {
   camKinds: new Set(["flitser", "roodlicht", "traject"]),
   onlySirene: false,
   alerted: new Set(),
+  sg: { points: [], near: [], show: true, onlyOpen: false, nearFrom: null },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -86,8 +87,16 @@ const map = L.map("map", { zoomControl: false, attributionControl: true }).setVi
 L.control.zoom({ position: "bottomleft" }).addTo(map);
 const incidentLayer = L.layerGroup().addTo(map);
 const camLayer = L.layerGroup().addTo(map);
+const sgLayer = L.layerGroup().addTo(map);
+const sgMarkers = new Map();
 const meLayer = L.layerGroup().addTo(map);
 const markers = new Map();
+
+/** Id van de marker met een open popup, zodat die na hertekenen weer open kan. */
+function openPopupId(markerMap) {
+  for (const [id, marker] of markerMap) if (marker.isPopupOpen()) return id;
+  return null;
+}
 
 function incidentIcon(inc) {
   const old = Date.now() / 1000 - inc.ts > OLD_INCIDENT_S;
@@ -115,6 +124,7 @@ function incidentPopup(inc) {
 }
 
 function renderIncidents() {
+  const reopen = openPopupId(markers);
   incidentLayer.clearLayers();
   markers.clear();
   // Oudste eerst tekenen, zodat nieuwe incidenten bovenop liggen.
@@ -130,6 +140,7 @@ function renderIncidents() {
     marker.addTo(incidentLayer);
     markers.set(inc.id, marker);
   }
+  if (reopen != null) markers.get(reopen)?.openPopup();
 }
 
 function camIcon(cam) {
@@ -306,6 +317,196 @@ function checkAlert(inc) {
   checkAlert.timer = setTimeout(() => { el.hidden = true; }, 60000);
 }
 
+// ---------- statiegeld ----------
+
+const SG_STATE_CLASS = { open: "sg-open", closed: "sg-closed", unknown: "sg-unknown" };
+
+function sgStatus(point) {
+  return OpeningHours.status(point.hours);
+}
+
+function sgVisible(point, st) {
+  return !state.sg.onlyOpen || st.state === "open";
+}
+
+function sgPopup(point) {
+  const st = sgStatus(point);
+  const today = OpeningHours.amsterdamNow().day;
+  const rows = OpeningHours.DAYS.map((day, i) => {
+    const raw = point.hours_raw[i];
+    const text = raw === "NA" ? "onbekend" : raw;
+    return `<tr${i === today ? ' class="today"' : ""}><td>${esc(day)}</td><td>${esc(text)}</td></tr>`;
+  }).join("");
+  const d = state.location ? haversine(state.location.lat, state.location.lon, point.lat, point.lon) : null;
+  const facts = [
+    point.machine ? "automaat" : "",
+    point.manual ? "inleveren aan de balie" : "",
+    point.public ? "vrij toegankelijk" : "",
+    point.bulk ? "grote hoeveelheden" : "",
+  ].filter(Boolean);
+  return `
+    <b>${esc(point.name)}</b><br>
+    ${esc(point.address)}${d != null ? ` · ${esc(fmtDistance(d))}` : ""}<br>
+    <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>
+    <table class="sg-hours">${rows}</table>
+    ${point.materials.length ? `<div><small>Neemt in: ${esc(point.materials.join(", "))}</small></div>` : ""}
+    ${point.payouts.length ? `<div><small>Uitbetaling: ${esc(point.payouts.join(", "))}</small></div>` : ""}
+    ${facts.length ? `<div><small>${esc(facts.join(" · "))}</small></div>` : ""}
+    <a href="https://www.openstreetmap.org/directions?to=${point.lat}%2C${point.lon}" target="_blank" rel="noopener noreferrer">Route ↗</a>`;
+}
+
+function sgIcon(st) {
+  return L.divIcon({
+    className: "sg-marker",
+    html: `<div class="sg-sign ${st.state}">♻</div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+let sgPendingPopup = null;
+
+function renderSg() {
+  const reopen = sgPendingPopup ?? openPopupId(sgMarkers);
+  sgLayer.clearLayers();
+  sgMarkers.clear();
+  if (!state.sg.show || map.getZoom() < state.config.statiegeld.min_zoom) return;
+  for (const point of state.sg.points) {
+    const st = sgStatus(point);
+    if (!sgVisible(point, st)) continue;
+    const marker = L.marker([point.lat, point.lon], { icon: sgIcon(st), keyboard: false, zIndexOffset: -500 })
+      .bindPopup(() => sgPopup(point), { maxWidth: 280 });
+    marker.addTo(sgLayer);
+    sgMarkers.set(point.id, marker);
+  }
+  if (reopen != null && sgMarkers.has(reopen)) {
+    sgMarkers.get(reopen).openPopup();
+    sgPendingPopup = null;
+  }
+}
+
+function sgListItem(point, st, dist) {
+  const li = document.createElement("li");
+  li.className = "item statiegeld";
+  li.tabIndex = 0;
+  const bar = document.createElement("span");
+  bar.className = `bar ${st.state}`;
+  const what = document.createElement("span");
+  what.className = "what";
+  what.textContent = point.name;
+  const distEl = document.createElement("span");
+  distEl.className = "dist";
+  distEl.textContent = fmtDistance(dist);
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  const status = document.createElement("span");
+  status.className = SG_STATE_CLASS[st.state];
+  status.textContent = st.text;
+  meta.append(status, ` · ${point.address}`);
+  li.append(bar, what, distEl, meta);
+  const open = () => {
+    // De marker bestaat mogelijk pas na het laden van dit kaartgebied.
+    sgPendingPopup = point.id;
+    map.setView([point.lat, point.lon], Math.max(map.getZoom(), state.config.statiegeld.min_zoom, 16));
+    if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
+  };
+  li.addEventListener("click", open);
+  li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  return li;
+}
+
+function renderSgList() {
+  const cfg = state.config.statiegeld;
+  $("sg-section").hidden = !cfg.enabled || !state.sg.show;
+  if ($("sg-section").hidden) return;
+  $("sg-title").textContent = `Statiegeld binnen ${fmtDistance(cfg.list_radius_m)}`;
+  const empty = $("empty-sg");
+  if (!state.location) {
+    $("list-sg").replaceChildren();
+    empty.textContent = "Nog geen locatie bekend.";
+    empty.hidden = false;
+    return;
+  }
+  const items = state.sg.near
+    .map((p) => ({ p, st: sgStatus(p), d: haversine(state.location.lat, state.location.lon, p.lat, p.lon) }))
+    .filter((x) => x.d <= cfg.list_radius_m && sgVisible(x.p, x.st))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 10);
+  $("list-sg").replaceChildren(...items.map((x) => sgListItem(x.p, x.st, x.d)));
+  empty.textContent = state.sg.onlyOpen ? "Geen open inleverpunt in de buurt." : "Geen inleverpunten in de buurt.";
+  empty.hidden = items.length > 0;
+}
+
+function bboxAround(lat, lon, radiusM) {
+  const dLat = radiusM / 111320;
+  const dLon = radiusM / (111320 * Math.cos((lat * Math.PI) / 180));
+  return [lon - dLon, lat - dLat, lon + dLon, lat + dLat];
+}
+
+async function fetchSg(bbox) {
+  return api(`/api/statiegeld?bbox=${bbox.map((v) => v.toFixed(5)).join(",")}`);
+}
+
+let sgViewportSeq = 0;
+let sgViewportTimer = null;
+function scheduleSgViewport() {
+  clearTimeout(sgViewportTimer);
+  sgViewportTimer = setTimeout(async () => {
+    const cfg = state.config.statiegeld;
+    if (!cfg.enabled || !state.sg.show || map.getZoom() < cfg.min_zoom) {
+      state.sg.points = [];
+      renderSg();
+      return;
+    }
+    const b = map.getBounds();
+    const seq = ++sgViewportSeq;
+    try {
+      const points = await fetchSg([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
+      if (seq !== sgViewportSeq) return; // intussen verder geschoven
+      state.sg.points = points;
+      renderSg();
+    } catch (err) { console.warn("Statiegeld:", err.message); }
+  }, 250);
+}
+
+async function loadSgNear(force) {
+  const cfg = state.config.statiegeld;
+  const loc = state.location;
+  if (!cfg.enabled || !state.sg.show || !loc) return renderSgList();
+  const from = state.sg.nearFrom;
+  // Pas opnieuw ophalen als je een flink stuk bent verplaatst.
+  if (!force && from && haversine(from.lat, from.lon, loc.lat, loc.lon) < cfg.list_radius_m / 4) {
+    return renderSgList();
+  }
+  state.sg.nearFrom = { lat: loc.lat, lon: loc.lon };
+  // Iets ruimer ophalen, zodat de lijst klopt terwijl je beweegt.
+  state.sg.near = await fetchSg(bboxAround(loc.lat, loc.lon, cfg.list_radius_m * 1.3));
+  renderSgList();
+}
+
+function initStatiegeld() {
+  if (!state.config.statiegeld.enabled) return;
+  $("sg-controls").hidden = false;
+  state.sg.show = store.get("sgShow") !== "0";
+  state.sg.onlyOpen = store.get("sgOnlyOpen") === "1";
+  $("sg-show").checked = state.sg.show;
+  $("sg-open").checked = state.sg.onlyOpen;
+  $("sg-show").addEventListener("change", (e) => {
+    state.sg.show = e.target.checked;
+    store.set("sgShow", state.sg.show ? "1" : "0");
+    scheduleSgViewport();
+    loadSgNear(true).catch(console.error);
+  });
+  $("sg-open").addEventListener("change", (e) => {
+    state.sg.onlyOpen = e.target.checked;
+    store.set("sgOnlyOpen", state.sg.onlyOpen ? "1" : "0");
+    renderSg();
+    renderSgList();
+  });
+  scheduleSgViewport();
+  loadSgNear(true).catch(console.error);
+}
+
 // ---------- data ----------
 
 async function loadIncidents() {
@@ -337,8 +538,13 @@ function connectEvents() {
     renderMe();
     renderList();
     renderStatus();
+    loadSgNear().catch(console.error);
   });
   es.addEventListener("speedcams", () => loadCams().catch(console.error));
+  es.addEventListener("statiegeld", () => {
+    scheduleSgViewport();
+    loadSgNear(true).catch(console.error);
+  });
   // Na een herverbinding kunnen we updates gemist hebben.
   es.addEventListener("open", () => loadIncidents().then(renderAll).catch(console.error));
 }
@@ -393,6 +599,7 @@ async function init() {
   if (loc) map.setView([loc.lat, loc.lon], 14);
   renderAll();
   loadCams().catch(console.error);
+  initStatiegeld();
   connectEvents();
 
   if (state.config.browser_location) {
@@ -431,10 +638,16 @@ $("window").addEventListener("change", async (e) => {
   renderIncidents();
   renderList();
 });
-map.on("moveend", () => { renderCams(); renderList(); });
+map.on("moveend", () => { renderCams(); renderList(); scheduleSgViewport(); });
 
 // Relatieve tijden bijwerken en verlopen incidenten laten verdwijnen.
-setInterval(() => { renderIncidents(); renderList(); renderStatus(); }, 30000);
+// Open/gesloten van statiegeldpunten verandert ook met de tijd.
+setInterval(() => {
+  renderIncidents();
+  renderList();
+  renderStatus();
+  if (state.config) { renderSg(); renderSgList(); }
+}, 30000);
 
 init().catch((err) => {
   console.error(err);

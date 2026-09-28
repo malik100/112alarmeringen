@@ -64,12 +64,23 @@
           <label class="chip cam"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
           <label class="chip cam"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
         </div>
+        <div class="chips" id="sg-controls" hidden>
+          <label class="chip statiegeld" title="Inleverpunten van Statiegeld Nederland (zichtbaar vanaf ingezoomd niveau)">
+            <input type="checkbox" id="sg-show" checked> ♻ Statiegeld</label>
+          <label class="chip statiegeld"><input type="checkbox" id="sg-open"> Alleen nu open</label>
+        </div>
       </fieldset>
 
       <section>
         <h2 id="near-title">In de buurt</h2>
         <ol class="list" id="list-near"></ol>
         <p class="empty" id="empty-near" hidden>Niets binnen je straal. 👍</p>
+      </section>
+
+      <section id="sg-section" hidden>
+        <h2 id="sg-title">Statiegeld in de buurt</h2>
+        <ol class="list" id="list-sg"></ol>
+        <p class="empty" id="empty-sg" hidden></p>
       </section>
 
       <section>
@@ -79,12 +90,13 @@
       </section>
 
       <footer class="credits">
-        P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL)
+        P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL) · statiegeld via Statiegeld Nederland
       </footer>
     </div>
   </aside>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/openinghours.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # Sirene Radar
 
-Een live kaart van P2000-alarmeringen en flitsers rond je eigen locatie. Het draait volledig
+Een live kaart van P2000-alarmeringen, flitsers en statiegeld-inleverpunten rond je eigen locatie. Het draait volledig
 op je eigen server of Raspberry Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
@@ -9,6 +9,9 @@ op je eigen server of Raspberry Pi. Pushmeldingen zijn optioneel en staan standa
   bovenaan de lijst, gesorteerd op afstand.
 - **Vaste flitsers, roodlichtcamera's en trajectcontroles** uit OpenStreetMap, als lagen die je
   aan en uit zet.
+- **Statiegeld-inleverpunten** (supermarkten, automaten) met openingstijden, wat ze innemen
+  en hoe je je geld krijgt. Een filter **"Alleen nu open"** toont alleen wat op dit moment
+  open is, en een lijst toont de dichtstbijzijnde punten.
 - **Live**: nieuwe incidenten verschijnen binnen ongeveer een minuut, zonder dat je de pagina
   hoeft te verversen.
 - **Optionele meldingen** via Home Assistant of een eigen ntfy-server.
@@ -18,9 +21,10 @@ Flexflitsers zitten er (nog) niet in: daar bestaat geen open databron voor.
 ## Hoe de data stroomt
 
 ```
-alarmeringen.nl (RSS) ─┐
-OpenStreetMap (flitsers)┼─► sirene-container ─► SQLite
-PDOK (adres → GPS)  ────┘        │   ▲
+alarmeringen.nl (RSS) ──┐
+OpenStreetMap (flitsers)├─► sirene-container ─► SQLite
+Statiegeld Nederland ───┤        │   ▲
+PDOK (adres → GPS)  ────┘        │   │
                                  │   └── jouw locatie: Home Assistant-app of de browser
                                  ▼
                      webkaart (live) ──► (optioneel) melding
@@ -28,7 +32,7 @@ PDOK (adres → GPS)  ────┘        │   ▲
 
 - Alle verwerking gebeurt op je eigen server. Je eigen locatie verlaat je server nooit.
 - Naar buiten gaan alleen: het ophalen van de P2000-feed, het adres van een incident naar
-  PDOK (gecachet), één keer per dag de flitsers, en de kaarttegels.
+  PDOK (gecachet), één keer per dag de flitsers en de statiegeldpunten, en de kaarttegels.
 
 ## Installatie
 
@@ -90,6 +94,25 @@ Rijd je zelf een straal binnen waarin net een incident is gestart, dan krijg je 
 Met `channel: ntfy` gaan meldingen naar je eigen ntfy-server
 (`docker compose --profile ntfy up -d`).
 
+## Statiegeld-inleverpunten
+
+De punten komen uit dezelfde openbare kaartdienst als de
+[locatiewijzer van Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer):
+ongeveer 8.700 punten, één keer per dag opgehaald (circa 7 MB, een paar seconden).
+
+- Op de kaart verschijnen de punten vanaf zoomniveau 12 (instelbaar met `statiegeld.min_zoom`).
+  Groen is nu open, grijs is gesloten, wit betekent onbekende openingstijden.
+- Het paneel toont de tien dichtstbijzijnde punten binnen `statiegeld.list_radius_m`
+  (standaard 2 km), met afstand en status, zoals "Open tot 22:00" of
+  "Gesloten · opent morgen om 08:00".
+- "Nu open" wordt in je browser berekend in Nederlandse tijd en elke 30 seconden bijgewerkt.
+  Tijden over middernacht (bijv. 10:00–01:00) en middagpauzes worden meegenomen.
+- Bij ongeveer een vijfde van de punten staan geen openingstijden in de bron. Die tonen we als
+  "openingstijden onbekend". Het filter "Alleen nu open" verbergt ze, omdat niet vaststaat dat
+  ze open zijn.
+
+Uitzetten kan met `statiegeld.enabled: false` in `config.yaml`.
+
 ## Nauwkeurigheid van de locatie
 
 P2000-berichten bevatten geen coördinaten. De locatie wordt bepaald uit postcode, straat en
@@ -114,13 +137,18 @@ Een lange straat kan honderden meters afwijken. Houd daar rekening mee bij een s
 - **Flitsers uit OSM**: zo volledig als de vrijwilligers van OpenStreetMap ze bijhouden.
   Waarschuwen voor flitsers mag in Nederland, maar onder andere in Duitsland, Zwitserland en
   Frankrijk niet.
+- **Statiegeld-kaartdienst**: dit is geen officieel gedocumenteerde API, maar de kaartdienst
+  achter de openbare locatiewijzer. Verandert de URL, dan kun je een nieuwe opgeven met
+  `statiegeld.url`. Bij een fout blijven de laatst opgehaalde punten staan en probeert de app
+  het na 30 minuten opnieuw.
 
 ## Ontwikkelen
 
 ```bash
 cd app
 pip install -r requirements-dev.txt
-pytest
+pytest                                  # Python-tests
+node --test "tests/js/*.test.js"        # openingstijden-logica (Node 18+)
 SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:app --reload --port 8080
 ```
 
@@ -128,14 +156,16 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 |----------------------------|---------------------------------------------------------|
 | `app/sirene/parser.py`     | P2000-tekst → dienst, prioriteit, straat, plaats, postcode |
 | `app/sirene/geocoder.py`   | adres → coördinaten (cache + PDOK)                      |
-| `app/sirene/sources/`      | P2000-feed en flitsers (Overpass)                       |
+| `app/sirene/sources/`      | P2000-feed, flitsers (Overpass), statiegeldpunten (WFS) |
 | `app/sirene/service.py`    | ophalen, opslaan, live doorsturen, meldingen            |
 | `app/sirene/main.py`       | API en webserver                                        |
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
+| `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
 
 ## Bronnen en licenties
 
 - P2000-berichten: [alarmeringen.nl](https://alarmeringen.nl) (RSS).
 - Adressen: [PDOK Locatieserver](https://www.pdok.nl), op basis van de BAG.
+- Statiegeld-inleverpunten: [Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - [Leaflet](https://leafletjs.com): BSD-2-licentie, meegeleverd in `app/sirene/static/vendor/leaflet`.
