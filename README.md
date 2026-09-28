@@ -205,16 +205,16 @@ Bron: [NDW open data](https://opendata.ndw.nu): alle ~79.000 openbare laadlocati
   geheugen kost. De beschikbaarheid staat alleen in het geheugen en wordt na een herstart direct
   opnieuw opgehaald.
 
-De laadlaag staat standaard uit. Zet hem aan met **⚡ Laadpalen** en kies een profiel:
+De laadlaag staat standaard uit. Zet hem aan met **Laadpalen** (onder *Op de kaart*) en kies een profiel:
 
 | Profiel                  | Voor wie                                   | Filter                                              |
 |--------------------------|--------------------------------------------|-----------------------------------------------------|
-| ⚡ Snelladen onderweg     | lange rit                                  | CCS, ≥ 50 kW, nu vrij                               |
-| 🏠 Laden in de straat     | bewoner zonder eigen oprit                 | Type 2, nu vrij; waarschuwt voor kosten per uur     |
-| 🛒 Bestemmingsladen       | werk, winkel, uitje                        | Type 2, ≥ 11 kW; popup toont ook het parkeertarief  |
-| 💳 Zonder laadpas         | huurauto, gast, buitenlandse bezoeker      | betalen met creditcard of pinpas, nu vrij           |
-| 🔌 CHAdeMO                | bijv. een oudere Nissan Leaf               | CHAdeMO, nu vrij                                    |
-| ⚙️ Eigen instellingen     | iedereen                                   | stekker, vermogen, nu vrij, zonder laadpas, niet alleen klanten, 24/7 |
+| Snelladen onderweg       | lange rit                                  | CCS, ≥ 50 kW, nu vrij                               |
+| Laden in de straat       | bewoner zonder eigen oprit                 | Type 2, nu vrij; waarschuwt voor kosten per uur     |
+| Bestemmingsladen         | werk, winkel, uitje                        | Type 2, ≥ 11 kW; popup toont ook het parkeertarief  |
+| Zonder laadpas           | huurauto, gast, buitenlandse bezoeker      | betalen met creditcard of pinpas, nu vrij           |
+| CHAdeMO                  | bijv. een oudere Nissan Leaf               | CHAdeMO, nu vrij                                    |
+| Eigen instellingen       | iedereen                                   | stekker, vermogen, nu vrij, zonder laadpas, niet alleen klanten, 24/7 |
 
 - **Per apparaat:** het profiel wordt op het apparaat onthouden, zodat ieder gezinslid op de
   eigen telefoon een ander profiel kan gebruiken, zonder accounts.
