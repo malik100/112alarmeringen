@@ -40,10 +40,11 @@
 
       <nav class="tabs" role="tablist" aria-label="Onderwerpen">
         <button role="tab" data-tab="overzicht">Overzicht</button>
-        <button role="tab" data-tab="112">🚨 112</button>
+        <button role="tab" data-tab="winkels" hidden>🛒 Winkels</button>
         <button role="tab" data-tab="parkeren" hidden>🅿 Parkeren</button>
         <button role="tab" data-tab="laden" hidden>⚡ Laden</button>
         <button role="tab" data-tab="statiegeld" hidden>♻ Statiegeld</button>
+        <button role="tab" data-tab="112">🚨 112</button>
       </nav>
 
       <!-- Overzicht: per onderwerp het belangrijkste op jouw plek -->
@@ -53,6 +54,7 @@
           <legend>Op de kaart</legend>
           <div class="chips">
             <label class="chip"><input type="checkbox" id="layer-incidents"> 🚨 Meldingen</label>
+            <label class="chip shops" id="sh-show-chip" hidden><input type="checkbox" id="sh-show"> 🛒 Winkels</label>
             <label class="chip"><input type="checkbox" id="layer-cams"> 📷 Flitsers</label>
             <label class="chip parking" id="pk-show-chip" hidden><input type="checkbox" id="pk-show"> 🅿 Parkeren</label>
             <label class="chip charging" id="ch-show-chip" hidden><input type="checkbox" id="ch-show"> ⚡ Laadpalen</label>
@@ -99,6 +101,24 @@
           <h2>In beeld op de kaart</h2>
           <ol class="list" id="list-view"></ol>
           <p class="empty" id="empty-view" hidden>Geen meldingen in dit kaartgebied.</p>
+        </section>
+      </div>
+
+      <!-- Winkels -->
+      <div data-panel="winkels" role="tabpanel" hidden>
+        <div class="chips">
+          <label class="chip shops"><input type="checkbox" data-sh-kind="supermarkt" checked> 🛒 Supermarkten</label>
+          <label class="chip shops"><input type="checkbox" data-sh-kind="buurtwinkel" checked> 🏪 Buurt- &amp; avondwinkels</label>
+          <label class="chip shops"><input type="checkbox" data-sh-kind="markt" checked> 🧺 Markten</label>
+        </div>
+        <div class="chips">
+          <label class="chip"><input type="checkbox" id="sh-open"> Alleen nu open</label>
+          <label class="chip"><input type="checkbox" id="sh-late"> Open na 22:00</label>
+        </div>
+        <section>
+          <h2 id="sh-title">Boodschappen in de buurt</h2>
+          <ol class="list" id="list-sh"></ol>
+          <p class="empty" id="empty-sh" hidden></p>
         </section>
       </div>
 
@@ -180,7 +200,7 @@
       </div>
 
       <footer class="credits">
-        P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL) · statiegeld via Statiegeld Nederland · parkeren via RDW (NPR) · nieuws via regionale omroepen, NOS, NU.nl en 112-sites · laadpalen via NDW
+        P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL) · statiegeld via Statiegeld Nederland · parkeren via RDW (NPR) · nieuws via regionale omroepen, NOS, NU.nl en 112-sites · laadpalen via NDW · winkels &copy; OpenStreetMap
       </footer>
     </div>
   </aside>

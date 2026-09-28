@@ -92,6 +92,15 @@ CREATE TABLE IF NOT EXISTS charging (
 );
 CREATE INDEX IF NOT EXISTS charging_lat_lon ON charging (lat, lon);
 
+CREATE TABLE IF NOT EXISTS shops (
+    id   TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    lat  REAL NOT NULL,
+    lon  REAL NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shops_lat_lon ON shops (lat, lon);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -316,6 +325,27 @@ class Database:
 
     def charging_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM charging").fetchone()[0]
+
+    # --- winkels ------------------------------------------------------------
+
+    def replace_shops(self, shops: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM shops")
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO shops (id, kind, lat, lon, data) VALUES (?, ?, ?, ?, ?)",
+                [(s["id"], s["kind"], s["lat"], s["lon"], json.dumps(s, ensure_ascii=False)) for s in shops],
+            )
+
+    def shops_in_bbox(self, south: float, west: float, north: float, east: float,
+                      limit: int) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT data FROM shops WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT ?",
+            (south, north, west, east, limit),
+        ).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def shops_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM shops").fetchone()[0]
 
     # --- meta -------------------------------------------------------------
 

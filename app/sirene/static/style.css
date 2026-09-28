@@ -204,6 +204,16 @@ html, body {
 .chip.onbekend, .chip.cam { color: var(--fg-muted); }
 .chip.statiegeld { color: var(--statiegeld); }
 .chip.parking { color: var(--politie); }
+.chip.shops { color: #7c2d12; }
+@media (prefers-color-scheme: dark) { .chip.shops { color: #fdba74; } }
+.sh-marker { background: none; border: 0; }
+.sh-sign {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; line-height: 1;
+  background: #fff; border: 3px solid var(--c, #9ca3af);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+.tag.late { background: #1e3a8a; color: #fff; }
 .chip.charging { color: var(--charging); font-weight: 600; white-space: nowrap; }
 #ch-controls .row .select { flex: 1 1 160px; }
 #ch-controls .row .select select { width: 100%; }

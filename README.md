@@ -1,13 +1,15 @@
 # Buurtradar
 
-Een live kaart van wat er in je buurt gebeurt: 112-meldingen, flitsers, parkeerzones, laadpalen,
-statiegeld-inleverpunten en het nieuws erbij. Het draait volledig op je eigen server of Raspberry
+Een live kaart van wat er in je buurt gebeurt: supermarkten en avondwinkels, parkeerzones,
+laadpalen, statiegeld-inleverpunten, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
 Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
-  `🚨 0 · 🅿 €8,01/u · ⚡ 5 vrij · ♻ 8 open`. Daaronder tabbladen (Overzicht, 112, Parkeren, Laden,
-  Statiegeld). Het overzicht toont per onderwerp het belangrijkste op jouw plek. Is er een
+  `🚨 0 · 🛒 4 open · 🅿 €8,01/u · ⚡ 5 vrij · ♻ 8 open`. Daaronder tabbladen (Overzicht, Winkels,
+  Parkeren, Laden, Statiegeld, 112). Het overzicht toont per onderwerp het belangrijkste op jouw plek. Is er een
   melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
+- **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
+  en "Open na 22:00", en een label "LAAT OPEN".
 - **Kaartlagen** zet je los aan en uit (meldingen, flitsers, parkeren, laadpalen, statiegeld).
   Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
@@ -165,6 +167,21 @@ Beperkingen:
 
 Uitzetten kan met `parking.enabled: false` in `config.yaml`.
 
+## Supermarkten, avondwinkels en markten
+
+Bron: OpenStreetMap (via Overpass, één keer per dag): ~5.200 supermarkten, ~2.800 buurtwinkels,
+avondwinkels en toko's, en ~270 markten.
+
+- **Openingstijden** komen uit OpenStreetMap (`opening_hours`). Ontbreken ze bij een supermarkt,
+  dan nemen we de tijden over van hetzelfde punt in de statiegelddata (zelfde merk, binnen 75 m).
+  Zo is de dekking ~73% van de winkels. De popup vermeldt de bron.
+- **Onbekend = onbekend:** van ~99% van de ingevulde tijden begrijpen we het formaat. Tijden die
+  we niet zeker kunnen lezen (bijv. "april–september", "schoolvakantie") tonen we als onbekend,
+  niet als open. Feestdagen worden niet doorgerekend.
+- **"LAAT OPEN"** betekent: op minstens één dag open tot na 22:00.
+- **Fouten verbeteren:** de popup linkt naar de winkel op OpenStreetMap. Een verbetering daar komt
+  na de volgende dagelijkse verversing ook in Buurtradar.
+
 ## Laadpalen
 
 Bron: [NDW open data](https://opendata.ndw.nu): alle ~79.000 openbare laadlocaties in Nederland.
@@ -281,6 +298,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
 | `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
 | `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen                  |
+| `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
 | `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
 | `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
@@ -296,6 +314,7 @@ installaties en hun gegevens werken.
 - Adressen: [PDOK Locatieserver](https://www.pdok.nl), op basis van de BAG.
 - Statiegeld-inleverpunten: [Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer).
 - Nieuws: RSS-feeds van de genoemde omroepen en sites; we tonen alleen titel, bron en link.
+- Winkels en markten: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Laadpalen: [NDW open data](https://opendata.ndw.nu) (OCPI).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.

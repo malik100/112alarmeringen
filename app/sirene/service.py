@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from typing import Any
 
@@ -20,6 +21,7 @@ from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
 from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import fetch_zones
+from .sources.shops import fetch_shops, is_late, same_store
 from .sources.speedcams import fetch_speedcams
 from .sources.statiegeld import DEFAULT_URL as STATIEGELD_URL
 from .sources.statiegeld import fetch_statiegeld
@@ -55,6 +57,7 @@ class Service:
             "parking": {"last_ok": None, "last_error": None, "count": 0},
             "news": {"last_ok": None, "last_error": None},
             "charging": {"last_ok": None, "last_error": None, "count": 0},
+            "shops": {"last_ok": None, "last_error": None, "count": 0},
             "charging_status": {"last_ok": None, "last_error": None},
             "homeassistant": {"last_ok": None, "last_error": None},
         }
@@ -294,6 +297,41 @@ class Service:
         self.bus.publish("parking", {"count": len(zones)})
         return True
 
+    # --- winkels ------------------------------------------------------------
+
+    def fill_shop_hours(self, shops: list[dict[str, Any]], radius_m: float = 75) -> int:
+        """Vult ontbrekende openingstijden aan met die van hetzelfde statiegeldpunt."""
+        filled = 0
+        for shop in shops:
+            if shop["hours"] or shop["kind"] == "markt":
+                continue
+            d_lat = radius_m / 111_320
+            d_lon = radius_m / (111_320 * max(0.1, math.cos(math.radians(shop["lat"]))))
+            for point in self.db.statiegeld_in_bbox(shop["lat"] - d_lat, shop["lon"] - d_lon,
+                                                    shop["lat"] + d_lat, shop["lon"] + d_lon, 50):
+                if (same_store(shop, point) and any(h is not None for h in point["hours"])
+                        and haversine_m(shop["lat"], shop["lon"], point["lat"], point["lon"]) <= radius_m):
+                    shop["hours"] = point["hours"]
+                    shop["hours_source"] = "Statiegeld Nederland"
+                    shop["late"] = is_late(point["hours"])
+                    filled += 1
+                    break
+        return filled
+
+    async def refresh_shops_once(self) -> bool:
+        try:
+            shops = await fetch_shops(self.client, self.cfg["speedcams"]["overpass_urls"])
+        except RuntimeError as exc:
+            self.status["shops"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        filled = self.fill_shop_hours(shops)
+        log.info("%d winkels, openingstijden van %d aangevuld via statiegelddata", len(shops), filled)
+        self.db.replace_shops(shops)
+        self.db.meta_set("shops_updated", time.time())
+        self.status["shops"].update(last_ok=time.time(), count=len(shops))
+        self.bus.publish("shops", {"count": len(shops)})
+        return True
+
     # --- laadpalen ---------------------------------------------------------
 
     async def refresh_charging_once(self) -> bool:
@@ -361,6 +399,10 @@ class Service:
         if self.cfg["news"]["enabled"]:
             self._tasks.append(asyncio.create_task(
                 self._loop("nieuws", self.cfg["news"]["poll_interval_s"], self.poll_news_once)))
+        if self.cfg["shops"]["enabled"]:
+            self.status["shops"]["count"] = self.db.shops_count()
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "shops", self.cfg["shops"]["refresh_hours"] * 3600, self.refresh_shops_once)))
         if self.cfg["charging"]["enabled"]:
             self.status["charging"]["count"] = self.db.charging_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(

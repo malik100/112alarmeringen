@@ -27,6 +27,7 @@ HEARTBEAT_S = 20
 STATIEGELD_LIMIT = 2000
 PARKING_LIMIT = 800
 CHARGING_LIMIT = 1500
+SHOPS_LIMIT = 2000
 PARKING_KINDS = {"betaald", "blauw", "vergunning", "garage"}
 
 logging.basicConfig(
@@ -67,6 +68,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "statiegeld": {k: cfg["statiegeld"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "parking": {k: cfg["parking"][k] for k in ("enabled", "min_zoom")},
             "charging": {k: cfg["charging"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
+            "shops": {k: cfg["shops"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
         }
 
     @app.get("/api/status")
@@ -136,6 +138,19 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             return []
         candidates = svc.db.parking_in_bbox(lat, lon, lat, lon, parse_kinds(kinds), PARKING_LIMIT)
         return [z for z in candidates if contains(z["geometry"], lon, lat)]
+
+    @app.get("/api/shops")
+    def get_shops(bbox: str = Query(description="west,zuid,oost,noord in graden")):
+        """Supermarkten, buurt-/avondwinkels en markten in een gebied."""
+        if not svc.cfg["shops"]["enabled"]:
+            return []
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > 1 or north - south > 1:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        return svc.db.shops_in_bbox(south, west, north, east, SHOPS_LIMIT)
 
     @app.get("/api/charging")
     def get_charging(bbox: str = Query(description="west,zuid,oost,noord in graden"),

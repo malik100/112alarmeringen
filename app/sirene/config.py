@@ -88,6 +88,14 @@ DEFAULTS: dict[str, Any] = {
             {"name": "112Ede", "url": "https://www.112ede.nl/feed/"},
         ],
     },
+    "shops": {
+        "enabled": True,
+        "refresh_hours": 24,
+        # Pas vanaf dit zoomniveau winkels op de kaart tekenen (er zijn er ~8.000).
+        "min_zoom": 13,
+        # Straal voor de lijst "boodschappen in de buurt".
+        "list_radius_m": 1500,
+    },
     "charging": {
         "enabled": True,
         # Details (stekkers, tarieven, toegang) één keer per dag; beschikbaarheid vaker.

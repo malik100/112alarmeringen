@@ -42,6 +42,12 @@ news:
   #   - {name: NH Nieuws, url: "https://rss.nhnieuws.nl/rss"}
   #   - {name: NOS, url: "https://feeds.nos.nl/nosnieuwsbinnenland"}
 
+shops:
+  enabled: true
+  refresh_hours: 24
+  min_zoom: 13
+  list_radius_m: 1500   # straal voor de lijst "boodschappen in de buurt"
+
 charging:
   enabled: true
   refresh_hours: 24         # details: stekkers, tarieven, toegang

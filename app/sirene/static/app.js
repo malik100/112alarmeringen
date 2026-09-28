@@ -28,6 +28,8 @@ const state = {
   showCams: true,
   sg: { points: [], near: [], show: true, onlyOpen: false, nearFrom: null },
   pk: { show: true, zones: [], here: [], kinds: new Set(["betaald", "blauw", "garage"]), hereFrom: null },
+  sh: { show: false, points: [], near: [], kinds: new Set(["supermarkt", "buurtwinkel", "markt"]),
+        onlyOpen: false, lateOnly: false, nearFrom: null },
   ch: { show: false, profile: "snel", custom: null, stations: [], near: [], statusTs: null, nearFrom: null },
 };
 
@@ -97,6 +99,8 @@ const sgMarkers = new Map();
 map.createPane("parking").style.zIndex = 350; // onder markers en popups
 const pkLayer = L.layerGroup().addTo(map);
 const pkShapes = new Map();
+const shLayer = L.layerGroup().addTo(map);
+const shMarkers = new Map();
 const chLayer = L.layerGroup().addTo(map);
 const chMarkers = new Map();
 const meLayer = L.layerGroup().addTo(map);
@@ -963,17 +967,215 @@ function initCharging() {
   chReload();
 }
 
+// ---------- winkels ----------
+
+const SH_ICON = { supermarkt: "🛒", buurtwinkel: "🏪", markt: "🧺" };
+const SH_KIND_LABEL = { supermarkt: "Supermarkt", buurtwinkel: "Buurt-/avondwinkel", markt: "Markt" };
+const SH_COLORS = { open: "#16a34a", closed: "#9ca3af", unknown: "#e5e7eb" };
+
+function shStatus(shop) {
+  return OpeningHours.status(shop.hours);
+}
+
+function shMatches(shop, st) {
+  if (!state.sh.kinds.has(shop.kind)) return false;
+  if (state.sh.onlyOpen && st.state !== "open") return false;
+  if (state.sh.lateOnly && !shop.late) return false;
+  return true;
+}
+
+function shWeekRows(shop) {
+  const today = OpeningHours.amsterdamNow().day;
+  return OpeningHours.DAYS.map((day, i) => {
+    const periods = shop.hours ? shop.hours[i] : null;
+    const text = periods == null ? "onbekend"
+      : !periods.length ? "gesloten"
+        : periods.map(([a, b]) => `${OpeningHours.hhmm(a)}–${b >= 1440 && b % 1440 === 0 ? "24:00" : OpeningHours.hhmm(b)}`).join(", ");
+    return `<tr${i === today ? ' class="today"' : ""}><td>${esc(day)}</td><td>${esc(text)}</td></tr>`;
+  }).join("");
+}
+
+function shPopup(shop) {
+  const st = shStatus(shop);
+  const d = state.location ? haversine(state.location.lat, state.location.lon, shop.lat, shop.lon) : null;
+  const [osmType, osmId] = shop.id.split("/");
+  return `
+    <b>${esc(shop.name)}</b><br>
+    ${esc(SH_KIND_LABEL[shop.kind])}${shop.address ? ` · ${esc(shop.address)}` : ""}${d != null ? ` · ${esc(fmtDistance(d))}` : ""}<br>
+    <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>${shop.late ? ' <span class="tag late">LAAT OPEN</span>' : ""}
+    ${shop.hours ? `<table class="sg-hours">${shWeekRows(shop)}</table>` : ""}
+    <div class="pk-note">${shop.hours_source ? `Openingstijden: ${esc(shop.hours_source)}. ` : "Geen openingstijden bekend. "}Feestdagen kunnen afwijken.</div>
+    <a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer">Klopt iets niet? Verbeter het op OpenStreetMap ↗</a><br>
+    <a href="https://www.openstreetmap.org/directions?to=${shop.lat}%2C${shop.lon}" target="_blank" rel="noopener noreferrer">Route ↗</a>`;
+}
+
+let shPendingPopup = null;
+
+function renderShops() {
+  const reopen = shPendingPopup ?? openPopupId(shMarkers);
+  shLayer.clearLayers();
+  shMarkers.clear();
+  if (!state.sh.show || map.getZoom() < state.config.shops.min_zoom) return;
+  for (const shop of state.sh.points) {
+    const st = shStatus(shop);
+    if (!shMatches(shop, st)) continue;
+    const marker = L.marker([shop.lat, shop.lon], {
+      icon: L.divIcon({ className: "sh-marker", html: `<div class="sh-sign" style="--c:${SH_COLORS[st.state]}">${SH_ICON[shop.kind]}</div>`,
+        iconSize: [24, 24], iconAnchor: [12, 12] }),
+      keyboard: false, zIndexOffset: -450,
+    }).bindPopup(() => shPopup(shop), { maxWidth: 290 });
+    marker.addTo(shLayer);
+    shMarkers.set(shop.id, marker);
+  }
+  if (reopen != null && shMarkers.has(reopen)) {
+    shMarkers.get(reopen).openPopup();
+    shPendingPopup = null;
+  }
+}
+
+function shNearItems() {
+  if (!state.location) return [];
+  return state.sh.near
+    .map((p) => ({ p, st: shStatus(p), d: haversine(state.location.lat, state.location.lon, p.lat, p.lon) }))
+    .filter((x) => x.d <= state.config.shops.list_radius_m)
+    .sort((a, b) => a.d - b.d);
+}
+
+function shListItem(x) {
+  const { p: shop, st, d } = x;
+  const li = document.createElement("li");
+  li.className = "item statiegeld";
+  li.tabIndex = 0;
+  const bar = document.createElement("span");
+  bar.className = `bar ${st.state}`;
+  const what = document.createElement("span");
+  what.className = "what";
+  what.textContent = `${SH_ICON[shop.kind]} ${shop.name}`;
+  const distEl = document.createElement("span");
+  distEl.className = "dist";
+  distEl.textContent = fmtDistance(d);
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  const status = document.createElement("span");
+  status.className = SG_STATE_CLASS[st.state];
+  status.textContent = st.text;
+  meta.append(status);
+  if (shop.late) {
+    const tag = document.createElement("span");
+    tag.className = "tag late";
+    tag.textContent = "LAAT OPEN";
+    meta.append(" ", tag);
+  }
+  if (shop.address) meta.append(` · ${shop.address}`);
+  li.append(bar, what, distEl, meta);
+  const open = () => {
+    shPendingPopup = shop.id;
+    setLayer("shops", true);
+    map.setView([shop.lat, shop.lon], Math.max(map.getZoom(), state.config.shops.min_zoom, 16));
+    scheduleShopsViewport();
+    if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
+  };
+  li.addEventListener("click", open);
+  li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  return li;
+}
+
+function renderShopsList() {
+  const cfg = state.config.shops;
+  if (!cfg.enabled) return;
+  $("sh-title").textContent = `Boodschappen binnen ${fmtDistance(cfg.list_radius_m)}`;
+  const empty = $("empty-sh");
+  if (!state.location) {
+    $("list-sh").replaceChildren();
+    empty.textContent = "Nog geen locatie bekend.";
+    empty.hidden = false;
+  } else {
+    const items = shNearItems().filter((x) => shMatches(x.p, x.st)).slice(0, 12);
+    $("list-sh").replaceChildren(...items.map(shListItem));
+    empty.textContent = state.sh.onlyOpen || state.sh.lateOnly
+      ? "Niets gevonden dat nu aan je filters voldoet." : "Geen winkels of markten in de buurt.";
+    empty.hidden = items.length > 0;
+  }
+  renderOverview();
+}
+
+let shSeq = 0;
+let shTimer = null;
+function scheduleShopsViewport() {
+  clearTimeout(shTimer);
+  shTimer = setTimeout(async () => {
+    const cfg = state.config.shops;
+    if (!cfg.enabled || !state.sh.show || map.getZoom() < cfg.min_zoom) {
+      state.sh.points = [];
+      renderShops();
+      return;
+    }
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(5)).join(",");
+    const seq = ++shSeq;
+    try {
+      const points = await api(`/api/shops?bbox=${bbox}`);
+      if (seq !== shSeq) return;
+      state.sh.points = points;
+      renderShops();
+    } catch (err) { console.warn("Winkels:", err.message); }
+  }, 250);
+}
+
+async function loadShopsNear(force) {
+  const cfg = state.config.shops;
+  const loc = state.location;
+  if (!cfg.enabled || !loc) return renderShopsList();
+  const from = state.sh.nearFrom;
+  if (!force && from && haversine(from.lat, from.lon, loc.lat, loc.lon) < cfg.list_radius_m / 4) {
+    return renderShopsList();
+  }
+  state.sh.nearFrom = { lat: loc.lat, lon: loc.lon };
+  const bbox = bboxAround(loc.lat, loc.lon, cfg.list_radius_m * 1.3).map((v) => v.toFixed(5)).join(",");
+  state.sh.near = await api(`/api/shops?bbox=${bbox}`);
+  renderShopsList();
+}
+
+function initShops() {
+  if (!state.config.shops.enabled) return;
+  document.querySelector('[data-tab="winkels"]').hidden = false;
+  $("sh-show-chip").hidden = false;
+  state.sh.show = store.get("shShow") === "1";
+  state.sh.onlyOpen = store.get("shOpen") === "1";
+  state.sh.lateOnly = store.get("shLate") === "1";
+  const savedKinds = store.get("shKinds");
+  if (savedKinds != null) state.sh.kinds = new Set(savedKinds.split(",").filter(Boolean));
+  $("sh-show").checked = state.sh.show;
+  $("sh-open").checked = state.sh.onlyOpen;
+  $("sh-late").checked = state.sh.lateOnly;
+  $("sh-show").addEventListener("change", (e) => setLayer("shops", e.target.checked));
+  const refilter = () => { renderShops(); renderShopsList(); };
+  $("sh-open").addEventListener("change", (e) => { state.sh.onlyOpen = e.target.checked; store.set("shOpen", e.target.checked ? "1" : "0"); refilter(); });
+  $("sh-late").addEventListener("change", (e) => { state.sh.lateOnly = e.target.checked; store.set("shLate", e.target.checked ? "1" : "0"); refilter(); });
+  document.querySelectorAll("[data-sh-kind]").forEach((el) => {
+    el.checked = state.sh.kinds.has(el.dataset.shKind);
+    el.addEventListener("change", () => {
+      el.checked ? state.sh.kinds.add(el.dataset.shKind) : state.sh.kinds.delete(el.dataset.shKind);
+      store.set("shKinds", [...state.sh.kinds].join(","));
+      refilter();
+    });
+  });
+  scheduleShopsViewport();
+  loadShopsNear(true).catch(console.error);
+}
+
 // ---------- overzicht ----------
 
 /** Zet een kaartlaag aan of uit (en onthoud dat per apparaat). */
 function setLayer(layer, on) {
-  const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show",
+  const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show", shops: "sh-show",
     charging: "ch-show", statiegeld: "sg-show" }[layer];
   if ($(el)) $(el).checked = on;
   if (layer === "incidents") { state.showIncidents = on; store.set("showIncidents", on ? "1" : "0"); renderIncidents(); }
   if (layer === "cams") { state.showCams = on; store.set("showCams", on ? "1" : "0"); $("cam-layers").hidden = !on; renderCams(); }
   if (layer === "parking") { state.pk.show = on; store.set("pkShow", on ? "1" : "0"); scheduleParkingViewport(); }
   if (layer === "charging") { state.ch.show = on; store.set("chShow", on ? "1" : "0"); scheduleChargingViewport(); }
+  if (layer === "shops") { state.sh.show = on; store.set("shShow", on ? "1" : "0"); scheduleShopsViewport(); }
   if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
 }
 
@@ -985,7 +1187,7 @@ function setTab(tab) {
   document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
   document.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== tab; });
   // Wie een onderwerp opent, wil het meestal ook op de kaart zien.
-  const layer = { 112: "incidents", parkeren: "parking", laden: "charging", statiegeld: "statiegeld" }[tab];
+  const layer = { 112: "incidents", winkels: "shops", parkeren: "parking", laden: "charging", statiegeld: "statiegeld" }[tab];
   if (layer) setLayer(layer, true);
   $("panel-body").scrollTop = 0;
 }
@@ -1032,6 +1234,10 @@ function summaryParts() {
   const sirenes = near.filter((x) => x.inc.sirene && Date.now() / 1000 - x.inc.ts < OLD_INCIDENT_S).length;
   parts.push({ text: sirenes ? `🚨 ${sirenes} sirene${sirenes > 1 ? "s" : ""} dichtbij` : `🚨 ${near.length}`,
     alert: sirenes > 0, title: "112-meldingen binnen je straal" });
+  if (state.config.shops.enabled && state.location) {
+    const open = shNearItems().filter((x) => x.st.state === "open").length;
+    parts.push({ text: `🛒 ${open} open`, title: "Winkels en markten in de buurt die nu open zijn" });
+  }
   if (state.config.parking.enabled && state.location) {
     const zone = state.pk.here.find((z) => z.kind === "betaald" || z.kind === "blauw");
     const st = zone && Parking.status(zone);
@@ -1092,6 +1298,18 @@ function renderOverview() {
     near.slice(0, 2).map((x) => listItem(x.inc, x.d)), recentSirene ? "urgent" : "");
 
   const topical = [];
+  if (state.config.shops.enabled) {
+    const items = shNearItems().filter((x) => state.sh.kinds.has(x.p.kind));
+    const open = items.filter((x) => x.st.state === "open");
+    const late = open.filter((x) => x.p.late);
+    const show = (open.length ? open : items).slice(0, 2);
+    const extra = late.length ? ` · ${late.length} laat open` : "";
+    topical.push(card("winkels", "🛒 Boodschappen",
+      items.length
+        ? `${open.length} van ${items.length} winkels binnen ${fmtDistance(state.config.shops.list_radius_m)} nu open${extra}`
+        : "Geen winkels of markten in de buurt.",
+      show.map(shListItem)));
+  }
   if (state.config.parking.enabled) {
     const zones = state.pk.here.filter((z) => z.kind !== "vergunning");
     const permit = state.pk.here.some((z) => z.kind === "vergunning");
@@ -1170,6 +1388,11 @@ function connectEvents() {
     loadSgNear().catch(console.error);
     loadParkingHere().catch(console.error);
     loadChargingNear().catch(console.error);
+    loadShopsNear().catch(console.error);
+  });
+  es.addEventListener("shops", () => {
+    scheduleShopsViewport();
+    loadShopsNear(true).catch(console.error);
   });
   es.addEventListener("charging", chReload);
   es.addEventListener("charging_status", chReload);
@@ -1240,6 +1463,7 @@ async function init() {
   initStatiegeld();
   initParking();
   initCharging();
+  initShops();
   setTab(store.get("tab") || "overzicht");
   connectEvents();
 
@@ -1280,7 +1504,7 @@ $("window").addEventListener("change", async (e) => {
   renderList();
 });
 map.on("moveend", () => {
-  renderCams(); renderList(); scheduleSgViewport(); scheduleParkingViewport(); scheduleChargingViewport();
+  renderCams(); renderList(); scheduleSgViewport(); scheduleParkingViewport(); scheduleChargingViewport(); scheduleShopsViewport();
 });
 
 // Relatieve tijden bijwerken en verlopen incidenten laten verdwijnen.
@@ -1289,7 +1513,7 @@ setInterval(() => {
   renderIncidents();
   renderList();
   renderStatus();
-  if (state.config) { renderSg(); renderSgList(); renderParking(); renderParkingHere(); renderChargingList(); }
+  if (state.config) { renderSg(); renderSgList(); renderParking(); renderParkingHere(); renderChargingList(); renderShops(); renderShopsList(); }
 }, 30000);
 
 init().catch((err) => {
