@@ -1,0 +1,277 @@
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f3f4f6;
+  --fg: #111827;
+  --fg-muted: #6b7280;
+  --border: #e5e7eb;
+  --shadow: 0 6px 24px rgba(0, 0, 0, .15);
+  --brandweer: #dc2626;
+  --ambulance: #d97706;
+  --politie: #2563eb;
+  --onbekend: #6b7280;
+  --traject: #7c3aed;
+  --me: #0ea5e9;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --err: #dc2626;
+  --radius: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111827;
+    --bg-soft: #1f2937;
+    --fg: #f9fafb;
+    --fg-muted: #9ca3af;
+    --border: #374151;
+    --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+#map { position: fixed; inset: 0; }
+
+/* --- bovenbalk --- */
+.topbar {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  left: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.topbar > * { pointer-events: auto; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  padding: 6px 12px;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.brand h1 { font-size: 15px; margin: 0; }
+.brand-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--brandweer);
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, .6);
+  animation: pulse 2s infinite;
+}
+.status { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  background: var(--bg);
+  color: var(--fg-muted);
+  box-shadow: var(--shadow);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.pill.ok::before, .pill.warn::before, .pill.err::before {
+  content: ""; display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; margin-right: 6px; vertical-align: 1px;
+}
+.pill.ok::before { background: var(--ok); }
+.pill.warn::before { background: var(--warn); }
+.pill.err::before { background: var(--err); }
+
+/* --- waarschuwing binnen straal --- */
+.alert {
+  position: fixed;
+  z-index: 1001;
+  top: calc(max(10px, env(safe-area-inset-top)) + 44px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 20px));
+  background: var(--brandweer);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* --- paneel --- */
+.panel {
+  position: fixed;
+  z-index: 1000;
+  top: 64px;
+  right: 10px;
+  bottom: 10px;
+  width: 370px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.panel-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+.handle-bar { display: none; }
+.panel-body { overflow-y: auto; padding: 12px 16px 16px; }
+
+.actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.btn {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--fg);
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.btn.primary { background: var(--me); border-color: var(--me); color: #fff; font-weight: 600; }
+
+.filters { border: 0; padding: 0; margin: 0 0 8px; }
+.filters legend { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.chip input { accent-color: currentColor; margin: 0; }
+.chip.brandweer { color: var(--brandweer); }
+.chip.ambulance { color: var(--ambulance); }
+.chip.politie { color: var(--politie); }
+.chip.onbekend, .chip.cam { color: var(--fg-muted); }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.select { display: inline-flex; align-items: center; gap: 6px; color: var(--fg-muted); }
+.select select {
+  font: inherit; color: var(--fg); background: var(--bg-soft);
+  border: 1px solid var(--border); border-radius: 8px; padding: 3px 6px;
+}
+
+h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 6px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.item {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 4px 10px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.item:hover, .item:focus-visible { background: var(--bg-soft); outline: none; }
+.item .bar { grid-row: 1 / span 2; width: 4px; border-radius: 2px; background: var(--onbekend); justify-self: center; }
+.item.brandweer .bar { background: var(--brandweer); }
+.item.ambulance .bar { background: var(--ambulance); }
+.item.politie .bar { background: var(--politie); }
+.item .what { font-weight: 600; overflow-wrap: anywhere; }
+.item .dist { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.item .meta { grid-column: 2 / span 2; font-size: 12px; color: var(--fg-muted); }
+.item.old { opacity: .6; }
+.tag {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  padding: 0 6px; border-radius: 6px; margin-right: 4px;
+  background: var(--bg-soft); color: var(--fg-muted);
+}
+.tag.sirene { background: var(--brandweer); color: #fff; }
+.empty { color: var(--fg-muted); font-size: 13px; margin: 4px 6px; }
+.credits { margin-top: 20px; font-size: 11px; color: var(--fg-muted); }
+
+/* --- kaartmarkers --- */
+.inc-marker { background: none; border: 0; }
+.inc-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+  background: var(--c, var(--onbekend));
+  color: #fff; font: 700 10px/14px system-ui, sans-serif; text-align: center;
+}
+.inc-dot.sirene { width: 24px; height: 24px; line-height: 20px; font-size: 12px; animation: pulse-c 1.6s infinite; }
+.inc-dot.approx { border-style: dashed; opacity: .75; }
+.inc-dot.old { opacity: .45; animation: none; }
+.inc-dot.brandweer { --c: var(--brandweer); }
+.inc-dot.ambulance { --c: var(--ambulance); }
+.inc-dot.politie { --c: var(--politie); }
+
+.cam-marker { background: none; border: 0; }
+.cam-sign {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; border: 3px solid #dc2626;
+  color: #111; font: 700 10px/18px system-ui, sans-serif; text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+.cam-sign.roodlicht { border-color: #111; background: #fde047; }
+.cam-sign.traject { border-color: var(--traject); }
+
+.me-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--me); border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, .35), 0 1px 4px rgba(0, 0, 0, .4);
+}
+
+.leaflet-popup-content { font: 13px/1.4 system-ui, sans-serif; }
+.leaflet-popup-content b { font-size: 14px; }
+.popup-raw { color: #6b7280; font-family: ui-monospace, monospace; font-size: 11px; margin-top: 4px; }
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .6); }
+  70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+@keyframes pulse-c {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 70%, transparent), 0 1px 4px rgba(0,0,0,.5); }
+  70% { box-shadow: 0 0 0 12px transparent, 0 1px 4px rgba(0,0,0,.5); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 1px 4px rgba(0,0,0,.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-dot, .inc-dot.sirene { animation: none; }
+}
+
+/* --- telefoon: paneel als uitschuifbaar vel onderaan --- */
+@media (max-width: 720px) {
+  .panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 70vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .panel.collapsed .panel-body { display: none; }
+  .panel-handle { cursor: pointer; }
+  .handle-bar {
+    display: block; align-self: center;
+    width: 40px; height: 4px; border-radius: 2px; background: var(--border);
+  }
+  .status .pill { font-size: 11px; }
+  .leaflet-bottom { bottom: 64px; }
+}

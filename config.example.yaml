@@ -1,0 +1,46 @@
+# Sirene Radar – kopieer naar config.yaml en pas aan.
+# Alles wat je weglaat krijgt de standaardwaarde (zie app/sirene/config.py).
+
+# Straal rond jouw locatie in meters: voor de lijst "in de buurt" en voor meldingen.
+radius_m: 1000
+
+p2000:
+  # Landelijke feed. Wil je alleen je eigen regio, gebruik dan bijvoorbeeld
+  # https://alarmeringen.nl/feeds/region/amsterdam-amstelland.rss
+  feeds:
+    - https://alarmeringen.nl/feeds/all.rss
+  poll_interval_s: 60   # niet vaker: de feed ververst ongeveer elke minuut
+  keep_hours: 24        # hoe lang incidenten bewaard blijven
+
+location:
+  homeassistant:
+    enabled: false      # zet op true en vul HA_URL/HA_TOKEN/HA_ENTITY_ID in .env
+    poll_interval_s: 15
+  # Laat de webkaart de locatie van je telefoon/laptop doorgeven (vereist HTTPS).
+  browser: true
+  # Vaste terugvallocatie (bijv. thuis) zolang er geen live locatie is.
+  fallback:
+    lat: null
+    lon: null
+  max_age_min: 30       # oudere locaties tellen niet mee voor meldingen
+
+speedcams:
+  enabled: true
+  refresh_hours: 24
+
+map:
+  # Standaard OpenStreetMap-tegels. De tegelserver ziet welk kaartgebied je bekijkt,
+  # niet je locatie of de incidenten. Later kun je hier een eigen tegelserver invullen.
+  tile_url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+  attribution: "&copy; OpenStreetMap-bijdragers"
+  default_window_minutes: 120
+
+notifications:
+  enabled: false        # optioneel: zet op true voor pushmeldingen
+  channel: homeassistant   # of: ntfy
+  only_priority_1: true    # alleen incidenten met sirene (A0/A1/P1)
+  min_precision: straat    # postcode | straat | plaats
+  homeassistant_service: notify.mobile_app_telefoon
+  ntfy:
+    url: http://ntfy
+    topic: sirene

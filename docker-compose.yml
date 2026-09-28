@@ -1,0 +1,47 @@
+services:
+  sirene:
+    build: ./app
+    container_name: sirene-radar
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      TZ: Europe/Amsterdam
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - sirene-data:/data
+
+  # Optioneel: Home Assistant in dezelfde stack.
+  # Start met: docker compose --profile homeassistant up -d
+  # Draait HA al ergens anders? Laat dit weg en zet HA_URL in .env.
+  homeassistant:
+    profiles: ["homeassistant"]
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+    volumes:
+      - ./homeassistant:/config
+    ports:
+      - "8123:8123"
+
+  # Optioneel: eigen pushserver voor meldingen (alternatief voor HA-meldingen).
+  # Start met: docker compose --profile ntfy up -d
+  ntfy:
+    profiles: ["ntfy"]
+    image: binwiederhier/ntfy
+    container_name: ntfy
+    command: serve
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+    volumes:
+      - ntfy-cache:/var/cache/ntfy
+    ports:
+      - "8090:80"
+
+volumes:
+  sirene-data:
+  ntfy-cache:

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <title>Sirene Radar</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="map" aria-label="Kaart met incidenten en flitsers"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot" aria-hidden="true"></span>
+      <h1>Sirene Radar</h1>
+    </div>
+    <div class="status" id="status">
+      <span class="pill" id="st-live" title="Live verbinding met de server">Verbinden…</span>
+      <span class="pill" id="st-loc" title="Bron en leeftijd van je locatie">Geen locatie</span>
+      <span class="pill" id="st-notify" title="Pushmeldingen (instelbaar in config.yaml)">Meldingen uit</span>
+    </div>
+  </header>
+
+  <div id="alert" class="alert" role="alert" hidden></div>
+
+  <aside class="panel" id="panel">
+    <button class="panel-handle" id="panel-toggle" aria-expanded="true" aria-controls="panel-body">
+      <span class="handle-bar" aria-hidden="true"></span>
+      <span id="summary">Laden…</span>
+    </button>
+
+    <div class="panel-body" id="panel-body">
+      <div class="actions">
+        <button id="btn-locate" class="btn primary" hidden>📍 Gebruik mijn locatie</button>
+        <button id="btn-center" class="btn">Centreer op mij</button>
+      </div>
+
+      <fieldset class="filters">
+        <legend>Tonen</legend>
+        <div class="chips">
+          <label class="chip brandweer"><input type="checkbox" data-disc="brandweer" checked> Brandweer</label>
+          <label class="chip ambulance"><input type="checkbox" data-disc="ambulance" checked> Ambulance</label>
+          <label class="chip politie"><input type="checkbox" data-disc="politie" checked> Politie</label>
+          <label class="chip onbekend"><input type="checkbox" data-disc="onbekend" checked> Overig</label>
+        </div>
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="only-sirene"> Alleen met sirene</label>
+          <label class="select">
+            Periode
+            <select id="window">
+              <option value="30">30 min</option>
+              <option value="60">1 uur</option>
+              <option value="120">2 uur</option>
+              <option value="360">6 uur</option>
+              <option value="1440">24 uur</option>
+            </select>
+          </label>
+        </div>
+        <div class="chips" id="cam-layers">
+          <label class="chip cam"><input type="checkbox" data-cam="flitser" checked> Flitsers</label>
+          <label class="chip cam"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
+          <label class="chip cam"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
+        </div>
+      </fieldset>
+
+      <section>
+        <h2 id="near-title">In de buurt</h2>
+        <ol class="list" id="list-near"></ol>
+        <p class="empty" id="empty-near" hidden>Niets binnen je straal. 👍</p>
+      </section>
+
+      <section>
+        <h2>In beeld op de kaart</h2>
+        <ol class="list" id="list-view"></ol>
+        <p class="empty" id="empty-view" hidden>Geen incidenten in dit kaartgebied.</p>
+      </section>
+
+      <footer class="credits">
+        P2000 via alarmeringen.nl · adressen via PDOK (BAG) · flitsers &copy; OpenStreetMap (ODbL)
+      </footer>
+    </div>
+  </aside>
+
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
