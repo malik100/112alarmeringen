@@ -14,14 +14,10 @@
 
   <header class="topbar">
     <div class="brand">
-      <span class="brand-dot" aria-hidden="true"></span>
+      <span class="brand-dot" id="st-live" title="Verbinden…" aria-hidden="true"></span>
       <h1>Buurtradar</h1>
     </div>
-    <div class="status" id="status">
-      <span class="pill" id="st-live" title="Live verbinding met de server">Verbinden…</span>
-      <span class="pill" id="st-loc" title="Bron en leeftijd van je locatie">Geen locatie</span>
-      <span class="pill" id="st-notify" title="Pushmeldingen (instelbaar in config.yaml)">Meldingen uit</span>
-    </div>
+    <span class="pill" id="st-loc" hidden></span>
   </header>
 
   <div id="alert" class="alert" role="alert" hidden></div>
@@ -33,18 +29,13 @@
     </button>
 
     <div class="panel-body" id="panel-body">
-      <div class="actions">
-        <button id="btn-locate" class="btn primary" hidden>📍 Gebruik mijn locatie</button>
-        <button id="btn-center" class="btn">Centreer op mij</button>
-      </div>
-
       <nav class="tabs" role="tablist" aria-label="Onderwerpen">
         <button role="tab" data-tab="overzicht">Overzicht</button>
-        <button role="tab" data-tab="winkels" hidden>🛒 Winkels</button>
-        <button role="tab" data-tab="parkeren" hidden>🅿 Parkeren</button>
-        <button role="tab" data-tab="laden" hidden>⚡ Laden</button>
-        <button role="tab" data-tab="statiegeld" hidden>♻ Statiegeld</button>
-        <button role="tab" data-tab="112">🚨 112</button>
+        <button role="tab" data-tab="winkels" hidden>Winkels</button>
+        <button role="tab" data-tab="parkeren" hidden>Parkeren</button>
+        <button role="tab" data-tab="laden" hidden>Laden</button>
+        <button role="tab" data-tab="statiegeld" hidden>Statiegeld</button>
+        <button role="tab" data-tab="112">112</button>
       </nav>
 
       <!-- Overzicht: per onderwerp het belangrijkste op jouw plek -->
@@ -53,26 +44,26 @@
         <fieldset class="filters">
           <legend>Op de kaart</legend>
           <div class="chips">
-            <label class="chip"><input type="checkbox" id="layer-incidents"> 🚨 Meldingen</label>
-            <label class="chip shops" id="sh-show-chip" hidden><input type="checkbox" id="sh-show"> 🛒 Winkels</label>
-            <label class="chip"><input type="checkbox" id="layer-cams"> 📷 Flitsers</label>
-            <label class="chip parking" id="pk-show-chip" hidden><input type="checkbox" id="pk-show"> 🅿 Parkeren</label>
-            <label class="chip charging" id="ch-show-chip" hidden><input type="checkbox" id="ch-show"> ⚡ Laadpalen</label>
-            <label class="chip statiegeld" id="sg-show-chip" hidden><input type="checkbox" id="sg-show"> ♻ Statiegeld</label>
+            <label class="chip"><input type="checkbox" id="layer-incidents"> 112-meldingen</label>
+            <label class="chip" id="sh-show-chip" hidden><input type="checkbox" id="sh-show"> Winkels</label>
+            <label class="chip"><input type="checkbox" id="layer-cams"> Flitsers</label>
+            <label class="chip" id="pk-show-chip" hidden><input type="checkbox" id="pk-show"> Parkeren</label>
+            <label class="chip" id="ch-show-chip" hidden><input type="checkbox" id="ch-show"> Laadpalen</label>
+            <label class="chip" id="sg-show-chip" hidden><input type="checkbox" id="sg-show"> Statiegeld</label>
           </div>
           <div class="chips" id="cam-layers">
-            <label class="chip cam"><input type="checkbox" data-cam="flitser" checked> Flitsers</label>
-            <label class="chip cam"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
-            <label class="chip cam"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
+            <label class="chip"><input type="checkbox" data-cam="flitser" checked> Flitsers</label>
+            <label class="chip"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
+            <label class="chip"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
           </div>
         </fieldset>
         <fieldset class="filters">
           <legend>Instellingen</legend>
           <label class="select nav-select">
-            🧭 Route openen in
+            Route openen in
             <select id="nav-app"></select>
           </label>
-          <p class="hint">Reistijden zijn een schatting op basis van de afstand (±).</p>
+          <p class="hint">Reistijden zijn een schatting op basis van de afstand. <span id="notify-state"></span></p>
         </fieldset>
       </div>
 
@@ -81,10 +72,10 @@
         <fieldset class="filters">
           <legend>Meldingen</legend>
           <div class="chips">
-            <label class="chip brandweer"><input type="checkbox" data-disc="brandweer" checked> Brandweer</label>
-            <label class="chip ambulance"><input type="checkbox" data-disc="ambulance" checked> Ambulance</label>
-            <label class="chip politie"><input type="checkbox" data-disc="politie" checked> Politie</label>
-            <label class="chip onbekend"><input type="checkbox" data-disc="onbekend" checked> Overig</label>
+            <label class="chip"><input type="checkbox" data-disc="brandweer" checked> Brandweer</label>
+            <label class="chip"><input type="checkbox" data-disc="ambulance" checked> Ambulance</label>
+            <label class="chip"><input type="checkbox" data-disc="politie" checked> Politie</label>
+            <label class="chip"><input type="checkbox" data-disc="onbekend" checked> Overig</label>
           </div>
           <div class="row">
             <label class="switch"><input type="checkbox" id="only-sirene"> Alleen met sirene</label>
@@ -115,9 +106,9 @@
       <!-- Winkels -->
       <div data-panel="winkels" role="tabpanel" hidden>
         <div class="chips">
-          <label class="chip shops"><input type="checkbox" data-sh-kind="supermarkt" checked> 🛒 Supermarkten</label>
-          <label class="chip shops"><input type="checkbox" data-sh-kind="buurtwinkel" checked> 🏪 Buurt- &amp; avondwinkels</label>
-          <label class="chip shops"><input type="checkbox" data-sh-kind="markt" checked> 🧺 Markten</label>
+          <label class="chip"><input type="checkbox" data-sh-kind="supermarkt" checked> Supermarkten</label>
+          <label class="chip"><input type="checkbox" data-sh-kind="buurtwinkel" checked> Buurt- &amp; avondwinkels</label>
+          <label class="chip"><input type="checkbox" data-sh-kind="markt" checked> Markten</label>
         </div>
         <div class="chips">
           <label class="chip"><input type="checkbox" id="sh-open"> Alleen nu open</label>
@@ -134,10 +125,10 @@
       <div data-panel="parkeren" role="tabpanel" hidden>
         <div id="pk-controls">
           <div class="chips">
-            <label class="chip parking" title="Betaald parkeren en blauwe zones (zichtbaar vanaf ingezoomd niveau)">
+            <label class="chip" title="Betaald parkeren en blauwe zones (zichtbaar vanaf ingezoomd niveau)">
               <input type="checkbox" data-pk="betaald,blauw" checked> Parkeerzones</label>
-            <label class="chip parking"><input type="checkbox" data-pk="garage" checked> Garages &amp; P+R</label>
-            <label class="chip parking"><input type="checkbox" data-pk="vergunning"> Vergunningzones</label>
+            <label class="chip"><input type="checkbox" data-pk="garage" checked> Garages &amp; P+R</label>
+            <label class="chip"><input type="checkbox" data-pk="vergunning"> Vergunningzones</label>
           </div>
           <p class="legend">
             <span><span class="swatch" style="--c:#16a34a"></span>&lt; €2,50/u</span>
@@ -198,7 +189,7 @@
       <!-- Statiegeld -->
       <div data-panel="statiegeld" role="tabpanel" hidden>
         <div class="chips">
-          <label class="chip statiegeld"><input type="checkbox" id="sg-open"> Alleen nu open</label>
+          <label class="chip"><input type="checkbox" id="sg-open"> Alleen nu open</label>
         </div>
         <section id="sg-section">
           <h2 id="sg-title">Statiegeld in de buurt</h2>

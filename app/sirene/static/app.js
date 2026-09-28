@@ -97,7 +97,8 @@ L.Popup.mergeOptions({
   autoPanPaddingBottomRight: L.point(16, window.matchMedia("(max-width: 720px)").matches ? 110 : 16),
 });
 const map = L.map("map", { zoomControl: false, attributionControl: true }).setView(NL_CENTER, 8);
-L.control.zoom({ position: "bottomleft" }).addTo(map);
+// Op een touchscreen zoom je met twee vingers; de knoppen zijn daar overbodig.
+if (!window.matchMedia("(pointer: coarse)").matches) L.control.zoom({ position: "bottomleft" }).addTo(map);
 const incidentLayer = L.layerGroup().addTo(map);
 const camLayer = L.layerGroup().addTo(map);
 const sgLayer = L.layerGroup().addTo(map);
@@ -263,7 +264,7 @@ function listItem(inc, dist) {
   if (inc.news && inc.news.length) {
     const tag = document.createElement("span");
     tag.className = "tag news";
-    tag.textContent = "📰 NIEUWS";
+    tag.textContent = "NIEUWS";
     tag.title = inc.news[0].title;
     meta.append(tag, " ");
   }
@@ -310,23 +311,26 @@ function renderList() {
 
 function renderStatus(live) {
   if (live !== undefined) {
-    $("st-live").textContent = live ? "Live" : "Verbinding weg";
-    $("st-live").className = `pill ${live ? "ok" : "err"}`;
+    $("st-live").className = `brand-dot ${live ? "ok" : "err"}`;
+    $("st-live").title = live ? "Live verbonden" : "Verbinding met de server weg";
   }
+  // Locatie alleen tonen als er iets aan de hand is.
   const loc = state.location;
   const locEl = $("st-loc");
-  if (loc) {
-    const age = Date.now() / 1000 - loc.ts;
-    const src = { homeassistant: "HA", browser: "browser", vast: "vast" }[loc.source] || loc.source;
-    locEl.textContent = `📍 ${src} · ${fmtAgo(loc.ts)}`;
-    locEl.className = `pill ${loc.source === "vast" || age > LOCATION_STALE_S ? "warn" : "ok"}`;
-  } else {
+  const age = loc ? Date.now() / 1000 - loc.ts : null;
+  if (!loc) {
     locEl.textContent = "Geen locatie";
     locEl.className = "pill err";
+  } else if (loc.source === "vast") {
+    locEl.textContent = "Vaste locatie";
+    locEl.className = "pill warn";
+  } else if (age > LOCATION_STALE_S) {
+    locEl.textContent = `Locatie ${fmtAgo(loc.ts)}`;
+    locEl.className = "pill warn";
   }
-  const n = $("st-notify");
-  n.textContent = state.config.notifications_enabled ? "🔔 Meldingen aan" : "🔕 Meldingen uit";
-  n.className = `pill ${state.config.notifications_enabled ? "ok" : ""}`;
+  locEl.hidden = !!loc && loc.source !== "vast" && age <= LOCATION_STALE_S;
+  const n = $("notify-state");
+  if (n) n.textContent = state.config.notifications_enabled ? "Pushmeldingen staan aan." : "Pushmeldingen staan uit.";
 }
 
 function renderAll() {
@@ -394,7 +398,7 @@ function sgPopup(point) {
     ${point.materials.length ? `<div><small>Neemt in: ${esc(point.materials.join(", "))}</small></div>` : ""}
     ${point.payouts.length ? `<div><small>Uitbetaling: ${esc(point.payouts.join(", "))}</small></div>` : ""}
     ${facts.length ? `<div><small>${esc(facts.join(" · "))}</small></div>` : ""}
-    ${routeLink(point.lat, point.lon)}`;
+    <div class="popup-links">${routeLink(point.lat, point.lon)}</div>`;
 }
 
 function sgIcon(st) {
@@ -581,7 +585,7 @@ function pkPopup(zone) {
     ${facts ? `<div><small>${esc(facts)}</small></div>` : ""}
     ${zone.special_days ? '<div class="pk-note">Op feestdagen en bij evenementen kunnen andere tijden gelden.</div>' : ""}
     <div class="pk-note">Bron: RDW/NPR. Borden ter plaatse gaan altijd voor.</div>
-    ${zone.kind === "garage" ? routeLink(...pkPoint(zone)) + "<br>" : ""}
+    ${zone.kind === "garage" ? `<div class="popup-links">${routeLink(...pkPoint(zone))}</div>` : ""}
     ${zone.url ? `<a href="${esc(/^https?:/.test(zone.url) ? zone.url : "https://" + zone.url)}" target="_blank" rel="noopener noreferrer">${esc(zone.manager)} ↗</a>` : ""}`;
 }
 
@@ -789,7 +793,7 @@ function chPopup(station) {
     ${warn}
     <div class="pk-note" data-ch-parking="${esc(station.id)}"></div>
     <div class="pk-note">Tarief volgens de exploitant; met je eigen laadpas kan het anders zijn.</div>
-    ${routeLink(station.lat, station.lon)}`;
+    <div class="popup-links">${routeLink(station.lat, station.lon)}</div>`;
 }
 
 /** Parkeertarief op de plek van de laadpaal (handig bij bestemmingsladen). */
@@ -1018,8 +1022,7 @@ function shPopup(shop) {
     <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>${shop.late ? ' <span class="tag late">LAAT OPEN</span>' : ""}
     ${shop.hours ? `<table class="sg-hours">${shWeekRows(shop)}</table>` : ""}
     <div class="pk-note">${shop.hours_source ? `Openingstijden: ${esc(shop.hours_source)}. ` : "Geen openingstijden bekend. "}Feestdagen kunnen afwijken.</div>
-    <a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer">Klopt iets niet? Verbeter het op OpenStreetMap ↗</a><br>
-    ${routeLink(shop.lat, shop.lon)}`;
+    <div class="popup-links">${routeLink(shop.lat, shop.lon)}<a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer" title="Klopt iets niet? Verbeter het op OpenStreetMap">Aanpassen</a></div>`;
 }
 
 let shPendingPopup = null;
@@ -1063,7 +1066,7 @@ function shListItem(x) {
   bar.className = `bar ${st.state}`;
   const what = document.createElement("span");
   what.className = "what";
-  what.textContent = `${SH_ICON[shop.kind]} ${shop.name}`;
+  what.textContent = shop.name;
   const distEl = document.createElement("span");
   distEl.className = "dist";
   distEl.textContent = fmtDistance(d);
@@ -1180,10 +1183,12 @@ function initShops() {
 
 // ---------- navigatie ----------
 
+const ROUTE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.7 11.3 12.7 2.3a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4ZM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5Z"/></svg>';
+
 function routeLink(lat, lon) {
   const app = state.navApp === "auto" ? (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? "Apple Kaarten" : "Google Maps")
     : Nav.APPS[state.navApp];
-  return `<a class="route-btn" href="${esc(Nav.routeUrl(lat, lon, state.navApp, navigator.userAgent))}" target="_blank" rel="noopener noreferrer">🧭 Route in ${esc(app)}</a>`;
+  return `<a class="route-link" href="${esc(Nav.routeUrl(lat, lon, state.navApp, navigator.userAgent))}" target="_blank" rel="noopener noreferrer" title="Open in ${esc(app)}">${ROUTE_ICON}Route</a>`;
 }
 
 /** Reistijd vanaf je locatie, bijv. "🚶 5 min · 🚲 2 min". */
@@ -1334,7 +1339,7 @@ function renderOverview() {
   // 112: bovenaan bij een recente sirene dichtbij, anders onderaan.
   const near = incidentsNear();
   const recentSirene = near.some((x) => x.inc.sirene && Date.now() / 1000 - x.inc.ts < OLD_INCIDENT_S);
-  const inc112 = card("112", "🚨 112-meldingen",
+  const inc112 = card("112", "112-meldingen",
     near.length
       ? `${near.length} melding${near.length > 1 ? "en" : ""} binnen ${radius} (${fmtWindow(state.windowMin)})`
       : `Rustig: geen meldingen binnen ${radius} (${fmtWindow(state.windowMin)}).`,
@@ -1347,7 +1352,7 @@ function renderOverview() {
     const late = open.filter((x) => x.p.late);
     const show = (open.length ? open : items).slice(0, 2);
     const extra = late.length ? ` · ${late.length} laat open` : "";
-    topical.push(card("winkels", "🛒 Boodschappen",
+    topical.push(card("winkels", "Boodschappen",
       items.length
         ? `${open.length} van ${items.length} winkels binnen ${fmtDistance(state.config.shops.list_radius_m)} nu open${extra}`
         : "Geen winkels of markten in de buurt.",
@@ -1357,13 +1362,13 @@ function renderOverview() {
     const zones = state.pk.here.filter((z) => z.kind !== "vergunning");
     const permit = state.pk.here.some((z) => z.kind === "vergunning");
     const first = zones[0] && Parking.status(zones[0]);
-    topical.push(card("parkeren", "🅿 Parkeren hier",
+    topical.push(card("parkeren", "Parkeren hier",
       first ? first.text : permit ? "Alleen vergunninghouders op deze plek." : "Geen parkeerregeling bekend: meestal vrij parkeren.",
       zones.slice(0, 1).map(pkListItem)));
   }
   if (state.config.charging.enabled) {
     const free = state.ch.near.filter((s) => Charging.availability(s).state === "free").length;
-    topical.push(card("laden", "⚡ Laden",
+    topical.push(card("laden", "Laden",
       state.ch.near.length
         ? `${free} van ${state.ch.near.length} dichtstbijzijnde vrij · ${chProfile().label}`
         : `Niets gevonden binnen ${fmtDistance(state.config.charging.list_radius_m)} · ${chProfile().label}`,
@@ -1373,7 +1378,7 @@ function renderOverview() {
     const items = sgNearItems();
     const open = items.filter((x) => x.st.state === "open");
     const show = (open.length ? open : items).slice(0, 2);
-    topical.push(card("statiegeld", "♻ Statiegeld",
+    topical.push(card("statiegeld", "Statiegeld",
       items.length ? `${open.length} van ${items.length} punten binnen ${fmtDistance(state.config.statiegeld.list_radius_m)} nu open`
         : "Geen inleverpunten in de buurt.",
       show.map((x) => sgListItem(x.p, x.st, x.d))));
@@ -1480,7 +1485,31 @@ function startBrowserLocation() {
     } catch (err) { console.error(err); }
   }, (err) => console.warn("Geolocatie:", err.message), { enableHighAccuracy: true, maximumAge: 10000 });
   store.set("browserLocation", "1");
-  $("btn-locate").textContent = "📍 Locatie wordt gedeeld";
+  document.querySelector(".locate-btn")?.classList.add("active");
+}
+
+const LOCATE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
+
+/** Eén knop: deel je locatie (als dat kan) en centreer de kaart op jou. */
+function addLocateControl() {
+  const Locate = L.Control.extend({
+    options: { position: "bottomleft" },
+    onAdd() {
+      const btn = L.DomUtil.create("button", "locate-btn");
+      btn.type = "button";
+      btn.title = "Mijn locatie";
+      btn.setAttribute("aria-label", "Mijn locatie");
+      btn.innerHTML = LOCATE_ICON;
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.on(btn, "click", () => {
+        if (state.config.browser_location && watchId == null &&
+            (window.isSecureContext || !state.location)) startBrowserLocation();
+        if (state.location) map.setView([state.location.lat, state.location.lon], Math.max(map.getZoom(), 15));
+      });
+      return btn;
+    },
+  });
+  new Locate().addTo(map);
 }
 
 // ---------- start ----------
@@ -1511,16 +1540,9 @@ async function init() {
   setTab(store.get("tab") || "overzicht");
   connectEvents();
 
-  if (state.config.browser_location) {
-    $("btn-locate").hidden = false;
-    if (store.get("browserLocation") === "1") startBrowserLocation();
-  }
+  addLocateControl();
+  if (state.config.browser_location && store.get("browserLocation") === "1") startBrowserLocation();
 }
-
-$("btn-locate").addEventListener("click", startBrowserLocation);
-$("btn-center").addEventListener("click", () => {
-  if (state.location) map.setView([state.location.lat, state.location.lon], 15);
-});
 $("panel-toggle").addEventListener("click", () => {
   if (window.matchMedia("(max-width: 720px)").matches) {
     setPanel($("panel").classList.contains("collapsed"));

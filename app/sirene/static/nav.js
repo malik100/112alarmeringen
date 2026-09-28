@@ -5,7 +5,7 @@
   "use strict";
 
   const APPS = {
-    auto: "Automatisch (Apple Kaarten op iPhone/Mac)",
+    auto: "Automatisch",
     apple: "Apple Kaarten",
     google: "Google Maps",
     waze: "Waze",

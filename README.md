@@ -10,11 +10,14 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
-- **Route en reistijd:** de knop "🧭 Route" opent je eigen navigatie-app (standaard Apple Kaarten op
+- **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
   een iPhone; te wijzigen naar Google Maps, Waze of OpenStreetMap onder *Overzicht → Instellingen*).
   De lijsten tonen een geschatte reistijd, bijv. "🚶 4 min · 🚲 1 min" (hemelsbreed × 1,3, gemiddelde
   snelheden). Alleen als je op de routeknop tikt, gaat de bestemming naar die navigatie-app. Bij
   112-meldingen staat bewust geen routeknop.
+- **Minimalistisch:** één locatieknop op de kaart (deelt je locatie en centreert), filters als
+  schakelpillen, en een groene of rode stip naast de naam voor de live verbinding. Een
+  locatiewaarschuwing verschijnt alleen als er iets mis is.
 - **Kaartlagen** zet je los aan en uit (meldingen, flitsers, parkeren, laadpalen, statiegeld).
   Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten

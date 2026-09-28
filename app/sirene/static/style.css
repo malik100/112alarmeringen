@@ -114,7 +114,7 @@ html, body {
   top: 64px;
   right: 10px;
   bottom: 10px;
-  width: 370px;
+  width: 400px;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -391,3 +391,72 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
   background: #0ea5e9; color: #fff !important; text-decoration: none; font-weight: 600;
 }
 .ch-profile-select select { flex: 1; width: 100%; }
+
+
+/* ================= minimalistische stijl ================= */
+.brand { gap: 7px; padding: 6px 12px; }
+.brand h1 { font-weight: 650; letter-spacing: -.01em; }
+.brand-dot { width: 8px; height: 8px; background: var(--fg-muted); box-shadow: none; animation: none; }
+.brand-dot.ok { background: var(--ok); }
+.brand-dot.err { background: var(--err); }
+.pill { font-size: 12px; }
+
+/* filters als rustige schakelpillen, zonder vinkjes */
+.chip {
+  position: relative; color: var(--fg-muted); background: transparent;
+  border: 1px solid var(--border); padding: 4px 11px; gap: 0; font-weight: 500;
+}
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip:has(input:checked) { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.chip:has(input:focus-visible) { outline: 2px solid var(--me); outline-offset: 2px; }
+.switch input { accent-color: var(--fg); }
+
+/* tabbladen: tekst, onderstreept als actief */
+.tabs { gap: 2px 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.tabs button {
+  border: 0; border-radius: 0; background: none; padding: 6px 0; margin-bottom: -1px;
+  color: var(--fg-muted); border-bottom: 2px solid transparent; font-weight: 500;
+}
+.tabs button[aria-selected="true"] { background: none; color: var(--fg); border-color: var(--fg); font-weight: 650; }
+
+/* kaartjes in het overzicht */
+.card { border: 0; border-radius: 0; padding: 10px 0 2px; margin: 0; border-bottom: 1px solid var(--border); }
+.card:last-child { border-bottom: 0; }
+.card.urgent { box-shadow: none; border-left: 3px solid var(--brandweer); padding-left: 10px; }
+.card h2 { font-size: 13px; }
+.card-link { font-weight: 650; }
+
+/* labels: subtiel, alleen SIRENE valt op */
+.tag { background: none; border: 1px solid var(--border); color: var(--fg-muted); font-weight: 600; }
+.tag.sirene { background: none; border-color: var(--brandweer); color: var(--brandweer); }
+.tag.news, .tag.late { background: none; color: var(--fg-muted); }
+
+/* route: een link, geen knop */
+.route-link {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+  color: #0284c7 !important; font-weight: 600; text-decoration: none;
+}
+.route-link svg { width: 14px; height: 14px; }
+.popup-links { margin-top: 6px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.popup-links a { font-size: 12px; }
+
+/* locatieknop op de kaart */
+.locate-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center; background: var(--bg); color: var(--fg);
+  box-shadow: var(--shadow);
+}
+.locate-btn svg { width: 18px; height: 18px; }
+.locate-btn.active { color: var(--me); }
+.leaflet-control-zoom a { border-radius: 8px; }
+
+fieldset.filters legend, h2 { letter-spacing: .06em; }
+
+fieldset { min-width: 0; }
+.nav-select select { min-width: 0; }
+.tabs { gap: 2px 12px; }
+.tabs button { font-size: 13px; }
+.tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { flex: 0 0 auto; }
+.tabs { gap: 2px 10px; }
