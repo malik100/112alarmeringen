@@ -31,7 +31,7 @@
   // Schatting zonder routeplanner: hemelsbreed × omrijfactor, gemiddelde snelheden in de stad.
   const DETOUR = 1.3;
   const SPEED_M_PER_MIN = { lopen: 80, fietsen: 250, auto: 500 };
-  const ICON = { lopen: "🚶", fietsen: "🚲", auto: "🚗" };
+  const VERB = { lopen: "lopen", fietsen: "fietsen", auto: "rijden" };
   const CAR_EXTRA_MIN = 2; // wegrijden en parkeren
 
   function minutes(distanceM, mode) {
@@ -39,13 +39,13 @@
     return Math.max(1, Math.round(m));
   }
 
-  /** "🚶 5 min · 🚲 2 min": de twee zinvolste vervoerswijzen voor deze afstand. */
+  /** "5 min lopen · 2 min fietsen": de twee zinvolste vervoerswijzen voor deze afstand. */
   function eta(distanceM, prefer) {
     if (distanceM == null) return "";
     let modes;
     if (prefer === "auto") modes = distanceM <= 800 ? ["lopen", "auto"] : ["fietsen", "auto"];
     else modes = minutes(distanceM, "lopen") <= 20 ? ["lopen", "fietsen"] : ["fietsen", "auto"];
-    return modes.map((m) => `${ICON[m]} ${minutes(distanceM, m)} min`).join(" · ");
+    return modes.map((m) => `${minutes(distanceM, m)} min ${VERB[m]}`).join(" · ");
   }
 
   const api = { APPS, routeUrl, eta, minutes };

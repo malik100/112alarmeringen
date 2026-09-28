@@ -22,9 +22,9 @@ test("reistijd schatten", () => {
 });
 
 test("zinvolle vervoerswijzen per afstand", () => {
-  assert.strictEqual(eta(400), "🚶 7 min · 🚲 2 min");
-  assert.strictEqual(eta(2500), "🚲 13 min · 🚗 9 min");   // te ver om te lopen
-  assert.strictEqual(eta(600, "auto"), "🚶 10 min · 🚗 4 min");
-  assert.strictEqual(eta(2000, "auto"), "🚲 10 min · 🚗 7 min");
+  assert.strictEqual(eta(400), "7 min lopen · 2 min fietsen");
+  assert.strictEqual(eta(2500), "13 min fietsen · 9 min rijden");   // te ver om te lopen
+  assert.strictEqual(eta(600, "auto"), "10 min lopen · 4 min rijden");
+  assert.strictEqual(eta(2000, "auto"), "10 min fietsen · 7 min rijden");
   assert.strictEqual(eta(null), "");
 });

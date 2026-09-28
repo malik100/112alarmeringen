@@ -35,6 +35,18 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+/** Lucide-icoon uit /static/icons.svg (als HTML-tekst). */
+function icon(name, cls = "") {
+  return `<svg class="i${cls ? ` ${cls}` : ""}" aria-hidden="true"><use href="/static/icons.svg#${name}"/></svg>`;
+}
+
+/** Lucide-icoon als DOM-element. */
+function iconEl(name, cls = "") {
+  const t = document.createElement("template");
+  t.innerHTML = icon(name, cls);
+  return t.content.firstChild;
+}
 const store = {
   get(key) { try { return localStorage.getItem(key); } catch { return null; } },
   set(key, value) { try { localStorage.setItem(key, value); } catch { /* privémodus */ } },
@@ -54,9 +66,11 @@ function haversine(lat1, lon1, lat2, lon2) {
   return 2 * 6371000 * Math.asin(Math.sqrt(a));
 }
 
+const nlNumber = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 });
 function fmtDistance(m) {
   if (m == null) return "";
-  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(m < 10000 ? 1 : 0)} km`;
+  if (m < 1000) return `${Math.round(m / 10) * 10} m`;
+  return `${nlNumber.format(m < 10000 ? Math.round(m / 100) / 10 : Math.round(m / 1000))} km`;
 }
 
 const rtf = new Intl.RelativeTimeFormat("nl", { numeric: "auto" });
@@ -137,12 +151,12 @@ function incidentPopup(inc) {
   const prio = inc.priority == null ? "prio onbekend" : `prio ${inc.priority}`;
   return `
     <b>${esc(inc.description || inc.title)}</b><br>
-    ${esc(LABEL[inc.discipline] || inc.discipline)} · ${inc.sirene ? "🚨 met sirene" : esc(prio)}<br>
+    ${esc(LABEL[inc.discipline] || inc.discipline)} · ${inc.sirene ? '<span class="sirene-text">met sirene</span>' : esc(prio)}<br>
     ${esc(fmtTime(inc.ts))} (${esc(fmtAgo(inc.ts))})${d != null ? ` · ${esc(fmtDistance(d))} van jou` : ""}<br>
     <small>${esc(PRECISION_TEXT[inc.precision] || "locatie onbekend")}</small>
     <div class="popup-raw">${esc(inc.title)}</div>
     ${newsHtml(inc)}
-    ${inc.link ? `<a href="${esc(inc.link)}" target="_blank" rel="noopener noreferrer">Meer informatie ↗</a>` : ""}`;
+    ${inc.link ? `<div class="popup-links"><a href="${esc(inc.link)}" target="_blank" rel="noopener noreferrer">Bron${icon("external-link")}</a></div>` : ""}`;
 }
 
 function newsDelay(inc, article) {
@@ -157,7 +171,7 @@ function newsHtml(inc) {
   const items = inc.news.slice(0, 3).map((n) => `
     <li><a href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a><br>
       <small>${esc(n.source)} · ${esc(newsDelay(inc, n))} · ${esc(n.label)} gerelateerd</small></li>`).join("");
-  return `<div class="news"><b>📰 Nieuws</b><ul>${items}</ul></div>`;
+  return `<div class="news"><b>${icon("newspaper")}Nieuws</b><ul>${items}</ul></div>`;
 }
 
 function renderIncidents() {
@@ -182,10 +196,10 @@ function renderIncidents() {
 }
 
 function camIcon(cam) {
-  const text = cam.kind === "roodlicht" ? "🚦" : cam.kind === "traject" ? "T" : (cam.maxspeed || "📷");
+  const content = cam.kind === "traject" ? "T" : cam.kind === "flitser" && cam.maxspeed ? esc(cam.maxspeed) : icon("camera");
   return L.divIcon({
     className: "cam-marker",
-    html: `<div class="cam-sign ${cam.kind}">${esc(text)}</div>`,
+    html: `<div class="cam-sign ${cam.kind}">${content}</div>`,
     iconSize: [24, 24],
     iconAnchor: [12, 12],
   });
@@ -300,7 +314,7 @@ function renderList() {
 
   $("near-title").textContent = state.location
     ? `Binnen ${fmtDistance(radius)} van jou`
-    : "In de buurt (nog geen locatie)";
+    : "Binnen je straal";
   $("list-near").replaceChildren(...near.map((x) => listItem(x.inc, x.d)));
   $("empty-near").hidden = near.length > 0 || !state.location;
   $("list-view").replaceChildren(...inView.map((x) => listItem(x.inc, x.d)));
@@ -352,7 +366,8 @@ function checkAlert(inc) {
   if (Date.now() / 1000 - inc.ts > 15 * 60) return;
   state.alerted.add(inc.id);
   const el = $("alert");
-  el.textContent = `🚨 ${LABEL[inc.discipline] || ""} met sirene op ${fmtDistance(d)}: ${inc.description || inc.title}`;
+  el.replaceChildren(iconEl("siren"),
+    `${LABEL[inc.discipline] || "Hulpdienst"} met sirene op ${fmtDistance(d)}: ${inc.description || inc.title}`);
   el.hidden = false;
   el.onclick = () => {
     el.hidden = true;
@@ -404,7 +419,7 @@ function sgPopup(point) {
 function sgIcon(st) {
   return L.divIcon({
     className: "sg-marker",
-    html: `<div class="sg-sign ${st.state}">♻</div>`,
+    html: `<div class="sg-sign ${st.state}">${icon("recycle")}</div>`,
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   });
@@ -586,7 +601,7 @@ function pkPopup(zone) {
     ${zone.special_days ? '<div class="pk-note">Op feestdagen en bij evenementen kunnen andere tijden gelden.</div>' : ""}
     <div class="pk-note">Bron: RDW/NPR. Borden ter plaatse gaan altijd voor.</div>
     ${zone.kind === "garage" ? `<div class="popup-links">${routeLink(...pkPoint(zone))}</div>` : ""}
-    ${zone.url ? `<a href="${esc(/^https?:/.test(zone.url) ? zone.url : "https://" + zone.url)}" target="_blank" rel="noopener noreferrer">${esc(zone.manager)} ↗</a>` : ""}`;
+    ${zone.url ? `<a href="${esc(/^https?:/.test(zone.url) ? zone.url : "https://" + zone.url)}" target="_blank" rel="noopener noreferrer">${esc(zone.manager)}${icon("external-link")}</a>` : ""}`;
 }
 
 /** Punt voor de route naar een garage/terrein: het punt zelf of het midden van het vlak. */
@@ -658,7 +673,7 @@ function renderParkingHere() {
   const order = { betaald: 0, blauw: 1, garage: 2, vergunning: 3 };
   const zones = [...state.pk.here].sort((a, b) => order[a.kind] - order[b.kind]);
   $("list-pk").replaceChildren(...zones.map(pkListItem));
-  empty.textContent = "Geen parkeerregeling bekend op deze plek (of vrij parkeren).";
+  empty.textContent = "Geen parkeerregeling bekend; meestal vrij parkeren.";
   empty.hidden = zones.length > 0;
   renderOverview();
 }
@@ -782,7 +797,7 @@ function chPopup(station) {
     return `<li>${c.count}× ${esc(c.plug)} · ${esc(kw)}${esc(free)}${price ? `<br><small>${esc(price)}</small>` : ""}</li>`;
   }).join("");
   const pay = [station.payment.creditcard ? "creditcard" : "", station.payment.pinpas ? "pinpas" : ""].filter(Boolean);
-  const warn = Charging.warnings(station, chProfile()).map((w) => `<div class="ch-warn">⚠ ${esc(w)}</div>`).join("");
+  const warn = Charging.warnings(station, chProfile()).map((w) => `<div class="ch-warn">${icon("triangle-alert")}${esc(w)}</div>`).join("");
   const d = state.location ? haversine(state.location.lat, state.location.lon, station.lat, station.lon) : null;
   return `
     <b>${esc(Charging.displayName(station))}</b><br>
@@ -804,7 +819,7 @@ async function chParkingNote(station, popupEl) {
     const el = popupEl.querySelector(`[data-ch-parking="${CSS.escape(station.id)}"]`);
     if (!el || !zones.length) return;
     const st = Parking.status(zones[0]);
-    el.textContent = `🅿 Parkeren hier: ${st.text}`;
+    el.textContent = `Parkeren hier: ${st.text}`;
   } catch (err) { /* geen parkeerinfo: niet erg */ }
 }
 
@@ -812,7 +827,7 @@ function chIcon(station) {
   const av = Charging.availability(station);
   return L.divIcon({
     className: "ch-marker",
-    html: `<div class="ch-sign${station.dc ? " dc" : ""}" style="--c:${CH_COLORS[av.state]}">⚡</div>`,
+    html: `<div class="ch-sign${station.dc ? " dc" : ""}" style="--c:${CH_COLORS[av.state]}">${icon("zap")}</div>`,
     iconSize: station.dc ? [26, 26] : [20, 20],
     iconAnchor: station.dc ? [13, 13] : [10, 10],
   });
@@ -875,7 +890,7 @@ function chListItem(station) {
   status.className = "ch-status";
   status.textContent = av.text;
   meta.append(status, " · ", etaSpan(Nav.eta(station.distance_m, "auto")), ` · ${Charging.summary(station)}`);
-  for (const w of Charging.warnings(station, chProfile()).slice(0, 1)) meta.append(` · ⚠ ${w}`);
+  for (const w of Charging.warnings(station, chProfile()).slice(0, 1)) meta.append(" · ", iconEl("triangle-alert", "warn"), w);
   li.append(bar, what, dist, meta);
   const open = () => {
     chPendingPopup = station.id;
@@ -986,7 +1001,7 @@ function initCharging() {
 
 // ---------- winkels ----------
 
-const SH_ICON = { supermarkt: "🛒", buurtwinkel: "🏪", markt: "🧺" };
+const SH_ICON = { supermarkt: "shopping-cart", buurtwinkel: "store", markt: "shopping-basket" };
 const SH_KIND_LABEL = { supermarkt: "Supermarkt", buurtwinkel: "Buurt-/avondwinkel", markt: "Markt" };
 const SH_COLORS = { open: "#16a34a", closed: "#9ca3af", unknown: "#e5e7eb" };
 
@@ -1022,7 +1037,7 @@ function shPopup(shop) {
     <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>${shop.late ? ' <span class="tag late">LAAT OPEN</span>' : ""}
     ${shop.hours ? `<table class="sg-hours">${shWeekRows(shop)}</table>` : ""}
     <div class="pk-note">${shop.hours_source ? `Openingstijden: ${esc(shop.hours_source)}. ` : "Geen openingstijden bekend. "}Feestdagen kunnen afwijken.</div>
-    <div class="popup-links">${routeLink(shop.lat, shop.lon)}<a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer" title="Klopt iets niet? Verbeter het op OpenStreetMap">Aanpassen</a></div>`;
+    <div class="popup-links">${routeLink(shop.lat, shop.lon)}<a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer" title="Klopt iets niet? Verbeter het op OpenStreetMap">${icon("pencil")}Aanpassen</a></div>`;
 }
 
 let shPendingPopup = null;
@@ -1036,7 +1051,7 @@ function renderShops() {
     const st = shStatus(shop);
     if (!shMatches(shop, st)) continue;
     const marker = L.marker([shop.lat, shop.lon], {
-      icon: L.divIcon({ className: "sh-marker", html: `<div class="sh-sign" style="--c:${SH_COLORS[st.state]}">${SH_ICON[shop.kind]}</div>`,
+      icon: L.divIcon({ className: "sh-marker", html: `<div class="sh-sign" style="--c:${SH_COLORS[st.state]}">${icon(SH_ICON[shop.kind])}</div>`,
         iconSize: [24, 24], iconAnchor: [12, 12] }),
       keyboard: false, zIndexOffset: -450,
     }).bindPopup(() => shPopup(shop), { maxWidth: 290 });
@@ -1100,7 +1115,7 @@ function shListItem(x) {
 function renderShopsList() {
   const cfg = state.config.shops;
   if (!cfg.enabled) return;
-  $("sh-title").textContent = `Boodschappen binnen ${fmtDistance(cfg.list_radius_m)}`;
+  $("sh-title").textContent = `Winkels binnen ${fmtDistance(cfg.list_radius_m)}`;
   const empty = $("empty-sh");
   if (!state.location) {
     $("list-sh").replaceChildren();
@@ -1183,7 +1198,7 @@ function initShops() {
 
 // ---------- navigatie ----------
 
-const ROUTE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.7 11.3 12.7 2.3a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4ZM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5Z"/></svg>';
+const ROUTE_ICON = icon("navigation-2");
 
 function routeLink(lat, lon) {
   const app = state.navApp === "auto" ? (/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? "Apple Kaarten" : "Google Maps")
@@ -1191,7 +1206,7 @@ function routeLink(lat, lon) {
   return `<a class="route-link" href="${esc(Nav.routeUrl(lat, lon, state.navApp, navigator.userAgent))}" target="_blank" rel="noopener noreferrer" title="Open in ${esc(app)}">${ROUTE_ICON}Route</a>`;
 }
 
-/** Reistijd vanaf je locatie, bijv. "🚶 5 min · 🚲 2 min". */
+/** Reistijd vanaf je locatie, bijv. "5 min lopen · 2 min fietsen". */
 function etaTo(lat, lon, prefer) {
   if (!state.location) return "";
   return Nav.eta(haversine(state.location.lat, state.location.lon, lat, lon), prefer);
@@ -1262,7 +1277,7 @@ function card(tab, title, summary, items, tone) {
   const h = document.createElement("h2");
   const link = document.createElement("button");
   link.className = "card-link";
-  link.textContent = `${title} ›`;
+  link.append(title, iconEl("chevron-right"));
   link.addEventListener("click", () => setTab(tab));
   h.append(link);
   const p = document.createElement("p");
@@ -1275,31 +1290,31 @@ function card(tab, title, summary, items, tone) {
   return sec;
 }
 
-/** Samenvatting per onderwerp, als losse stukjes tekst. */
+/** Samenvatting per onderwerp: icoon + korte waarde. */
 function summaryParts() {
   const parts = [];
   const near = incidentsNear();
   const sirenes = near.filter((x) => x.inc.sirene && Date.now() / 1000 - x.inc.ts < OLD_INCIDENT_S).length;
-  parts.push({ text: sirenes ? `🚨 ${sirenes} sirene${sirenes > 1 ? "s" : ""} dichtbij` : `🚨 ${near.length}`,
-    alert: sirenes > 0, title: "112-meldingen binnen je straal" });
+  parts.push({ icon: "siren", text: sirenes ? `${sirenes} ${sirenes > 1 ? "sirenes" : "sirene"} dichtbij` : String(near.length),
+    alert: sirenes > 0, title: `112-meldingen binnen ${fmtDistance(state.config.radius_m)}` });
   if (state.config.shops.enabled && state.location) {
     const open = shNearItems().filter((x) => x.st.state === "open").length;
-    parts.push({ text: `🛒 ${open} open`, title: "Winkels en markten in de buurt die nu open zijn" });
+    parts.push({ icon: "shopping-cart", text: `${open} open`, title: "Winkels in de buurt die nu open zijn" });
   }
   if (state.config.parking.enabled && state.location) {
     const zone = state.pk.here.find((z) => z.kind === "betaald" || z.kind === "blauw");
     const st = zone && Parking.status(zone);
-    const text = !st ? "🅿 vrij" : st.state === "paid" && st.rate != null
-      ? `🅿 ${fmtEur(st.rate)}/u` : st.state === "disc" ? "🅿 schijf" : st.state === "free" ? "🅿 gratis" : "🅿 ?";
-    parts.push({ text, title: "Parkeren op jouw plek" });
+    const text = !st ? "vrij" : st.state === "paid" && st.rate != null
+      ? `${fmtEur(st.rate)}/u` : st.state === "disc" ? "schijf" : st.state === "free" ? "gratis" : "?";
+    parts.push({ icon: "square-parking", text, title: "Parkeren hier" });
   }
   if (state.config.charging.enabled && state.location) {
     const free = state.ch.near.filter((s) => Charging.availability(s).state === "free").length;
-    parts.push({ text: `⚡ ${free} vrij`, title: `Laadpunten in de buurt (${chProfile().label})` });
+    parts.push({ icon: "zap", text: `${free} vrij`, title: `Laadpunten in de buurt (${chProfile().label})` });
   }
   if (state.config.statiegeld.enabled && state.location) {
     const open = sgNearItems().filter((x) => x.st.state === "open").length;
-    parts.push({ text: `♻ ${open} open`, title: "Statiegeldpunten die nu open zijn" });
+    parts.push({ icon: "recycle", text: `${open} open`, title: "Statiegeldpunten die nu open zijn" });
   }
   return parts;
 }
@@ -1311,13 +1326,13 @@ function fmtEur(v) {
 function renderSummary() {
   const el = $("summary");
   if (!state.location) {
-    el.textContent = "Buurtoverzicht · locatie nog onbekend";
+    el.textContent = "Locatie onbekend";
     return;
   }
   el.replaceChildren(...summaryParts().map((p) => {
     const span = document.createElement("span");
     span.className = `sum-part${p.alert ? " urgent" : ""}`;
-    span.textContent = p.text;
+    span.append(iconEl(p.icon), p.text);
     span.title = p.title;
     return span;
   }));
@@ -1330,7 +1345,7 @@ function renderOverview() {
   if (!state.location) {
     const p = document.createElement("p");
     p.className = "empty";
-    p.textContent = "Deel je locatie (knop hierboven) of stel een vaste locatie in, dan zie je hier wat er in je buurt speelt.";
+    p.textContent = "Tik op de locatieknop op de kaart, of stel een vaste locatie in. Dan zie je hier wat er in je buurt speelt.";
     $("ov-cards").replaceChildren(p);
     return;
   }
@@ -1352,7 +1367,7 @@ function renderOverview() {
     const late = open.filter((x) => x.p.late);
     const show = (open.length ? open : items).slice(0, 2);
     const extra = late.length ? ` · ${late.length} laat open` : "";
-    topical.push(card("winkels", "Boodschappen",
+    topical.push(card("winkels", "Winkels",
       items.length
         ? `${open.length} van ${items.length} winkels binnen ${fmtDistance(state.config.shops.list_radius_m)} nu open${extra}`
         : "Geen winkels of markten in de buurt.",
@@ -1363,7 +1378,7 @@ function renderOverview() {
     const permit = state.pk.here.some((z) => z.kind === "vergunning");
     const first = zones[0] && Parking.status(zones[0]);
     topical.push(card("parkeren", "Parkeren hier",
-      first ? first.text : permit ? "Alleen vergunninghouders op deze plek." : "Geen parkeerregeling bekend: meestal vrij parkeren.",
+      first ? first.text : permit ? "Alleen vergunninghouders op deze plek." : "Geen parkeerregeling bekend; meestal vrij parkeren.",
       zones.slice(0, 1).map(pkListItem)));
   }
   if (state.config.charging.enabled) {
@@ -1464,12 +1479,12 @@ let lastSent = 0;
 
 function startBrowserLocation() {
   if (!("geolocation" in navigator)) {
-    alert("Deze browser ondersteunt geen locatiebepaling.");
+    alert("Deze browser kan je locatie niet bepalen.");
     return;
   }
   if (!window.isSecureContext) {
-    alert("Locatie via de browser werkt alleen via HTTPS (of op localhost). " +
-      "Gebruik de Home Assistant-app of zet een reverse proxy met HTTPS voor deze server.");
+    alert("Je locatie delen via de browser kan alleen via https. " +
+      "Gebruik de Home Assistant-app of stel een vaste locatie in.");
     return;
   }
   if (watchId != null) return;
@@ -1488,7 +1503,7 @@ function startBrowserLocation() {
   document.querySelector(".locate-btn")?.classList.add("active");
 }
 
-const LOCATE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
+const LOCATE_ICON = icon("locate-fixed");
 
 /** Eén knop: deel je locatie (als dat kan) en centreer de kaart op jou. */
 function addLocateControl() {

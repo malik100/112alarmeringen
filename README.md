@@ -5,19 +5,22 @@ laadpalen, statiegeld-inleverpunten, 112-meldingen met het nieuws erbij, en flit
 Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
-  `🚨 0 · 🛒 4 open · 🅿 €8,01/u · ⚡ 5 vrij · ♻ 8 open`. Daaronder tabbladen (Overzicht, Winkels,
+  "0 meldingen · 4 winkels open · €8,01/u parkeren · 5 laadpunten vrij · 8 statiegeldpunten open"
+  (met iconen). Daaronder tabbladen (Overzicht, Winkels,
   Parkeren, Laden, Statiegeld, 112). Het overzicht toont per onderwerp het belangrijkste op jouw plek. Is er een
   melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
 - **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
   een iPhone; te wijzigen naar Google Maps, Waze of OpenStreetMap onder *Overzicht → Instellingen*).
-  De lijsten tonen een geschatte reistijd, bijv. "🚶 4 min · 🚲 1 min" (hemelsbreed × 1,3, gemiddelde
-  snelheden). Alleen als je op de routeknop tikt, gaat de bestemming naar die navigatie-app. Bij
+  De lijsten tonen een geschatte reistijd, bijv. "4 min lopen · 1 min fietsen" (hemelsbreed × 1,3,
+  gemiddelde snelheden). Alleen als je op de routeknop tikt, gaat de bestemming naar die navigatie-app. Bij
   112-meldingen staat bewust geen routeknop.
 - **Minimalistisch:** één locatieknop op de kaart (deelt je locatie en centreert), filters als
   schakelpillen, en een groene of rode stip naast de naam voor de live verbinding. Een
   locatiewaarschuwing verschijnt alleen als er iets mis is.
+- **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
+  `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
 - **Kaartlagen** zet je los aan en uit (meldingen, flitsers, parkeren, laadpalen, statiegeld).
   Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
@@ -327,4 +330,5 @@ installaties en hun gegevens werken.
 - Laadpalen: [NDW open data](https://opendata.ndw.nu) (OCPI).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
+- Iconen: [Lucide](https://lucide.dev), ISC-licentie, zie `app/sirene/static/vendor/lucide/LICENSE`.
 - [Leaflet](https://leafletjs.com): BSD-2-licentie, meegeleverd in `app/sirene/static/vendor/leaflet`.

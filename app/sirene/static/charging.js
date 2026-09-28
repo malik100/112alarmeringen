@@ -7,33 +7,33 @@
   /** Profielen voor verschillende soorten gebruikers. */
   const PROFILES = {
     snel: {
-      label: "⚡ Snelladen onderweg",
+      label: "Snelladen onderweg",
       hint: "Snelladers met CCS vanaf 50 kW die nu vrij zijn.",
       filters: { plugs: ["CCS"], min_kw: 50, available: true, card: false, public: true, always_open: false },
     },
     straat: {
-      label: "🏠 Laden in de straat",
+      label: "Laden in de straat",
       hint: "Gewone laadpalen (Type 2) die nu vrij zijn. Let op een blokkeertarief als je de auto lang laat staan.",
       filters: { plugs: ["Type 2"], min_kw: 0, available: true, card: false, public: true, always_open: false },
       warnParking: true,
     },
     bestemming: {
-      label: "🛒 Bestemmingsladen",
+      label: "Bestemmingsladen",
       hint: "Laden bij werk, winkel of uitje (Type 2, vanaf 11 kW). De popup toont ook het parkeertarief.",
       filters: { plugs: ["Type 2"], min_kw: 11, available: false, card: false, public: false, always_open: false },
     },
     zonderpas: {
-      label: "💳 Zonder laadpas",
+      label: "Zonder laadpas",
       hint: "Punten waar je met creditcard of pinpas kunt betalen, bijv. met een huurauto of als gast.",
       filters: { plugs: [], min_kw: 0, available: true, card: true, public: true, always_open: false },
     },
     chademo: {
-      label: "🔌 CHAdeMO (bijv. oudere Nissan Leaf)",
+      label: "CHAdeMO (bijv. oudere Nissan Leaf)",
       hint: "Alleen laadpunten met een CHAdeMO-stekker.",
       filters: { plugs: ["CHAdeMO"], min_kw: 0, available: true, card: false, public: true, always_open: false },
     },
     eigen: {
-      label: "⚙️ Eigen instellingen",
+      label: "Eigen instellingen",
       hint: "Stel hieronder zelf de filters in.",
       filters: { plugs: [], min_kw: 0, available: false, card: false, public: false, always_open: false },
     },
