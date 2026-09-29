@@ -76,7 +76,7 @@ PDOK (adres → GPS) ──────┘        │   │
 Je hebt Docker en Docker Compose nodig. Een Raspberry Pi 4 of 5 is ruim voldoende.
 
 ```bash
-git clone https://github.com/malik100/112alarmeringen.git buurtradar
+git clone -b claude/p2000-sirene-alerts-selfhosted-sbherl https://github.com/malik100/112alarmeringen.git buurtradar
 cd buurtradar
 cp config.example.yaml config.yaml
 cp .env.example .env
@@ -84,6 +84,32 @@ docker compose up -d --build
 ```
 
 Open daarna `http://<ip-van-je-server>:8080`.
+
+> Zolang de code nog niet in de hoofdbranch staat, heb je de `-b claude/p2000-…`-optie nodig.
+
+### Lokaal op je pc
+
+**Met Docker** (Windows, macOS of Linux): installeer [Docker Desktop](https://www.docker.com/products/docker-desktop/),
+voer de stappen hierboven uit en open `http://localhost:8080`. Stoppen: `docker compose down`
+(je gegevens blijven bewaard in het volume `sirene-data`).
+
+**Zonder Docker** (Python 3.11 of nieuwer):
+
+```bash
+cd buurtradar/app
+python -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+# macOS/Linux:
+SIRENE_CONFIG=../config.yaml SIRENE_DB=./buurtradar.db uvicorn --factory sirene.main:app --port 8080
+# Windows (PowerShell):
+#   $env:SIRENE_CONFIG="../config.yaml"; $env:SIRENE_DB="./buurtradar.db"
+#   uvicorn --factory sirene.main:app --port 8080
+```
+
+Op `http://localhost` mag de browser je locatie gewoon doorgeven (HTTPS is alleen nodig voor
+andere adressen): klik op de locatieknop linksonder op de kaart. De eerste keer duurt het een paar
+minuten voordat alles binnen is; laadpalen (~210 MB downloaden) het langst.
 
 ### Je locatie doorgeven
 
@@ -98,8 +124,8 @@ Kies één of beide manieren:
    4. Zet in `config.yaml` de optie `location.homeassistant.enabled: true`.
    5. Voor een nauwkeurige positie: zet in de app bij *Instellingen → Companion app →
       Sensoren beheren* de locatiesensoren aan en kies een korte update-interval.
-2. **Browser**: tik op de kaart op *📍 Gebruik mijn locatie*. Browsers geven je locatie alleen
-   via HTTPS door. Zet dus een reverse proxy met HTTPS voor de server (bijvoorbeeld Caddy)
+2. **Browser**: tik op de locatieknop linksonder op de kaart. Browsers geven je locatie alleen
+   via HTTPS (of op `localhost`) door. Zet dus een reverse proxy met HTTPS voor de server (bijvoorbeeld Caddy)
    of gebruik die van Home Assistant.
 
 Zonder live locatie kun je in `config.yaml` een vaste locatie opgeven onder `location.fallback`,
