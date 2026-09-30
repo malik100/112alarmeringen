@@ -200,3 +200,39 @@ def same_store(shop: dict[str, Any], point: dict[str, Any]) -> bool:
         if len(c) >= 3 and (c in a or (len(a) >= 3 and a in c)):
             return True
     return False
+
+
+def link_statiegeld(shops: list[dict[str, Any]], points: list[dict[str, Any]],
+                    radius_m: float = 75) -> int:
+    """Koppelt winkels aan hun eigen statiegeld-inleverpunt: shop["statiegeld"] = punt-id.
+
+    Zelfde winkel = naam/merk komt overeen en binnen `radius_m`. Elk punt hoort bij hooguit
+    één winkel (de dichtstbijzijnde), zodat de kaart per winkel één icoon kan tonen.
+    """
+    from ..geo import haversine_m
+
+    cell = 0.002  # ~140-220 m: buurcellen dekken ruim 75 m
+    grid: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for p in points:
+        grid.setdefault((int(p["lat"] // cell), int(p["lon"] // cell)), []).append(p)
+    candidates = []
+    for shop in shops:
+        shop.pop("statiegeld", None)
+        if shop["kind"] == "markt":
+            continue
+        ci, cj = int(shop["lat"] // cell), int(shop["lon"] // cell)
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                for p in grid.get((ci + di, cj + dj), ()):
+                    d = haversine_m(shop["lat"], shop["lon"], p["lat"], p["lon"])
+                    if d <= radius_m and same_store(shop, p):
+                        candidates.append((d, shop, p))
+    linked_points: set = set()
+    linked = 0
+    for d, shop, p in sorted(candidates, key=lambda c: c[0]):
+        if "statiegeld" in shop or p["id"] in linked_points:
+            continue
+        shop["statiegeld"] = p["id"]
+        linked_points.add(p["id"])
+        linked += 1
+    return linked

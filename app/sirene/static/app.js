@@ -1114,7 +1114,19 @@ function shWeekRows(shop) {
   }).join("");
 }
 
-function shPopup(shop) {
+/** Statiegeldinfo in de winkelpopup (als de winkel een eigen inleverpunt heeft). */
+function sgInShopHtml(point) {
+  const st = sgStatus(point);
+  return `
+    <div class="sg-in-shop">
+      <b>${icon("recycle")}Statiegeld inleveren</b><br>
+      <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>
+      ${point.materials.length ? `<div><small>Neemt in: ${esc(point.materials.join(", "))}</small></div>` : ""}
+      ${point.payouts.length ? `<div><small>Uitbetaling: ${esc(point.payouts.join(", "))}</small></div>` : ""}
+    </div>`;
+}
+
+function shPopup(shop, sgPoint = null) {
   const st = shStatus(shop);
   const d = state.location ? haversine(state.location.lat, state.location.lon, shop.lat, shop.lon) : null;
   const [osmType, osmId] = shop.id.split("/");
@@ -1124,6 +1136,7 @@ function shPopup(shop) {
     <span class="${SG_STATE_CLASS[st.state]}">${esc(st.text)}</span>${shop.late ? ' <span class="tag late">LAAT OPEN</span>' : ""}
     ${shop.hours ? `<table class="sg-hours">${shWeekRows(shop)}</table>` : ""}
     <div class="pk-note">${shop.hours_source ? `Openingstijden: ${esc(shop.hours_source)}. ` : "Geen openingstijden bekend. "}Feestdagen kunnen afwijken.</div>
+    ${sgPoint ? sgInShopHtml(sgPoint) : ""}
     <div class="popup-links">${routeLink(shop.lat, shop.lon)}<a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer" title="Klopt iets niet? Verbeter het op OpenStreetMap">${icon("pencil")}Aanpassen</a></div>`;
 }
 
@@ -1134,13 +1147,20 @@ function drawShops(layout) {
   shLayer.clearLayers();
   shMarkers.clear();
   layout.shops.forEach(({ p: shop, st }, i) => {
-    const html = `<div class="sh-sign" style="--c:${SH_COLORS[st.state]}">${icon(SH_ICON[shop.kind])}</div>`;
+    const point = layout.shopSg[i];
+    const badge = point ? `<span class="sh-badge" title="Ook statiegeld inleveren">${icon("recycle")}</span>` : "";
+    const html = `<div class="sh-sign" style="--c:${SH_COLORS[st.state]}">${icon(SH_ICON[shop.kind])}${badge}</div>`;
     const marker = spreadMarker(shop.lat, shop.lon, html, "sh-marker", 24, layout.shopOff[i], shop.brand || shop.name, -450)
-      .bindPopup(() => shPopup(shop), { maxWidth: 290 });
+      .bindPopup(() => shPopup(shop, point), { maxWidth: 290 });
     marker.addTo(shLayer);
     shMarkers.set(shop.id, marker);
   });
-  if (reopen != null && shMarkers.has(reopen)) {
+  // Een samengevoegd inleverpunt opent (bijv. vanuit de statiegeldlijst) de winkelpopup.
+  for (const [pointId, shopId] of layout.merged) sgMarkers.set(pointId, shMarkers.get(shopId));
+  if (sgPendingPopup != null && layout.merged.has(sgPendingPopup)) {
+    shMarkers.get(layout.merged.get(sgPendingPopup)).openPopup();
+    sgPendingPopup = null;
+  } else if (reopen != null && shMarkers.has(reopen)) {
     shMarkers.get(reopen).openPopup();
     shPendingPopup = null;
   }
@@ -1156,18 +1176,29 @@ function poiLayout() {
     ? state.sh.points.map((p) => ({ p, st: shStatus(p) })).filter((x) => shMatches(x.p, x.st)) : [];
   const sg = state.sg.show && map.getZoom() >= state.config.statiegeld.min_zoom
     ? state.sg.points.map((p) => ({ p, st: sgStatus(p) })).filter((x) => sgVisible(x.p, x.st)) : [];
-  const offsets = spreadOffsets([...shops.map((x) => x.p), ...sg.map((x) => x.p)], 24);
+  // Winkel met een eigen (zichtbaar) inleverpunt: één icoon, het winkelicoon met een
+  // statiegeldteken. Het losse statiegeldicoon van dat punt vervalt.
+  const sgById = new Map(sg.map((x) => [x.p.id, x.p]));
+  const merged = new Map();  // punt-id -> winkel-id
+  const shopSg = shops.map(({ p }) => {
+    const point = p.statiegeld && sgById.get(p.statiegeld);
+    if (point) merged.set(point.id, p.id);
+    return point || null;
+  });
+  const sgShown = sg.filter((x) => !merged.has(x.p.id));
+  const offsets = spreadOffsets([...shops.map((x) => x.p), ...sgShown.map((x) => x.p)], 24);
   const firstWord = (n) => (n || "").toLowerCase().split(/\s+/)[0];
-  const sgLabel = sg.map(({ p }) => !shops.some(({ p: shop }) =>
+  const sgLabel = sgShown.map(({ p }) => !shops.some(({ p: shop }) =>
     firstWord(shop.brand || shop.name) === firstWord(p.name) && haversine(shop.lat, shop.lon, p.lat, p.lon) < 60));
-  return { shops, sg, shopOff: offsets.slice(0, shops.length), sgOff: offsets.slice(shops.length), sgLabel };
+  return { shops, sg: sgShown, shopSg, merged, sgLabel,
+    shopOff: offsets.slice(0, shops.length), sgOff: offsets.slice(shops.length) };
 }
 
 function renderPois() {
   if (!state.config) return;
   const layout = poiLayout();
-  drawShops(layout);
   drawSg(layout);
+  drawShops(layout);
 }
 const renderShops = renderPois;
 const renderSg = renderPois;

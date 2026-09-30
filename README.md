@@ -246,8 +246,13 @@ avondwinkels en toko's, en ~270 markten.
 
 - **Dicht op elkaar:** winkels (en statiegeldpunten) die op het scherm over elkaar zouden vallen,
   zet de kaart in een klein cirkeltje rond hun plek, zodat elke winkel zichtbaar en aanklikbaar is.
-  Vanaf zoomniveau 16 staat de naam eronder; een inleverpunt in een winkel die al op de kaart
-  staat, krijgt geen tweede label.
+  Vanaf zoomniveau 16 staat de naam eronder.
+- **Winkel met inleverpunt = één icoon:** staan *Supermarkten* en *Statiegeld* allebei aan, dan
+  toont een winkel met een eigen inleverpunt (zelfde naam/merk, binnen 75 m) alleen het
+  winkelicoon, met een groen statiegeldteken. De popup bevat dan ook de statiegeldinfo (open of
+  dicht, wat ze aannemen, uitbetaling). Staat alleen *Statiegeld* aan, dan zie je het
+  statiegeldicoon; losse inleverpunten zonder winkel (automaten, recyclewinkels) blijven altijd
+  een eigen statiegeldicoon.
 - **Openingstijden** komen uit OpenStreetMap (`opening_hours`). Ontbreken ze bij een supermarkt,
   dan nemen we de tijden over van hetzelfde punt in de statiegelddata (zelfde merk, binnen 75 m).
   Zo is de dekking ~73% van de winkels. De popup vermeldt de bron.

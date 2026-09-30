@@ -22,6 +22,7 @@ from .geo import haversine_m
 from .sources.charging import matches as charging_matches
 from .sources.roadworks import is_active, relevance as roadwork_relevance
 from .sources.npr import contains
+from .sources.shops import link_statiegeld
 
 STATIC_DIR = Path(__file__).parent / "static"
 HEARTBEAT_S = 20
@@ -172,7 +173,14 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
         if east - west > 1 or north - south > 1:
             raise HTTPException(422, "Gebied te groot: zoom verder in")
-        return svc.db.shops_in_bbox(south, west, north, east, SHOPS_LIMIT)
+        shops = svc.db.shops_in_bbox(south, west, north, east, SHOPS_LIMIT)
+        if svc.cfg["statiegeld"]["enabled"] and shops:
+            # Winkel met eigen inleverpunt: op de kaart één icoon in plaats van twee.
+            pad = 0.001
+            points = svc.db.statiegeld_in_bbox(south - pad, west - pad, north + pad, east + pad,
+                                               STATIEGELD_LIMIT * 2)
+            link_statiegeld(shops, points)
+        return shops
 
     @app.get("/api/roadworks")
     async def get_roadworks(bbox: str = Query(description="west,zuid,oost,noord in graden"),

@@ -93,3 +93,22 @@ async def test_refresh_fills_hours_from_statiegeld_and_api(service):
         assert client.get("/api/shops?bbox=3,50,7,54").status_code == 422
     assert shops["node/10"]["hours_source"] == "Statiegeld Nederland" and shops["node/10"]["hours"][0] == [[480, 1320]]
     assert shops["node/11"]["hours"] is None          # Lidl is geen Jumbo: niet overnemen
+
+
+def test_link_statiegeld():
+    from sirene.sources.shops import link_statiegeld
+    ah = {"id": "n1", "kind": "supermarkt", "name": "Albert Heijn", "brand": "Albert Heijn", "lat": 52.37871, "lon": 4.84676}
+    vomar = {"id": "n2", "kind": "supermarkt", "name": "Vomar", "brand": "Vomar", "lat": 52.37860, "lon": 4.84730}
+    ah2 = {"id": "n3", "kind": "supermarkt", "name": "Albert Heijn", "brand": "Albert Heijn", "lat": 52.37880, "lon": 4.84690}
+    markt = {"id": "n4", "kind": "markt", "name": "Albert Heijn markt", "lat": 52.37871, "lon": 4.84676}
+    points = [
+        {"id": "sg-ah", "name": "Albert Heijn", "lat": 52.37872, "lon": 4.84680},
+        {"id": "sg-vomar", "name": "Vomar", "lat": 52.37861, "lon": 4.84733},
+        {"id": "sg-droppie", "name": "Droppie Recyclewinkel", "lat": 52.37870, "lon": 4.84700},
+        {"id": "sg-ver", "name": "Vomar", "lat": 52.3900, "lon": 4.8600},   # te ver weg
+    ]
+    shops = [ah, vomar, ah2, markt]
+    assert link_statiegeld(shops, points) == 2
+    assert ah["statiegeld"] == "sg-ah" and vomar["statiegeld"] == "sg-vomar"
+    assert "statiegeld" not in ah2          # het AH-punt hoort al bij de dichtstbijzijnde AH
+    assert "statiegeld" not in markt        # markten hebben geen inleverpunt

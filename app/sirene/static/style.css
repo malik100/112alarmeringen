@@ -654,5 +654,17 @@ fieldset { min-width: 0; }
 }
 .leaflet-tooltip.map-label::before { display: none; }
 
+/* winkel met eigen inleverpunt: klein statiegeldteken op het winkelicoon */
+.sh-sign { position: relative; }
+.sh-badge {
+  position: absolute; right: -8px; top: -8px; width: 15px; height: 15px; border-radius: 50%;
+  display: grid; place-items: center; background: #15803d; border: 1.5px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+.sh-badge .i { width: 9px; height: 9px; color: #fff; stroke-width: 2.75; }
+.sg-in-shop { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border, #e5e7eb); }
+.sg-in-shop b { display: inline-flex; align-items: center; gap: 5px; }
+.sg-in-shop b .i { color: #15803d; }
+
 /* "hidden" moet altijd winnen van display-regels hierboven. */
 [hidden] { display: none !important; }
