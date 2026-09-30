@@ -115,7 +115,39 @@
     });
   }
 
-  const api = { status, weekLines, KIND_LABEL };
+  /** Het (hoogste) uurtarief dat in de zone geldt, los van het tijdstip. null = onbekend. */
+  function zoneRate(zone) {
+    let rate = null;
+    for (const day of zone.schedule || []) {
+      for (const p of day) {
+        const r = p.fare && (zone.fares || {})[p.fare] ? zone.fares[p.fare].rate_h : null;
+        if (r != null && (rate == null || r > rate)) rate = r;
+      }
+    }
+    return rate;
+  }
+
+  // Kleur per tarief: zo zijn aangrenzende zones met een ander tarief (bijv. in Amsterdam
+  // €5,37 / €6,98 / €8,05) op de kaart van elkaar te onderscheiden.
+  const RATE_SCALE = [
+    { below: 2, color: "#16a34a", label: "< €2" },
+    { below: 3.5, color: "#65a30d", label: "€2–3,50" },
+    { below: 5, color: "#ca8a04", label: "€3,50–5" },
+    { below: 6, color: "#ea580c", label: "€5–6" },
+    { below: 7.5, color: "#dc2626", label: "€6–7,50" },
+    { below: Infinity, color: "#9333ea", label: "≥ €7,50" },
+  ];
+  const KIND_COLOR = { blauw: "#2563eb", vergunning: "#6b7280", garage: "#0ea5e9" };
+
+  function zoneColor(zone) {
+    if (KIND_COLOR[zone.kind] && zone.kind !== "garage") return KIND_COLOR[zone.kind];
+    const rate = zoneRate(zone);
+    if (rate == null) return "#9ca3af";
+    if (rate === 0) return RATE_SCALE[0].color;
+    return RATE_SCALE.find((b) => rate < b.below).color;
+  }
+
+  const api = { status, weekLines, zoneRate, zoneColor, RATE_SCALE, KIND_LABEL };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Parking = api;
 })(typeof window !== "undefined" ? window : globalThis);

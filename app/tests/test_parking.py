@@ -203,7 +203,7 @@ async def test_refresh_and_api(service):
     assert service.status["parking"]["count"] == 2
 
     with TestClient(create_app(service, start_background=False)) as client:
-        assert client.get("/api/config").json()["parking"] == {"enabled": True, "min_zoom": 14}
+        assert client.get("/api/config").json()["parking"] == {"enabled": True, "min_zoom": 13}
         zones = client.get("/api/parking?bbox=4.88,52.36,4.91,52.39").json()
         assert {z["id"] for z in zones} == {"363:T11V", "363:GAR"}
         only = client.get("/api/parking?bbox=4.88,52.36,4.91,52.39&kinds=garage").json()

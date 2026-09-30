@@ -617,7 +617,7 @@ function pkPopup(zone) {
   return `
     <b>${esc(zone.name)}</b><br>
     ${esc(Parking.KIND_LABEL[zone.kind])} · ${esc(zone.manager)}<br>
-    <span class="pk-status" style="--c:${pkColor(st)}">${esc(st.text)}</span>
+    <span class="pk-status" style="--c:${st.state === "paid" ? Parking.zoneColor(zone) : pkColor(st)}">${esc(st.text)}</span>
     <table class="pk-week">${rows}</table>
     ${extras ? `<div><small>Ook mogelijk:</small><ul class="pk-extras">${extras}</ul></div>` : ""}
     ${facts ? `<div><small>${esc(facts)}</small></div>` : ""}
@@ -644,9 +644,10 @@ function renderParking() {
   // Grote vlakken eerst, zodat kleinere (bijv. garages) erbovenop klikbaar blijven.
   const area = (z) => (z.bbox[2] - z.bbox[0]) * (z.bbox[3] - z.bbox[1]);
   const zones = state.pk.zones.filter((z) => state.pk.kinds.has(z.kind)).sort((a, b) => area(b) - area(a));
+  const here = new Set(state.pk.here.map((z) => z.id));
   for (const zone of zones) {
     const st = Parking.status(zone);
-    const color = pkColor(st);
+    const color = Parking.zoneColor(zone);
     let shape;
     if (zone.geometry.type === "Point") {
       const [lon, lat] = zone.geometry.coordinates;
@@ -656,17 +657,23 @@ function renderParking() {
         zIndexOffset: -600,
       });
     } else {
+      // Nu betalen: stevig gekleurd. Nu gratis (buiten de tijden): zelfde kleur, lichter en
+      // gestippeld, zodat je de zone en het tarief ook 's avonds ziet. Jouw zone: dikke rand.
+      const mine = here.has(zone.id);
+      const permit = zone.kind === "vergunning";
+      const quiet = st.state === "free" || permit;
       shape = L.geoJSON(zone.geometry, {
         pane: "parking",
         style: {
           color,
-          weight: zone.kind === "vergunning" ? 1 : 2,
-          opacity: 0.8,
-          dashArray: st.state === "free" || zone.kind === "vergunning" ? "5 5" : null,
+          weight: mine ? 4 : permit ? 1 : 2,
+          opacity: 0.9,
+          dashArray: quiet ? "6 5" : null,
           fillColor: color,
-          fillOpacity: st.state === "free" ? 0.04 : zone.kind === "vergunning" ? 0.06 : 0.15,
+          fillOpacity: (permit ? 0.05 : quiet ? 0.12 : 0.26) + (mine ? 0.08 : 0),
         },
       });
+      shape.bindTooltip(() => `<b>${esc(zone.name)}</b><br>${esc(st.text)}`, { sticky: true, direction: "top", className: "pk-tip" });
     }
     shape.bindPopup(() => pkPopup(zone), { maxWidth: 320 }).addTo(pkLayer);
     pkShapes.set(zone.id, shape);
@@ -698,6 +705,7 @@ function renderParkingHere() {
   $("list-pk").replaceChildren(...zones.map(pkListItem));
   empty.textContent = "Geen parkeerregeling bekend; meestal vrij parkeren.";
   empty.hidden = zones.length > 0;
+  renderParking();  // jouw zone krijgt op de kaart een dikke rand
   renderOverview();
 }
 
@@ -705,7 +713,7 @@ function pkListItem(zone) {
   const st = Parking.status(zone);
   const li = document.createElement("li");
   li.className = "item parking";
-  li.style.setProperty("--c", pkColor(st));
+  li.style.setProperty("--c", Parking.zoneColor(zone));
   li.tabIndex = 0;
   const bar = document.createElement("span");
   bar.className = "bar";
@@ -720,6 +728,7 @@ function pkListItem(zone) {
   const status = document.createElement("span");
   status.className = "pk-status";
   status.textContent = st.text;
+  if (st.state !== "paid") status.style.setProperty("--c", pkColor(st));
   meta.append(status, ` · ${zone.manager}`);
   li.append(bar, what, kind, meta);
   const open = () => {
@@ -773,6 +782,11 @@ async function loadParkingHere(force) {
 
 function initParking() {
   if (!state.config.parking.enabled) return;
+  const swatch = (color, label, cls = "") =>
+    `<span><span class="swatch${cls}" style="--c:${color}"></span>${label}</span>`;
+  $("pk-legend").innerHTML = Parking.RATE_SCALE.map((b) => swatch(b.color, `${b.label}/u`)).join("")
+    + swatch("#2563eb", "blauwe zone")
+    + '<span class="legend-note">Dikke rand = jouw zone. Gestippeld = nu gratis (buiten de betaaltijden).</span>';
   $("pk-show-chip").hidden = false;
   state.pk.show = store.get("pkShow") !== "0";
   $("pk-show").checked = state.pk.show;

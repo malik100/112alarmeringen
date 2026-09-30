@@ -73,7 +73,7 @@ charging:
 parking:
   enabled: true
   refresh_hours: 24
-  min_zoom: 14          # pas vanaf dit zoomniveau zones op de kaart tonen
+  min_zoom: 13          # pas vanaf dit zoomniveau zones op de kaart tonen
 
 map:
   # Standaard OpenStreetMap-tegels. De tegelserver ziet welk kaartgebied je bekijkt,

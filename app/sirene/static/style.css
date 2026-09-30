@@ -621,5 +621,8 @@ fieldset { min-width: 0; }
 .lsec-body > section > h2:first-child, .lsec-body > div > section > h2:first-child { margin-top: 4px; }
 #no-sections { margin: 8px 0 16px; }
 
+.legend > .legend-note { flex-basis: 100%; white-space: normal; font-size: 11px; color: var(--fg-muted); }
+.pk-tip { font-size: 12px; }
+
 /* "hidden" moet altijd winnen van display-regels hierboven. */
 [hidden] { display: none !important; }

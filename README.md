@@ -210,7 +210,7 @@ zo'n 5.900 zones opgebouwd.
 
 | Soort             | Op de kaart                                                      |
 |-------------------|------------------------------------------------------------------|
-| Betaald parkeren  | vlak, gekleurd naar het uurtarief van dit moment; gestippeld = nu gratis |
+| Betaald parkeren  | vlak, gekleurd naar het uurtarief (6 kleuren, van groen < €2 tot paars ≥ €7,50); lichter en gestippeld = nu gratis (buiten de betaaltijden) |
 | Blauwe zone       | blauw vlak; parkeerschijf verplicht, met maximale duur           |
 | Vergunningzone    | grijs gestippeld vlak (standaard uit)                            |
 | Garage / P+R      | blauwe **P**, of een vlak                                        |
@@ -218,7 +218,8 @@ zo'n 5.900 zones opgebouwd.
 - Klik op een zone voor het weekoverzicht met tijden en tarieven, eventuele dag- en avondkaarten,
   capaciteit en maximale hoogte (garages).
 - *Parkeren op jouw plek* toont de zones waarin je locatie ligt, met wat er nu geldt en tot wanneer.
-- Vlakken verschijnen vanaf zoomniveau 14 (instelbaar met `parking.min_zoom`).
+- De zone waar jij staat heeft een dikke rand. Wijs een zone aan met de muis voor naam en tarief.
+- Vlakken verschijnen vanaf zoomniveau 13 (instelbaar met `parking.min_zoom`).
 - Uurprijzen komen uit de tariefdelen: bijvoorbeeld €0,134 per minuut is €8,05 per uur. Tarieven
   die in delen oplopen worden als "eerste 1 uur …; daarna …" getoond.
 

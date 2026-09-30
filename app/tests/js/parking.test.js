@@ -69,3 +69,18 @@ test("weekoverzicht: tijdvakken met hetzelfde tarief samen", () => {
   assert.strictEqual(weekLines({ kind: "betaald", fares: FARES, schedule })[1].text,
     "00:00–01:00, 07:00–24:00 €5,34 per uur");
 });
+
+test("kleur per tarief, los van het tijdstip", () => {
+  const { zoneRate, zoneColor, RATE_SCALE } = require("../../sirene/static/parking.js");
+  const zone = (rate, kind = "betaald") => ({
+    kind, fares: { A: { rate_h: rate }, D: { rate_h: 1 } },
+    schedule: WEEK([{ s: 540, e: 1440, fare: "A", max: null }]),
+  });
+  assert.strictEqual(zoneRate(zone(5.37)), 5.37);
+  // Amsterdam: aangrenzende tarieven krijgen elk een eigen kleur.
+  const colors = [1.72, 3.01, 4.19, 5.37, 6.98, 8.05].map((r) => zoneColor(zone(r)));
+  assert.strictEqual(new Set(colors).size, 6);
+  assert.strictEqual(zoneColor(zone(8.05)), RATE_SCALE[RATE_SCALE.length - 1].color);
+  assert.strictEqual(zoneColor(zone(2, "blauw")), "#2563eb");
+  assert.strictEqual(zoneRate({ kind: "betaald", fares: {}, schedule: WEEK([]) }), null);
+});

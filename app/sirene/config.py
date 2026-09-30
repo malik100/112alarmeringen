@@ -62,7 +62,7 @@ DEFAULTS: dict[str, Any] = {
         "enabled": True,
         "refresh_hours": 24,
         # Pas vanaf dit zoomniveau zones op de kaart tekenen (vlakken zijn zwaar).
-        "min_zoom": 14,
+        "min_zoom": 13,
     },
     "news": {
         "enabled": True,
