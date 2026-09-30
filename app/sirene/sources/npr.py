@@ -37,12 +37,19 @@ DATASETS = {
     "beheerder": "2uc2-nnv3",
     "gebruiksdoel": "qidm-7mkf",
     "specificaties": "b3us-f26s",
+    # Parkeerautomaten en hun plek: voor gebieden waarvan de gemeente geen kaartvlak aanlevert.
+    "verkooppunt": "fk68-nf2y",
+    "geo_verkooppunt": "cgqw-pfbp",
 }
+MAX_METERS = 400  # grote zones hebben er ruim 200 (Maastricht Brusselsepoort: 236)
 ROW_LIMIT = 500_000
 # Verhoog dit als de verwerking verandert: bestaande installaties halen dan direct opnieuw op
 # in plaats van tot een dag lang de oude (verkeerd opgebouwde) zones te tonen.
 # 2: alle vlakken van een gebied samengevoegd (daarvoor bleef er per gebied maar één over).
-PARSER_VERSION = 2
+# 3: bezoekersregelingen zonder tarief zijn vergunningzones (geen betaalzone met onbekend tarief).
+# 4: gebieden zonder kaartvlak krijgen de plekken van hun parkeerautomaten (MultiPoint).
+# 5: ook bezoekerszones mét (bezoekers)tarief zijn vergunningzones, geen betaalzone voor iedereen.
+PARSER_VERSION = 5
 
 WEEKDAYS = ["MAANDAG", "DINSDAG", "WOENSDAG", "DONDERDAG", "VRIJDAG", "ZATERDAG", "ZONDAG"]
 
@@ -136,6 +143,8 @@ def merge_geometries(geoms: list[dict[str, Any]]) -> dict[str, Any] | None:
             parts = [g["coordinates"]]
         elif g["type"] == "MultiPolygon":
             parts = g["coordinates"]
+        elif g["type"] == "MultiPoint":
+            return g if not polygons else {"type": "Polygon", "coordinates": polygons[0]}
         else:
             points.append(g)
             continue
@@ -153,6 +162,10 @@ def geometry_bbox(geom: dict[str, Any]) -> tuple[float, float, float, float]:
     if geom["type"] == "Point":
         x, y = geom["coordinates"]
         return x, y, x, y
+    if geom["type"] == "MultiPoint":
+        xs = [p[0] for p in geom["coordinates"]]
+        ys = [p[1] for p in geom["coordinates"]]
+        return min(xs), min(ys), max(xs), max(ys)
     polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
     xs = [p[0] for poly in polys for ring in poly for p in ring]
     ys = [p[1] for poly in polys for ring in poly for p in ring]
@@ -168,7 +181,7 @@ def _in_ring(x: float, y: float, ring: list[list[float]]) -> bool:
 
 
 def contains(geom: dict[str, Any], lon: float, lat: float) -> bool:
-    if geom["type"] == "Point":
+    if geom["type"] in ("Point", "MultiPoint"):
         return False
     polys = [geom["coordinates"]] if geom["type"] == "Polygon" else geom["coordinates"]
     for rings in polys:
@@ -329,6 +342,26 @@ def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None
         if g:
             area_geoms.setdefault((r["areamanagerid"], r["areaid"]), []).append(g)
 
+    # Gebieden zonder kaartvlak: de parkeerautomaten laten zien waar de zone ligt.
+    meter_at: dict[tuple, list[float]] = {}
+    for r in data.get("geo_verkooppunt", []):
+        loc = r.get("location") or {}
+        coords = loc.get("coordinates") or []
+        if loc.get("type") == "Point" and len(coords) == 2:
+            lon, lat = float(coords[0]), float(coords[1])
+            if 50.5 <= lat <= 54 and 3 <= lon <= 7.5:
+                meter_at[(r["areamanagerid"], r["sellingpointid"])] = [round(lon, 6), round(lat, 6)]
+    meters: dict[tuple, list[list[float]]] = defaultdict(list)
+    for r in data.get("verkooppunt", []):
+        key = (r["areamanagerid"], r.get("areaid"))
+        point = meter_at.get((r["areamanagerid"], r.get("sellingpointid")))
+        known = meters.get(key, [])
+        if (point and key not in area_geoms and point not in known and len(known) < MAX_METERS
+                and is_active(r.get("startdatesellingpoint"), r.get("enddatesellingpoint"), t)):
+            meters[key].append(point)
+    for key, points in meters.items():
+        area_geoms[key] = [{"type": "MultiPoint", "coordinates": points}]
+
     zones = []
     seen: dict[str, dict[str, Any]] = {}
     for key, geoms in area_geoms.items():
@@ -376,8 +409,14 @@ def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None
         used = {p["fare"] for day in schedule for p in day if p["fare"]}
         fingerprint = json.dumps([manager, kind, name, schedule, {c: fares[c] for c in sorted(used)},
                                   [round(v, 4) for v in (west, south, east, north)]], sort_keys=True)
+        # Alleen bezoek van bewoners (bijv. Rotterdam "Sector 12", Maastricht "Centrum-West bezoek"):
+        # parkeren met een bezoekersvergunning, soms tegen een lager tarief. Geen betaalzone voor
+        # iedereen; zie de nabewerking hieronder.
+        visitor_only = kind == "betaald" and all(
+            t.startswith("BEZOEK") for t in tops if classify([t]) == "betaald")
         if fingerprint in seen:
             twin = seen[fingerprint]
+            twin["_visitor_only"] = twin["_visitor_only"] and visitor_only
             twin["usages"] = sorted(set(twin["usages"]) | {usage_desc(manager, g["usageid"]) for g in regs})
             twin["fares"].update(fares)
             twin["extras"] += [x for x in extras if x not in twin["extras"]]
@@ -400,8 +439,15 @@ def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None
             "special_days": special,
             "capacity": int(_num(spec.get("capacity"))) or None,
             "max_height_cm": int(_num(spec.get("maximumvehicleheight"))) or None,
+            # Geen zonegrens bekend: de punten zijn de parkeerautomaten van deze zone.
+            "approx": "automaten" if geom["type"] == "MultiPoint" else None,
+            "_visitor_only": visitor_only,
         })
         seen[fingerprint] = zones[-1]
+    for zone in zones:
+        # Samengevoegd met een gewone betaalzone (zelfde tijden en tarief): gewoon betaald.
+        if zone.pop("_visitor_only"):
+            zone["kind"] = "vergunning"
     return zones
 
 

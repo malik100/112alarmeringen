@@ -204,9 +204,26 @@ Uitzetten kan met `statiegeld.enabled: false` in `config.yaml`.
 ## Parkeerzones, tarieven en tijden
 
 Bron: [RDW Open Data Parkeren](https://opendata.rdw.nl), de openbare kant van het Nationaal
-Parkeerregister (NPR). Daarin registreren gemeenten hun zones, tijden en tarieven voor parkeerapps.
-Eén keer per dag worden negen datasets opgehaald (circa 35 MB, zo'n 15 seconden). Daaruit worden
-zo'n 5.900 zones opgebouwd.
+Parkeerregister (NPR). Daarin registreren alle gemeenten hun zones, tijden en tarieven; parkeerapps
+rekenen ermee af. Ook de tarievenkaart van Amsterdam gebruikt deze gegevens (vergeleken: alle 29
+betaalde zones hebben dezelfde tijden, tarieven en grenzen). Eén keer per dag worden elf datasets
+opgehaald (circa 45 MB). Daaruit worden zo'n 4.600 zones opgebouwd.
+
+**Dekking in Nederland** (september 2026, 342 gemeenten):
+
+- 153 gemeenten hebben betaald parkeren of blauwe zones in het register; de andere 189 hebben er
+  (volgens het register) geen.
+- Bijna alle grote steden leveren kaartvlakken met tijden en tarieven aan.
+- Sommige gemeenten leveren wel tijden en tarieven, maar geen kaartvlak (o.a. Maastricht, Zutphen,
+  Barneveld, Terneuzen, Oss, Deventer, Gouda). Daar tonen we de **parkeerautomaten** van de zone
+  (uit dezelfde RDW-data) als stippen in de tariefkleur; *Parkeren hier* noemt zo'n zone
+  "waarschijnlijk" als er binnen 200 m een automaat staat. Dat geldt voor 176 zones.
+- Zones die alleen voor **bezoek van bewoners** gelden (bijv. Rotterdam "Sector 12", Maastricht
+  "Centrum-West bezoek"), ook als er een bezoekerstarief aan hangt, tonen we als vergunningzone en
+  niet als betaalzone voor iedereen.
+- Nog zonder plek op de kaart: ~190 gebieden in 44 gemeenten, vooral blauwe zones en kleine
+  parkeerterreinen zonder kaartvlak en zonder automaten (bijv. Enkhuizen, Simpelveld, Westland,
+  Meierijstad, Hoogeveen). Hun tijden en tarieven staan wel in het register.
 
 | Soort             | Op de kaart                                                      |
 |-------------------|------------------------------------------------------------------|

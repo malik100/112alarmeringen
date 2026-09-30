@@ -28,6 +28,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 HEARTBEAT_S = 20
 STATIEGELD_LIMIT = 2000
 PARKING_LIMIT = 800
+METER_NEAR_M = 200  # "waarschijnlijk hier": parkeerautomaat van een zone zonder kaartvlak
 CHARGING_LIMIT = 1500
 SHOPS_LIMIT = 2000
 ROADWORKS_LIMIT = 1500
@@ -160,7 +161,21 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         if not svc.cfg["parking"]["enabled"]:
             return []
         candidates = svc.db.parking_in_bbox(lat, lon, lat, lon, parse_kinds(kinds), PARKING_LIMIT)
-        return [z for z in candidates if contains(z["geometry"], lon, lat)]
+        here = [z for z in candidates if contains(z["geometry"], lon, lat)]
+        if not any(z["kind"] in ("betaald", "blauw") for z in here):
+            # Geen getekende zone: staat er een parkeerautomaat van een zone zonder kaartvlak vlakbij?
+            pad = METER_NEAR_M / 111_000 * 2
+            nearby = []
+            for z in svc.db.parking_in_bbox(lat - pad, lon - pad, lat + pad, lon + pad,
+                                            parse_kinds(kinds), PARKING_LIMIT):
+                if z["geometry"]["type"] != "MultiPoint":
+                    continue
+                d = min(haversine_m(lat, lon, y, x) for x, y in z["geometry"]["coordinates"])
+                if d <= METER_NEAR_M:
+                    nearby.append({**z, "approx_distance_m": round(d)})
+            here += sorted(nearby, key=lambda z: z["approx_distance_m"])[:2]
+        # Wat voor iedereen geldt (betaald, blauwe zone) eerst, vergunningzones daarna.
+        return sorted(here, key=lambda z: z["kind"] not in ("betaald", "blauw"))
 
     @app.get("/api/shops")
     def get_shops(bbox: str = Query(description="west,zuid,oost,noord in graden")):

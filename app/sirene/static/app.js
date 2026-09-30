@@ -674,6 +674,8 @@ function pkPopup(zone) {
     ${extras ? `<div><small>Ook mogelijk:</small><ul class="pk-extras">${extras}</ul></div>` : ""}
     ${facts ? `<div><small>${esc(facts)}</small></div>` : ""}
     ${zone.special_days ? '<div class="pk-note">Op feestdagen en bij evenementen kunnen andere tijden gelden.</div>' : ""}
+    ${zone.approx === "automaten" ? '<div class="pk-note">Zonegrens niet bekend bij de RDW: de stippen zijn de parkeerautomaten van deze zone.</div>' : ""}
+    ${zone.approx_distance_m != null ? `<div class="pk-note">Waarschijnlijk geldt deze zone hier: er staat een automaat op ${esc(fmtDistance(zone.approx_distance_m))}.</div>` : ""}
     <div class="pk-note">Bron: RDW/NPR. Borden ter plaatse gaan altijd voor.</div>
     ${zone.kind === "garage" ? `<div class="popup-links">${routeLink(...pkPoint(zone))}</div>` : ""}
     ${zone.url ? `<a href="${esc(/^https?:/.test(zone.url) ? zone.url : "https://" + zone.url)}" target="_blank" rel="noopener noreferrer">${esc(zone.manager)}${icon("external-link")}</a>` : ""}`;
@@ -682,6 +684,12 @@ function pkPopup(zone) {
 /** Punt voor de route naar een garage/terrein: het punt zelf of het midden van het vlak. */
 function pkPoint(zone) {
   if (zone.geometry.type === "Point") return [zone.geometry.coordinates[1], zone.geometry.coordinates[0]];
+  if (zone.geometry.type === "MultiPoint") {
+    const pts = zone.geometry.coordinates.map(([x, y]) => [y, x]);
+    if (!state.location) return pts[0];
+    return pts.reduce((best, p) => (haversine(state.location.lat, state.location.lon, p[0], p[1])
+      < haversine(state.location.lat, state.location.lon, best[0], best[1]) ? p : best));
+  }
   return [(zone.bbox[1] + zone.bbox[3]) / 2, (zone.bbox[0] + zone.bbox[2]) / 2];
 }
 
@@ -701,7 +709,13 @@ function renderParking() {
     const st = Parking.status(zone);
     const color = Parking.zoneColor(zone);
     let shape;
-    if (zone.geometry.type === "Point") {
+    if (zone.geometry.type === "MultiPoint") {
+      // Zone zonder kaartvlak: de parkeerautomaten als stippen in de tariefkleur.
+      shape = L.featureGroup(zone.geometry.coordinates.map(([x, y]) => L.circleMarker([y, x], {
+        pane: "parking", radius: 5, color: "#fff", weight: 1.5, fillColor: color, fillOpacity: st.state === "free" ? 0.55 : 0.95,
+      })));
+      shape.bindTooltip(() => `<b>${esc(zone.name)}</b><br>${esc(st.text)}<br><small>parkeerautomaat</small>`, { sticky: true, direction: "top", className: "pk-tip" });
+    } else if (zone.geometry.type === "Point") {
       const [lon, lat] = zone.geometry.coordinates;
       shape = L.marker([lat, lon], {
         icon: L.divIcon({ className: "pk-marker", html: '<div class="pk-sign">P</div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
@@ -733,7 +747,9 @@ function renderParking() {
   if (reopen != null && pkShapes.has(reopen)) {
     const shape = pkShapes.get(reopen);
     const zone = state.pk.zones.find((z) => z.id === reopen);
-    if (zone && zone.geometry.type !== "Point" && state.location) {
+    if (zone && zone.geometry.type === "MultiPoint") {
+      shape.openPopup(pkPoint(zone));  // bij de dichtstbijzijnde automaat
+    } else if (zone && zone.geometry.type !== "Point" && state.location) {
       shape.openPopup([state.location.lat, state.location.lon]);
     } else {
       shape.openPopup();
@@ -781,7 +797,8 @@ function pkListItem(zone) {
   status.className = "pk-status";
   status.textContent = st.text;
   if (st.state !== "paid") status.style.setProperty("--c", pkColor(st));
-  meta.append(status, ` · ${zone.manager}`);
+  meta.append(status, zone.approx_distance_m != null
+    ? ` · waarschijnlijk (automaat op ${fmtDistance(zone.approx_distance_m)})` : ` · ${zone.manager}`);
   li.append(bar, what, kind, meta);
   const open = () => {
     pkPendingPopup = zone.id;

@@ -82,6 +82,8 @@ def dataset(**overrides):
                           "startdateusageid": "20050101"}],
         "specificaties": [{"areamanagerid": "363", "areaid": "GAR", "capacity": "335",
                            "maximumvehicleheight": "200", "startdatespecifications": "20170613"}],
+        "verkooppunt": [],
+        "geo_verkooppunt": [],
     }
     data.update(overrides)
     return data
@@ -234,3 +236,80 @@ async def test_new_parser_version_triggers_immediate_refresh(service):
         assert service.db.meta_get("parking_updated") == 0
     finally:
         await service.stop()
+
+
+def test_visitor_permit_area_without_fare_is_permit_zone():
+    """Rotterdam "Sector 12": bezoekersregeling zonder tarief = vergunningzone, geen betaalzone."""
+    data = dataset()
+    data["geometrie"].append(dict(data["geometrie"][0], areaid="SECTOR12",
+                                  areageometryastext=SQUARE.replace("4.89", "4.91").replace("4.90", "4.92")))
+    data["gebied"].append(dict(data["gebied"][0], areaid="SECTOR12", areadesc="Sector 12"))
+    data["gebiedregeling"].append({"areamanagerid": "363", "areaid": "SECTOR12", "regulationid": "BZ",
+                                   "usageid": "BEZOEKP", "startdatearearegulation": "20050101000000"})
+    data["regeling"].append({"areamanagerid": "363", "regulationid": "BZ", "regulationdesc": "Bezoekersparkeren",
+                             "regulationtype": "B", "startdateregulation": "20050101"})
+    data["tijdvak"].append({"areamanagerid": "363", "regulationid": "BZ", "daytimeframe": "MAANDAG",
+                            "starttimetimeframe": "900", "endtimetimeframe": "2300", "claimrightpossible": "J",
+                            "startdatetimeframe": "20170523000000"})
+    zones = {z["id"]: z for z in npr.build_zones(data, TODAY)}
+    assert zones["363:SECTOR12"]["kind"] == "vergunning"
+    assert zones["363:T11V"]["kind"] == "betaald"       # gewone betaalzone blijft betaald
+
+
+def meter_zone(data):
+    """Betaald gebied zonder kaartvlak (bijv. Maastricht), wel met twee parkeerautomaten."""
+    data["gebied"].append(dict(data["gebied"][0], areaid="MAAS1", areadesc="Maastricht zone 1"))
+    data["gebiedregeling"].append({"areamanagerid": "363", "areaid": "MAAS1", "regulationid": "BP11V",
+                                   "usageid": "BETAALDP", "startdatearearegulation": "20050101000000"})
+    data["verkooppunt"] = [
+        {"areamanagerid": "363", "areaid": "MAAS1", "sellingpointid": "A1", "startdatesellingpoint": "20200101",
+         "enddatesellingpoint": "29991231"},
+        {"areamanagerid": "363", "areaid": "MAAS1", "sellingpointid": "A2", "startdatesellingpoint": "20200101"},
+        {"areamanagerid": "363", "areaid": "MAAS1", "sellingpointid": "OUD", "startdatesellingpoint": "20100101",
+         "enddatesellingpoint": "20150101"},
+        {"areamanagerid": "363", "areaid": "T11V", "sellingpointid": "A3", "startdatesellingpoint": "20200101"},
+    ]
+    data["geo_verkooppunt"] = [
+        {"areamanagerid": "363", "sellingpointid": sid, "location": {"type": "Point", "coordinates": xy}}
+        for sid, xy in [("A1", [5.690, 50.850]), ("A2", [5.692, 50.851]), ("OUD", [5.70, 50.86]), ("A3", [4.895, 52.375])]
+    ]
+    return data
+
+
+def test_area_without_polygon_gets_parking_meters():
+    zones = {z["id"]: z for z in npr.build_zones(meter_zone(dataset()), TODAY)}
+    zone = zones["363:MAAS1"]
+    assert zone["kind"] == "betaald" and zone["approx"] == "automaten"
+    assert zone["geometry"] == {"type": "MultiPoint", "coordinates": [[5.69, 50.85], [5.692, 50.851]]}  # zonder oude
+    assert zone["bbox"] == [5.69, 50.85, 5.692, 50.851]
+    assert zone["fares"]["TC1"]["text"] == "€8,05 per uur"
+    # Een gebied mét kaartvlak houdt zijn vlak; automaten veranderen daar niets aan.
+    assert zones["363:T11V"]["geometry"]["type"] == "Polygon" and zones["363:T11V"]["approx"] is None
+
+
+@respx.mock
+def test_parking_here_uses_nearby_meters(service):
+    data = meter_zone(dataset())
+    for name, ds in npr.DATASETS.items():
+        respx.get(f"{npr.BASE_URL}/{ds}.json").mock(return_value=httpx.Response(200, json=data[name]))
+    import asyncio
+    asyncio.run(service.refresh_parking_once())
+    with TestClient(create_app(service, start_background=False)) as client:
+        here = client.get("/api/parking/at?lat=50.8505&lon=5.6905").json()   # ~65 m van automaat A1
+        assert [z["id"] for z in here] == ["363:MAAS1"] and 40 < here[0]["approx_distance_m"] < 100
+        assert client.get("/api/parking/at?lat=50.86&lon=5.72").json() == []   # te ver weg
+        # In een getekende betaalzone: geen gok op basis van automaten.
+        assert [z["id"] for z in client.get("/api/parking/at?lat=52.375&lon=4.895").json()] == ["363:T11V"]
+
+
+def test_visitor_rate_area_is_permit_zone():
+    """Maastricht "Centrum-West bezoek": bezoekerstarief €1,85 = geen betaalzone voor iedereen."""
+    data = dataset()
+    data["geometrie"].append(dict(data["geometrie"][0], areaid="CWB",
+                                  areageometryastext=SQUARE.replace("4.89", "4.93").replace("4.90", "4.94")))
+    data["gebied"].append(dict(data["gebied"][0], areaid="CWB", areadesc="Centrum-West bezoek"))
+    data["gebiedregeling"].append({"areamanagerid": "363", "areaid": "CWB", "regulationid": "BP11V",
+                                   "usageid": "BEZOEKP", "startdatearearegulation": "20050101000000"})
+    zones = {z["id"]: z for z in npr.build_zones(data, TODAY)}
+    assert zones["363:CWB"]["kind"] == "vergunning"
+    assert "_visitor_only" not in zones["363:CWB"]
