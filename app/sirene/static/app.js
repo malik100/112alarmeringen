@@ -138,6 +138,69 @@ function openPopupId(markerMap) {
   return null;
 }
 
+/**
+ * Markers die op het scherm over elkaar vallen een stukje uit elkaar zetten.
+ * Geeft per item een verschuiving [dx, dy] in pixels; de echte plek (lat/lon) blijft gelijk.
+ * Zo verdwijnt bijv. een Albert Heijn niet onder de Vomar die 40 meter verderop zit.
+ */
+function spreadOffsets(items, minPx = 22) {
+  const pts = items.map((it) => map.latLngToLayerPoint([it.lat, it.lon]));
+  const order = pts.map((_, i) => i).sort((a, b) => pts[a].x - pts[b].x);
+  const group = new Array(items.length).fill(-1);
+  const groups = [];
+  for (let oi = 0; oi < order.length; oi++) {
+    const i = order[oi];
+    if (group[i] >= 0) continue;
+    const g = [i];
+    group[i] = groups.length;
+    // Uitbreiden zolang er een nieuw punt dicht bij een lid van de groep ligt.
+    for (let k = 0; k < g.length; k++) {
+      const pk = pts[g[k]];
+      for (let oj = 0; oj < order.length; oj++) {
+        const j = order[oj];
+        if (pts[j].x - pk.x > minPx) break;
+        if (group[j] < 0 && Math.abs(pts[j].x - pk.x) < minPx && pk.distanceTo(pts[j]) < minPx) {
+          group[j] = groups.length;
+          g.push(j);
+        }
+      }
+    }
+    groups.push(g);
+  }
+  const offsets = items.map(() => [0, 0]);
+  for (const g of groups) {
+    if (g.length < 2) continue;
+    const cx = g.reduce((t, i) => t + pts[i].x, 0) / g.length;
+    const cy = g.reduce((t, i) => t + pts[i].y, 0) / g.length;
+    const r = Math.max(minPx * 0.75, (minPx * g.length) / (2 * Math.PI));
+    g.forEach((i, k) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * k) / g.length;
+      offsets[i] = [cx + r * Math.cos(angle) - pts[i].x, cy + r * Math.sin(angle) - pts[i].y];
+    });
+  }
+  return offsets;
+}
+
+const LABEL_ZOOM = 16;
+function shortName(name) {
+  return name.length > 18 ? `${name.slice(0, 17).trimEnd()}…` : name;
+}
+
+/** Marker met (optioneel) verschoven icoon en, bij genoeg inzoomen, een naamlabel eronder. */
+function spreadMarker(lat, lon, html, className, size, [dx, dy], label, zIndexOffset) {
+  const half = size / 2;
+  const marker = L.marker([lat, lon], {
+    icon: L.divIcon({ className, html, iconSize: [size, size], iconAnchor: [half - dx, half - dy],
+      popupAnchor: [dx, dy - half] }),
+    keyboard: false, zIndexOffset,
+  });
+  if (label && map.getZoom() >= LABEL_ZOOM) {
+    marker.bindTooltip(shortName(label), { permanent: true, direction: "bottom", offset: [dx, dy + half - 4],
+      className: "map-label", interactive: false });
+  }
+  return marker;
+}
+
 function incidentIcon(inc) {
   const old = Date.now() / 1000 - inc.ts > OLD_INCIDENT_S;
   const cls = ["inc-dot", inc.discipline, inc.sirene && !old ? "sirene" : "",
@@ -440,30 +503,19 @@ function sgPopup(point) {
     <div class="popup-links">${routeLink(point.lat, point.lon)}</div>`;
 }
 
-function sgIcon(st) {
-  return L.divIcon({
-    className: "sg-marker",
-    html: `<div class="sg-sign ${st.state}">${icon("recycle")}</div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-  });
-}
-
 let sgPendingPopup = null;
 
-function renderSg() {
+function drawSg(layout) {
   const reopen = sgPendingPopup ?? openPopupId(sgMarkers);
   sgLayer.clearLayers();
   sgMarkers.clear();
-  if (!state.sg.show || map.getZoom() < state.config.statiegeld.min_zoom) return;
-  for (const point of state.sg.points) {
-    const st = sgStatus(point);
-    if (!sgVisible(point, st)) continue;
-    const marker = L.marker([point.lat, point.lon], { icon: sgIcon(st), keyboard: false, zIndexOffset: -500 })
+  layout.sg.forEach(({ p: point, st }, i) => {
+    const marker = spreadMarker(point.lat, point.lon, `<div class="sg-sign ${st.state}">${icon("recycle")}</div>`,
+      "sg-marker", 22, layout.sgOff[i], layout.sgLabel[i] ? point.name : null, -500)
       .bindPopup(() => sgPopup(point), { maxWidth: 280 });
     marker.addTo(sgLayer);
     sgMarkers.set(point.id, marker);
-  }
+  });
   if (reopen != null && sgMarkers.has(reopen)) {
     sgMarkers.get(reopen).openPopup();
     sgPendingPopup = null;
@@ -1077,27 +1129,48 @@ function shPopup(shop) {
 
 let shPendingPopup = null;
 
-function renderShops() {
+function drawShops(layout) {
   const reopen = shPendingPopup ?? openPopupId(shMarkers);
   shLayer.clearLayers();
   shMarkers.clear();
-  if (!state.sh.show || map.getZoom() < state.config.shops.min_zoom) return;
-  for (const shop of state.sh.points) {
-    const st = shStatus(shop);
-    if (!shMatches(shop, st)) continue;
-    const marker = L.marker([shop.lat, shop.lon], {
-      icon: L.divIcon({ className: "sh-marker", html: `<div class="sh-sign" style="--c:${SH_COLORS[st.state]}">${icon(SH_ICON[shop.kind])}</div>`,
-        iconSize: [24, 24], iconAnchor: [12, 12] }),
-      keyboard: false, zIndexOffset: -450,
-    }).bindPopup(() => shPopup(shop), { maxWidth: 290 });
+  layout.shops.forEach(({ p: shop, st }, i) => {
+    const html = `<div class="sh-sign" style="--c:${SH_COLORS[st.state]}">${icon(SH_ICON[shop.kind])}</div>`;
+    const marker = spreadMarker(shop.lat, shop.lon, html, "sh-marker", 24, layout.shopOff[i], shop.brand || shop.name, -450)
+      .bindPopup(() => shPopup(shop), { maxWidth: 290 });
     marker.addTo(shLayer);
     shMarkers.set(shop.id, marker);
-  }
+  });
   if (reopen != null && shMarkers.has(reopen)) {
     shMarkers.get(reopen).openPopup();
     shPendingPopup = null;
   }
 }
+
+/**
+ * Winkels en statiegeldpunten samen verdelen: zo valt ook een winkel niet over zijn eigen
+ * inleverpunt (of over de supermarkt ernaast). Een inleverpunt in een winkel die al op de kaart
+ * staat, krijgt geen tweede naamlabel.
+ */
+function poiLayout() {
+  const shops = state.sh.show && map.getZoom() >= state.config.shops.min_zoom
+    ? state.sh.points.map((p) => ({ p, st: shStatus(p) })).filter((x) => shMatches(x.p, x.st)) : [];
+  const sg = state.sg.show && map.getZoom() >= state.config.statiegeld.min_zoom
+    ? state.sg.points.map((p) => ({ p, st: sgStatus(p) })).filter((x) => sgVisible(x.p, x.st)) : [];
+  const offsets = spreadOffsets([...shops.map((x) => x.p), ...sg.map((x) => x.p)], 24);
+  const firstWord = (n) => (n || "").toLowerCase().split(/\s+/)[0];
+  const sgLabel = sg.map(({ p }) => !shops.some(({ p: shop }) =>
+    firstWord(shop.brand || shop.name) === firstWord(p.name) && haversine(shop.lat, shop.lon, p.lat, p.lon) < 60));
+  return { shops, sg, shopOff: offsets.slice(0, shops.length), sgOff: offsets.slice(shops.length), sgLabel };
+}
+
+function renderPois() {
+  if (!state.config) return;
+  const layout = poiLayout();
+  drawShops(layout);
+  drawSg(layout);
+}
+const renderShops = renderPois;
+const renderSg = renderPois;
 
 function shNearItems() {
   if (!state.location) return [];
@@ -2193,7 +2266,7 @@ setInterval(() => {
   renderIncidents();
   renderList();
   renderStatus();
-  if (state.config) { renderSg(); renderSgList(); renderParking(); renderParkingHere(); renderChargingList(); renderShops(); renderShopsList(); }
+  if (state.config) { renderPois(); renderSgList(); renderParking(); renderParkingHere(); renderChargingList(); renderShopsList(); }
 }, 30000);
 
 init().catch((err) => {

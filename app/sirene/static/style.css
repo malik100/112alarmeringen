@@ -646,5 +646,13 @@ fieldset { min-width: 0; }
   }
 }
 
+/* naamlabels onder winkels en statiegeldpunten (vanaf zoomniveau 16) */
+.leaflet-tooltip.map-label {
+  background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--fg);
+  border: 0; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); border-radius: 6px;
+  padding: 0 5px; font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap;
+}
+.leaflet-tooltip.map-label::before { display: none; }
+
 /* "hidden" moet altijd winnen van display-regels hierboven. */
 [hidden] { display: none !important; }

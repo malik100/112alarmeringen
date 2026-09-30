@@ -244,6 +244,10 @@ Uitzetten kan met `parking.enabled: false` in `config.yaml`.
 Bron: OpenStreetMap (via Overpass, één keer per dag): ~5.200 supermarkten, ~2.800 buurtwinkels,
 avondwinkels en toko's, en ~270 markten.
 
+- **Dicht op elkaar:** winkels (en statiegeldpunten) die op het scherm over elkaar zouden vallen,
+  zet de kaart in een klein cirkeltje rond hun plek, zodat elke winkel zichtbaar en aanklikbaar is.
+  Vanaf zoomniveau 16 staat de naam eronder; een inleverpunt in een winkel die al op de kaart
+  staat, krijgt geen tweede label.
 - **Openingstijden** komen uit OpenStreetMap (`opening_hours`). Ontbreken ze bij een supermarkt,
   dan nemen we de tijden over van hetzelfde punt in de statiegelddata (zelfde merk, binnen 75 m).
   Zo is de dekking ~73% van de winkels. De popup vermeldt de bron.
