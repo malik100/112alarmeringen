@@ -145,6 +145,56 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
     def get_status():
         return svc.status
 
+    @app.get("/api/status/overview")
+    def get_status_overview():
+        """Voor het paneel: per bron wanneer voor het laatst gelukt, fouten, en de schijfruimte."""
+        import shutil
+        names = {"p2000": "112-meldingen", "news": "Nieuws", "announcements": "Bekendmakingen",
+                 "roadworks": "Wegwerk", "parking": "Parkeren", "statiegeld": "Statiegeld", "shops": "Winkels",
+                 "fuel": "Tankstations", "charging": "Laadpalen", "charging_status": "Laadpalen (beschikbaarheid)",
+                 "speedcams": "Flitsers", "ov": "OV-dienstregeling", "ov_realtime": "OV actueel",
+                 "homeassistant": "Home Assistant"}
+        enabled = {"p2000": True, "news": svc.cfg["news"]["enabled"],
+                   "announcements": svc.cfg["announcements"]["enabled"],
+                   "roadworks": svc.cfg["roadworks"]["enabled"], "parking": svc.cfg["parking"]["enabled"],
+                   "statiegeld": svc.cfg["statiegeld"]["enabled"], "shops": svc.cfg["shops"]["enabled"],
+                   "fuel": svc.cfg["fuel"]["enabled"], "charging": svc.cfg["charging"]["enabled"],
+                   "charging_status": svc.cfg["charging"]["enabled"],
+                   "speedcams": svc.cfg["speedcams"]["enabled"], "ov": svc.cfg["ov"]["enabled"],
+                   "ov_realtime": svc.cfg["ov"]["enabled"],
+                   "homeassistant": svc.cfg["location"]["homeassistant"]["enabled"]}
+        sources = []
+        for key, label in names.items():
+            if not enabled.get(key):
+                continue
+            st = svc.status.get(key, {})
+            error = st.get("last_error")
+            error_ts = None
+            if error and ":" in error and error.split(":", 1)[0].isdigit():
+                error_ts, error = int(error.split(":", 1)[0]), error.split(":", 1)[1].strip()
+            sources.append({"key": key, "name": label, "last_ok": st.get("last_ok"), "count": st.get("count"),
+                            "error": error if not st.get("last_ok") or (error_ts or 0) > st["last_ok"] else None,
+                            "busy": bool(st.get("importing"))})
+        files = {}
+        db_path = svc.cfg["database"]
+        if db_path != ":memory:":
+            for name, path in (("database", Path(db_path)), ("ov", svc.ov_path())):
+                try:
+                    size = path.stat().st_size
+                    for suffix in ("-wal", "-shm"):
+                        extra = path.with_name(path.name + suffix)
+                        size += extra.stat().st_size if extra.exists() else 0
+                    files[name] = size
+                except OSError:
+                    pass
+            try:
+                usage = shutil.disk_usage(Path(db_path).parent)
+                files["free"] = usage.free
+                files["total"] = usage.total
+            except OSError:
+                pass
+        return {"sources": sources, "disk": files, "started": svc.started}
+
     @app.get("/api/location")
     def get_location():
         loc = svc.locations.current

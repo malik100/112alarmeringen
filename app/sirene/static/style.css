@@ -819,3 +819,14 @@ fieldset { min-width: 0; }
 .presets { padding: 6px 6px 4px; margin: 0 0 2px; border-bottom: 1px solid var(--border); }
 .presets .chip { font-size: 12px; padding: 3px 10px; cursor: pointer; font: inherit; font-size: 12px; }
 .presets .chip.active { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+
+/* --- status --- */
+.status-list { list-style: none; margin: 0 0 8px; padding: 0; font-size: 13px; }
+.status-list li { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.status-list li:last-child { border-bottom: 0; }
+.status-list .name { flex: 1; }
+.status-list .when { color: var(--fg-muted); white-space: nowrap; font-size: 12px; }
+.status-list .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; align-self: center; }
+.status-list .dot.warn { background: var(--warn); } .status-list .dot.err { background: var(--err); } .status-list .dot.none { background: var(--border); }
+.status-list .err-text { flex-basis: 100%; color: var(--err); font-size: 12px; padding-left: 16px; }
+.status-list li.has-error { flex-wrap: wrap; }

@@ -91,6 +91,7 @@ class Service:
             "homeassistant": {"last_ok": None, "last_error": None},
         }
         self._tasks: list[asyncio.Task] = []
+        self.started = time.time()
         # Beschikbaarheid van laadpalen: alleen in het geheugen (vluchtig, elk kwartier nieuw).
         self.charging_status: dict[str, dict[str, Any]] = {}
         self.charging_status_ts: float | None = None

@@ -2812,7 +2812,7 @@ function setSectionOpen(sec, open) {
 
 function initSections() {
   let closed;
-  try { closed = new Set(JSON.parse(store.get("closedSections") || '["instellingen"]')); } catch { closed = new Set(); }
+  try { closed = new Set(JSON.parse(store.get("closedSections") || '["instellingen", "status"]')); } catch { closed = new Set(); }
   document.querySelectorAll(".lsec").forEach((sec) => {
     setSectionOpen(sec, !closed.has(sec.dataset.sec));
     sec.querySelector(".lsec-head").addEventListener("click", () => {
@@ -3273,6 +3273,59 @@ function pickOnMap() {
   $("zoom-hint-btn").onclick = done;
 }
 
+// ---------- status ----------
+
+const nlInt = new Intl.NumberFormat("nl-NL");
+function fmtBytes(b) {
+  if (b == null) return "?";
+  if (b >= 1e9) return `${(b / 1e9).toFixed(1).replace(".", ",")} GB`;
+  return `${Math.round(b / 1e6)} MB`;
+}
+
+async function renderStatusPanel() {
+  let data;
+  try { data = await api("/api/status/overview"); } catch { return; }
+  const now = Date.now() / 1000;
+  let problems = 0;
+  $("status-list").replaceChildren(...data.sources.map((s) => {
+    const li = document.createElement("li");
+    const dot = document.createElement("span");
+    const stale = s.last_ok && now - s.last_ok > 2 * 86400;
+    dot.className = `dot ${s.error ? "err" : !s.last_ok ? "none" : stale ? "warn" : ""}`;
+    if (s.error) problems++;
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = s.name + (s.count ? ` · ${nlInt.format(s.count)}` : "");
+    const when = document.createElement("span");
+    when.className = "when";
+    when.textContent = s.busy ? "bezig met inlezen…" : s.last_ok ? `bijgewerkt ${fmtAgo(s.last_ok)}` : "nog niet opgehaald";
+    li.append(dot, name, when);
+    if (s.error) {
+      li.className = "has-error";
+      const err = document.createElement("span");
+      err.className = "err-text";
+      err.textContent = s.error.length > 140 ? `${s.error.slice(0, 137)}…` : s.error;
+      li.append(err);
+    }
+    return li;
+  }));
+  const d = data.disk;
+  const parts = [];
+  if (d.database != null) parts.push(`database ${fmtBytes(d.database)}`);
+  if (d.ov != null) parts.push(`ov-dienstregeling ${fmtBytes(d.ov)}`);
+  if (d.free != null) parts.push(`${fmtBytes(d.free)} vrij op de schijf`);
+  if (data.started) parts.push(`draait sinds ${fmtAgo(data.started).replace("geleden", "").trim()}`);
+  $("status-disk").textContent = parts.join(" · ");
+  const low = d.free != null && d.free < 2e9;
+  setSectionSummary("status", problems ? `${problems} bron${problems > 1 ? "nen" : ""} met een fout`
+    : low ? `Weinig schijfruimte: ${fmtBytes(d.free)} vrij` : "Alles in orde", problems || low ? "urgent" : "");
+}
+
+function initStatusPanel() {
+  renderStatusPanel();
+  setInterval(renderStatusPanel, 60000);
+}
+
 function initAccess() {
   if (!state.config.password_protected) return;
   $("access-box").hidden = false;
@@ -3366,6 +3419,7 @@ async function init() {
   initLocationUi();
   initSearch();
   initAccess();
+  initStatusPanel();
   if (state.config.browser_location && store.get("browserLocation") === "1") startBrowserLocation();
 }
 $("panel-toggle").addEventListener("click", () => {

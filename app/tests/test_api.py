@@ -108,3 +108,12 @@ def test_password_protection(cfg):
 def test_no_password_means_open(client):
     assert client.get("/api/config").json()["password_protected"] is False
     assert client.get("/login", follow_redirects=False).status_code == 303
+
+
+def test_status_overview(client, service):
+    service.status["roadworks"]["last_error"] = "1790000000: kapot"
+    got = client.get("/api/status/overview").json()
+    names = {s["key"]: s for s in got["sources"]}
+    assert names["p2000"]["name"] == "112-meldingen" and names["roadworks"]["error"] == "kapot"
+    assert "homeassistant" not in names            # staat uit in de configuratie
+    assert got["disk"]["free"] > 0 and got["disk"]["database"] > 0 and got["started"]
