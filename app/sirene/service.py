@@ -25,6 +25,7 @@ from .sources.bekendmakingen import relevance as announcement_relevance
 from .sources.roadworks import DEFAULT_URL as ROADWORKS_URL
 from .sources.roadworks import fetch_roadworks, fetch_street
 from .sources.charging import fetch_availability, fetch_stations
+from .sources.npr import PARSER_VERSION as PARKING_PARSER_VERSION
 from .sources.npr import fetch_zones
 from .sources.shops import fetch_shops, is_late, same_store
 from .sources.speedcams import fetch_speedcams
@@ -423,6 +424,7 @@ class Service:
             return False
         self.db.replace_parking(zones)
         self.db.meta_set("parking_updated", time.time())
+        self.db.meta_set("parking_version", PARKING_PARSER_VERSION)
         self.status["parking"].update(last_ok=time.time(), count=len(zones))
         self.bus.publish("parking", {"count": len(zones)})
         return True
@@ -586,6 +588,8 @@ class Service:
                 self.refresh_charging_status_once)))
         if self.cfg["parking"]["enabled"]:
             self.status["parking"]["count"] = self.db.parking_count()
+            if self.db.meta_get("parking_version") != PARKING_PARSER_VERSION:
+                self.db.meta_set("parking_updated", 0)  # nieuwe verwerking: meteen opnieuw ophalen
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "parking", self.cfg["parking"]["refresh_hours"] * 3600,
                 self.refresh_parking_once)))

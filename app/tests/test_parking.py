@@ -219,3 +219,18 @@ async def test_refresh_failure_keeps_old_data(service):
     respx.get(url__startswith=npr.BASE_URL).mock(return_value=httpx.Response(503))
     assert not await service.refresh_parking_once()
     assert service.status["parking"]["last_error"]
+
+
+async def test_new_parser_version_triggers_immediate_refresh(service):
+    """Na een update met betere verwerking niet een dag wachten op de volgende verversing."""
+    import time
+    service.db.meta_set("parking_updated", time.time())       # net ververst met de oude versie
+    service.db.meta_set("parking_version", npr.PARSER_VERSION - 1)
+    service.cfg.update({k: dict(service.cfg[k], enabled=False) for k in
+                        ("speedcams", "statiegeld", "news", "shops", "charging", "roadworks", "announcements")})
+    service.cfg["p2000"]["feeds"] = []
+    service.start()
+    try:
+        assert service.db.meta_get("parking_updated") == 0
+    finally:
+        await service.stop()

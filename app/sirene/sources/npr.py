@@ -39,6 +39,10 @@ DATASETS = {
     "specificaties": "b3us-f26s",
 }
 ROW_LIMIT = 500_000
+# Verhoog dit als de verwerking verandert: bestaande installaties halen dan direct opnieuw op
+# in plaats van tot een dag lang de oude (verkeerd opgebouwde) zones te tonen.
+# 2: alle vlakken van een gebied samengevoegd (daarvoor bleef er per gebied maar één over).
+PARSER_VERSION = 2
 
 WEEKDAYS = ["MAANDAG", "DINSDAG", "WOENSDAG", "DONDERDAG", "VRIJDAG", "ZATERDAG", "ZONDAG"]
 
