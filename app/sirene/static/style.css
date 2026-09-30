@@ -534,5 +534,72 @@ fieldset { min-width: 0; }
 .rw-sign.planned { background: #9ca3af; }
 .rw-sign .i { width: 12px; height: 12px; stroke-width: 2.5; }
 
+/* ================= kaartlagen (links) ================= */
+.layers {
+  position: fixed; z-index: 1000;
+  top: 64px; left: 10px; width: 270px;
+  /* ruimte laten voor de locatieknop en zoomknoppen linksonder */
+  max-height: calc(100% - 64px - 120px);
+  display: flex; flex-direction: column;
+  background: var(--bg); border-radius: var(--radius); box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.layers-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: 0; background: none; color: var(--fg); cursor: pointer;
+  font: inherit; font-weight: 650; font-size: 14px; text-align: left;
+  padding: 11px 14px;
+}
+.layers-head > span { flex: 1; }
+.layers:not(.collapsed) .layers-head { border-bottom: 1px solid var(--border); }
+.caret { color: var(--fg-muted); transition: transform .15s; }
+.collapsed .caret { transform: rotate(-90deg); }
+.layers-body { overflow-y: auto; overscroll-behavior: contain; padding: 6px 6px 8px; }
+.layers.collapsed .layers-body { display: none; }
+.layers.collapsed { width: auto; }
+
+.layer-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px; border-radius: 10px; cursor: pointer; font-size: 14px;
+}
+.layer-row:hover { background: var(--bg-soft); }
+.layer-row[hidden] { display: none; }
+.layer-ic { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+  background: var(--bg-soft); color: var(--fg-muted); flex: none; }
+.layer-row:has(.toggle:checked) .layer-ic { background: var(--fg); color: var(--bg); }
+.layer-name { flex: 1; line-height: 1.25; }
+.layer-sub { padding: 0 8px 6px 46px; }
+.layer-sub .chip { font-size: 12px; padding: 3px 9px; }
+
+/* schakelaar */
+.toggle {
+  appearance: none; -webkit-appearance: none; flex: none; margin: 0; cursor: pointer;
+  width: 36px; height: 20px; border-radius: 999px; position: relative;
+  background: var(--border); transition: background .15s;
+}
+.toggle::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s;
+}
+.toggle:checked { background: var(--ok); }
+.toggle:checked::after { transform: translateX(16px); }
+.toggle:focus-visible { outline: 2px solid var(--me); outline-offset: 2px; }
+
+/* inhoudspaneel (rechts) inklapbaar, ook op desktop */
+.panel-handle { position: relative; cursor: pointer; padding-right: 40px; }
+.panel-handle > .caret { position: absolute; right: 14px; top: 14px; width: 18px; height: 18px; }
+.panel.collapsed { bottom: auto; }
+.panel.collapsed .panel-body { display: none; }
+.panel.collapsed .panel-handle { border-bottom: 0; }
+
+@media (max-width: 720px) {
+  .layers { top: calc(max(10px, env(safe-area-inset-top)) + 46px); width: min(300px, calc(100% - 20px));
+            max-height: 55vh; z-index: 1001; }
+  .layers.collapsed { width: auto; }
+  .layers-head { padding: 8px 12px; font-size: 13px; }
+  .panel.collapsed { bottom: 0; }
+  .panel-handle > .caret { display: none; }  /* op de telefoon is de greep de knop */
+}
+
 /* "hidden" moet altijd winnen van display-regels hierboven. */
 [hidden] { display: none !important; }

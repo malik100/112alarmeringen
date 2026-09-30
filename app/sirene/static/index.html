@@ -25,10 +25,57 @@
 
   <div id="alert" class="alert" role="alert" hidden></div>
 
+  <!-- Kaartlagen: links (op de telefoon een uitklapmenu) -->
+  <aside class="layers" id="layers" aria-label="Kaartlagen">
+    <button type="button" class="layers-head" id="layers-toggle" aria-expanded="true" aria-controls="layers-body">
+      <svg class="i" aria-hidden="true"><use href="/static/icons.svg#layers"/></svg><span>Kaartlagen</span><svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+    </button>
+    <div class="layers-body" id="layers-body">
+      <label class="layer-row" id="pk-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#square-parking"/></svg></span><span class="layer-name">Parkeerzones &amp; tarieven</span>
+        <input type="checkbox" class="toggle" id="pk-show">
+      </label>
+      <label class="layer-row" id="sg-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#recycle"/></svg></span><span class="layer-name">Statiegeld-inleverpunten</span>
+        <input type="checkbox" class="toggle" id="sg-show">
+      </label>
+      <label class="layer-row" id="sh-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#shopping-cart"/></svg></span><span class="layer-name">Supermarkten &amp; avondwinkels</span>
+        <input type="checkbox" class="toggle" id="sh-show">
+      </label>
+      <label class="layer-row" id="rw-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#construction"/></svg></span><span class="layer-name">Wegwerkzaamheden</span>
+        <input type="checkbox" class="toggle" id="rw-show">
+      </label>
+      <label class="layer-row">
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#camera"/></svg></span><span class="layer-name">Flitsers &amp; trajectcontroles</span>
+        <input type="checkbox" class="toggle" id="layer-cams">
+      </label>
+      <div class="layer-sub chips" id="cam-layers">
+        <label class="chip"><input type="checkbox" data-cam="flitser" checked> Flitsers</label>
+        <label class="chip"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
+        <label class="chip"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
+      </div>
+      <label class="layer-row" id="ch-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#zap"/></svg></span><span class="layer-name">Laadpalen</span>
+        <input type="checkbox" class="toggle" id="ch-show">
+      </label>
+      <label class="layer-row" id="bk-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#stamp"/></svg></span><span class="layer-name">Bekendmakingen</span>
+        <input type="checkbox" class="toggle" id="bk-show">
+      </label>
+      <label class="layer-row">
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#siren"/></svg></span><span class="layer-name">112-meldingen</span>
+        <input type="checkbox" class="toggle" id="layer-incidents">
+      </label>
+    </div>
+  </aside>
+
   <aside class="panel" id="panel">
-    <button class="panel-handle" id="panel-toggle" aria-expanded="true" aria-controls="panel-body">
+    <button class="panel-handle" id="panel-toggle" aria-expanded="true" aria-controls="panel-body" title="Inklappen of uitklappen">
       <span class="handle-bar" aria-hidden="true"></span>
       <span id="summary">Even geduld…</span>
+      <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
     </button>
 
     <div class="panel-body" id="panel-body">
@@ -46,24 +93,6 @@
       <!-- Overzicht: per onderwerp het belangrijkste op jouw plek -->
       <div data-panel="overzicht" role="tabpanel">
         <div id="ov-cards"></div>
-        <fieldset class="filters">
-          <legend>Op de kaart</legend>
-          <div class="chips">
-            <label class="chip"><input type="checkbox" id="layer-incidents"> 112-meldingen</label>
-            <label class="chip" id="bk-show-chip" hidden><input type="checkbox" id="bk-show"> Bekendmakingen</label>
-            <label class="chip" id="rw-show-chip" hidden><input type="checkbox" id="rw-show"> Wegwerk</label>
-            <label class="chip" id="sh-show-chip" hidden><input type="checkbox" id="sh-show"> Winkels</label>
-            <label class="chip"><input type="checkbox" id="layer-cams"> Flitsers</label>
-            <label class="chip" id="pk-show-chip" hidden><input type="checkbox" id="pk-show"> Parkeren</label>
-            <label class="chip" id="ch-show-chip" hidden><input type="checkbox" id="ch-show"> Laadpalen</label>
-            <label class="chip" id="sg-show-chip" hidden><input type="checkbox" id="sg-show"> Statiegeld</label>
-          </div>
-          <div class="chips" id="cam-layers">
-            <label class="chip"><input type="checkbox" data-cam="flitser" checked> Flitsers</label>
-            <label class="chip"><input type="checkbox" data-cam="roodlicht" checked> Roodlicht</label>
-            <label class="chip"><input type="checkbox" data-cam="traject" checked> Trajectcontroles</label>
-          </div>
-        </fieldset>
         <fieldset class="filters">
           <legend>Instellingen</legend>
           <label class="select nav-select">

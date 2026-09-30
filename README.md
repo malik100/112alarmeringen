@@ -26,7 +26,10 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   locatiewaarschuwing verschijnt alleen als er iets mis is.
 - **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
   `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
-- **Kaartlagen** zet je los aan en uit (meldingen, wegwerk, bekendmakingen, winkels, flitsers, parkeren, laadpalen, statiegeld).
+- **Twee panelen**: links *Kaartlagen* (per laag een schakelaar: parkeren, statiegeld, winkels,
+  wegwerk, flitsers met roodlicht/traject apart, laadpalen, bekendmakingen, 112), rechts de
+  inhoud met de tabbladen. Beide klap je in met één klik; de app onthoudt dat per apparaat.
+  Op de telefoon is *Kaartlagen* een uitklapmenu en de inhoud een vel onderaan.
   Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
   met sirene (A0/A1/P1) pulseren.

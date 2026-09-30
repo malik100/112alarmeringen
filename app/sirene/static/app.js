@@ -359,6 +359,25 @@ function renderAll() {
   renderStatus();
 }
 
+const isPhone = () => window.matchMedia("(max-width: 720px)").matches;
+
+/** Kaartlagen-paneel links in- of uitklappen. */
+function setLayersPanel(open) {
+  $("layers").classList.toggle("collapsed", !open);
+  $("layers-toggle").setAttribute("aria-expanded", String(open));
+}
+
+function initLayersPanel() {
+  // Desktop: standaard open; telefoon: standaard dicht (anders bedekt het de kaart).
+  const saved = store.get(isPhone() ? "layersOpenPhone" : "layersOpen");
+  setLayersPanel(saved != null ? saved === "1" : !isPhone());
+  $("layers-toggle").addEventListener("click", () => {
+    const open = $("layers").classList.contains("collapsed");
+    setLayersPanel(open);
+    store.set(isPhone() ? "layersOpenPhone" : "layersOpen", open ? "1" : "0");
+  });
+}
+
 function setPanel(open) {
   $("panel").classList.toggle("collapsed", !open);
   $("panel-toggle").setAttribute("aria-expanded", String(open));
@@ -2053,8 +2072,10 @@ function addLocateControl() {
 // ---------- start ----------
 
 async function init() {
-  // Op een telefoon start het paneel ingeklapt, zodat de kaart zichtbaar is.
-  if (window.matchMedia("(max-width: 720px)").matches) setPanel(false);
+  // Op een telefoon start het paneel ingeklapt, zodat de kaart zichtbaar is; op desktop
+  // zoals je het de vorige keer achterliet.
+  setPanel(isPhone() ? false : store.get("panelOpen") !== "0");
+  initLayersPanel();
   state.config = await api("/api/config");
   const { map: m } = state.config;
   L.tileLayer(m.tile_url, { maxZoom: 19, attribution: m.attribution }).addTo(map);
@@ -2084,9 +2105,9 @@ async function init() {
   if (state.config.browser_location && store.get("browserLocation") === "1") startBrowserLocation();
 }
 $("panel-toggle").addEventListener("click", () => {
-  if (window.matchMedia("(max-width: 720px)").matches) {
-    setPanel($("panel").classList.contains("collapsed"));
-  }
+  const open = $("panel").classList.contains("collapsed");
+  setPanel(open);
+  if (!isPhone()) store.set("panelOpen", open ? "1" : "0");
 });
 document.querySelectorAll("[data-disc]").forEach((el) => el.addEventListener("change", () => {
   el.checked ? state.disciplines.add(el.dataset.disc) : state.disciplines.delete(el.dataset.disc);
