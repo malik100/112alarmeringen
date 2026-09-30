@@ -154,7 +154,9 @@ async def test_refresh_and_api(service):
     respx.get(ch.LOCATIONS_URL).mock(return_value=httpx.Response(200, content=gz(LOCATIONS)))
     respx.get(ch.AVAILABILITY_URL).mock(return_value=httpx.Response(200, content=gz(AVAILABILITY)))
     assert await service.refresh_charging_once()
-    await service.refresh_charging_status_once()
+    await service.refresh_charging_status_once()          # niemand kijkt: overgeslagen (scheelt 5 MB)
+    assert service.charging_status_ts is None
+    await service.refresh_charging_status_once(force=True)
     assert service.status["charging"]["count"] == 4 and service.charging_status_ts
 
     with TestClient(create_app(service, start_background=False)) as client:
@@ -173,6 +175,6 @@ async def test_refresh_and_api(service):
 async def test_status_failure_keeps_previous(service):
     service.charging_status = {"x": {"available": 1, "total": 1, "plugs": {}}}
     respx.get(ch.AVAILABILITY_URL).mock(return_value=httpx.Response(503))
-    await service.refresh_charging_status_once()
+    await service.refresh_charging_status_once(force=True)
     assert service.charging_status == {"x": {"available": 1, "total": 1, "plugs": {}}}
     assert service.status["charging_status"]["last_error"]

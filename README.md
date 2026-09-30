@@ -35,7 +35,8 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   schakelpillen, en een groene of rode stip naast de naam voor de live verbinding. Een
   locatiewaarschuwing verschijnt alleen als er iets mis is.
 - **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
-  `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
+  `app/sirene/static/icons.svg`. Met "Zet op beginscherm" (iPhone) of "App installeren" (Android,
+  Chrome) wordt Buurtradar een echte app op je telefoon: eigen icoon, zonder browserbalk.
 - **Twee panelen**: links *Kaartlagen* (per laag een schakelaar: parkeren, statiegeld, winkels,
   tankstations, wegwerk, openbaar vervoer, flitsers met roodlicht/traject apart, laadpalen, nieuws, bekendmakingen, 112), rechts
   de inhoud van precies de lagen die aanstaan, in dezelfde volgorde. Elke sectie heeft een kop
@@ -326,8 +327,9 @@ Bron: [NDW open data](https://opendata.ndw.nu): alle ~79.000 openbare laadlocati
 
 - **Details** (stekkers, vermogen, tarieven, betaalmogelijkheden, toegang): één keer per dag,
   ~22 MB.
-- **Beschikbaarheid** (vrij/bezet): elke 15 minuten, ~5 MB per keer, ~470 MB per dag. Instelbaar
-  met `charging.status_interval_s`; 1800 halveert het dataverbruik.
+- **Beschikbaarheid** (vrij/bezet): ~5 MB per keer, alleen zolang iemand de laadpalenlaag bekijkt
+  en dan hooguit elke 15 minuten (`charging.status_interval_s`). Kijkt niemand, dan wordt er niets
+  opgehaald. Bij het openen van de laag komt de eerste stand binnen een paar seconden.
 - De bestanden worden in stukjes verwerkt (streaming), zodat het ook op een Raspberry Pi weinig
   geheugen kost. De beschikbaarheid staat alleen in het geheugen en wordt na een herstart direct
   opnieuw opgehaald.

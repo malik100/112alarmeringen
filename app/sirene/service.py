@@ -94,6 +94,8 @@ class Service:
         # Beschikbaarheid van laadpalen: alleen in het geheugen (vluchtig, elk kwartier nieuw).
         self.charging_status: dict[str, dict[str, Any]] = {}
         self.charging_status_ts: float | None = None
+        self._charging_wanted = 0.0            # laatste keer dat iemand de laadpalen bekeek
+        self._charging_task: asyncio.Task | None = None
         # Per feed: (aantal fouten op rij, niet opnieuw proberen voor dit tijdstip).
         self._feed_backoff: dict[str, tuple[int, float]] = {}
         # Woonplaatsen rond de laatst bekeken plek (PDOK), bewaard over herstarts heen.
@@ -623,7 +625,24 @@ class Service:
         self.bus.publish("charging", {"count": len(stations)})
         return True
 
-    async def refresh_charging_status_once(self) -> None:
+    def charging_status_wanted(self) -> None:
+        """Iemand kijkt naar de laadpalen: beschikbaarheid ophalen (nu, en zolang er gekeken wordt)."""
+        self._charging_wanted = time.time()
+        interval = self.cfg["charging"]["status_interval_s"]
+        if (self.charging_status_ts or 0) < time.time() - interval and self._charging_task is None:
+            self._charging_task = asyncio.create_task(self._charging_status_now())
+
+    async def _charging_status_now(self) -> None:
+        try:
+            await self.refresh_charging_status_once(force=True)
+        finally:
+            self._charging_task = None
+
+    async def refresh_charging_status_once(self, force: bool = False) -> None:
+        """Beschikbaarheid (~5 MB per keer): alleen zolang iemand de laag bekijkt, anders overslaan."""
+        interval = self.cfg["charging"]["status_interval_s"]
+        if not force and time.time() - self._charging_wanted > 2 * interval:
+            return
         try:
             status = await fetch_availability(self.client)
         except (httpx.HTTPError, ValueError, OSError) as exc:

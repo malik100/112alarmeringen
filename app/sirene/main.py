@@ -346,6 +346,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         if east - west > 0.6 or north - south > 0.6:
             raise HTTPException(422, "Gebied te groot: zoom verder in")
         wanted = {p.strip() for p in plugs.split(",") if p.strip()} if plugs else None
+        svc.charging_status_wanted()
         stations = []
         for s in svc.db.charging_in_bbox(south, west, north, east):
             status = svc.charging_status.get(s["id"])
@@ -472,6 +473,10 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
     @app.get("/healthz")
     def healthz():
         return {"ok": True}
+
+    @app.get("/manifest.webmanifest")
+    def manifest():
+        return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")
 
     @app.get("/")
     def index():
