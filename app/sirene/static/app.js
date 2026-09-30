@@ -16,6 +16,7 @@ const PRECISION_TEXT = {
 const state = {
   config: null,
   location: null,
+  home: null,
   incidents: new Map(),
   cams: [],
   windowMin: 120,
@@ -2954,6 +2955,8 @@ function connectEvents() {
   es.addEventListener("location", (e) => {
     const first = !state.location;
     state.location = JSON.parse(e.data);
+    renderLocationCard();
+    if (!state.location) { renderMe(); renderStatus(); return; }
     if (first) map.setView([state.location.lat, state.location.lon], 14);
     renderMe();
     renderList();
@@ -3000,19 +3003,57 @@ function connectEvents() {
 
 let watchId = null;
 let lastSent = 0;
+let locError = null;   // laatste fout van de browser ("denied", "unavailable", "timeout")
+
+const LOC_ERRORS = {
+  denied: "De browser heeft geen toestemming voor je locatie. Klik op het slotje of het (i) in de adresbalk en zet Locatie op Toestaan. Of kies hieronder een vaste plek.",
+  unavailable: "Deze computer kan zijn locatie niet bepalen (geen gps of wifi-positie). Kies een vaste plek op de kaart.",
+  timeout: "De locatie bepalen duurde te lang. Probeer het opnieuw of kies een vaste plek.",
+};
+
+function canShareLocation() {
+  return state.config.browser_location && "geolocation" in navigator && window.isSecureContext;
+}
+
+/** Kaartje "Nog geen locatie" met de mogelijke oplossingen; verdwijnt zodra er een locatie is. */
+function renderLocationCard() {
+  const card = $("loc-card");
+  let dismissed = false;
+  try { dismissed = sessionStorage.getItem("locCardClosed") === "1"; } catch { /* privémodus */ }
+  if (state.location || dismissed) { card.hidden = true; return; }
+  const title = $("loc-card-title");
+  const text = $("loc-card-text");
+  $("loc-share").hidden = !canShareLocation();
+  if (locError) {
+    title.textContent = "Locatie delen lukt niet";
+    text.textContent = LOC_ERRORS[locError] || LOC_ERRORS.unavailable;
+  } else if (!state.config.browser_location) {
+    title.textContent = "Nog geen locatie";
+    text.textContent = "Locatie via de browser staat uit in config.yaml. Kies een vaste plek, of gebruik Home Assistant.";
+  } else if (!window.isSecureContext) {
+    title.textContent = "Nog geen locatie";
+    text.textContent = `Locatie delen werkt in de browser alleen via https of localhost, niet via ${location.host}. `
+      + "Open de app op deze computer via http://localhost:8080, of kies een vaste plek.";
+  } else {
+    title.textContent = "Nog geen locatie";
+    text.textContent = "Deel je locatie, dan zie je wat er in jouw buurt speelt: parkeren, winkels, ov, wegwerk en meldingen.";
+  }
+  card.hidden = false;
+}
 
 function startBrowserLocation() {
   if (!("geolocation" in navigator)) {
-    alert("Deze browser kan je locatie niet bepalen.");
+    locError = "unavailable";
+    renderLocationCard();
     return;
   }
   if (!window.isSecureContext) {
-    alert("Je locatie delen via de browser kan alleen via https. " +
-      "Gebruik de Home Assistant-app of stel een vaste locatie in.");
+    renderLocationCard();
     return;
   }
   if (watchId != null) return;
   watchId = navigator.geolocation.watchPosition(async (pos) => {
+    locError = null;
     if (Date.now() - lastSent < 10000) return;
     lastSent = Date.now();
     try {
@@ -3022,9 +3063,84 @@ function startBrowserLocation() {
         body: JSON.stringify({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy }),
       });
     } catch (err) { console.error(err); }
-  }, (err) => console.warn("Geolocatie:", err.message), { enableHighAccuracy: true, maximumAge: 10000 });
+  }, (err) => {
+    console.warn("Geolocatie:", err.message);
+    locError = { 1: "denied", 2: "unavailable", 3: "timeout" }[err.code] || "unavailable";
+    if (err.code === 1) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    renderLocationCard();
+  }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
   store.set("browserLocation", "1");
   document.querySelector(".locate-btn")?.classList.add("active");
+}
+
+// ---------- vaste plek (thuis) ----------
+
+let picking = false;
+
+async function setHome(lat, lon) {
+  const home = await api("/api/location/home", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lat, lon }),
+  });
+  state.home = home;
+  renderHome();
+}
+
+async function clearHome() {
+  await api("/api/location/home", { method: "DELETE" });
+  state.home = null;
+  renderHome();
+}
+
+function renderHome() {
+  const home = state.home;
+  $("home-state").textContent = home ? `Ingesteld op ${home.lat.toFixed(4)}, ${home.lon.toFixed(4)}.` : "Geen vaste plek ingesteld.";
+  $("home-clear").hidden = !home;
+}
+
+/** Eén klik op de kaart kiest de vaste plek. */
+function pickOnMap() {
+  if (picking) return;
+  picking = true;
+  $("map").classList.add("picking");
+  $("loc-card").hidden = true;
+  if (isPhone()) setPanel(false);
+  const hint = $("zoom-hint");
+  const prevText = $("zoom-hint-text").textContent;
+  $("zoom-hint-text").textContent = "Klik op de kaart op de plek die je als vaste plek wilt gebruiken";
+  $("zoom-hint-btn").textContent = "Annuleren";
+  hint.hidden = false;
+  const done = () => {
+    picking = false;
+    $("map").classList.remove("picking");
+    $("zoom-hint-text").textContent = prevText;
+    $("zoom-hint-btn").textContent = "Inzoomen";
+    map.off("click", onClick);
+    renderZoomHint();
+    renderLocationCard();
+  };
+  const onClick = (e) => { setHome(e.latlng.lat, e.latlng.lng).catch(console.error); done(); };
+  map.once("click", onClick);
+  $("zoom-hint-btn").onclick = done;
+}
+
+function initLocationUi() {
+  $("loc-share").addEventListener("click", startBrowserLocation);
+  $("loc-pick").addEventListener("click", pickOnMap);
+  $("home-pick").addEventListener("click", pickOnMap);
+  const useCenter = () => { const c = map.getCenter(); setHome(c.lat, c.lng).catch(console.error); };
+  $("loc-center").addEventListener("click", useCenter);
+  $("home-center").addEventListener("click", useCenter);
+  $("home-clear").addEventListener("click", () => clearHome().catch(console.error));
+  $("loc-card-close").addEventListener("click", () => {
+    try { sessionStorage.setItem("locCardClosed", "1"); } catch { /* privémodus */ }
+    $("loc-card").hidden = true;
+  });
+  $("st-loc").addEventListener("click", () => {
+    try { sessionStorage.removeItem("locCardClosed"); } catch { /* privémodus */ }
+    if (!state.location) renderLocationCard();
+  });
+  api("/api/location/home").then((home) => { state.home = home; renderHome(); }).catch(console.error);
+  renderLocationCard();
 }
 
 const LOCATE_ICON = icon("locate-fixed");
@@ -3041,8 +3157,8 @@ function addLocateControl() {
       btn.innerHTML = LOCATE_ICON;
       L.DomEvent.disableClickPropagation(btn);
       L.DomEvent.on(btn, "click", () => {
-        if (state.config.browser_location && watchId == null &&
-            (window.isSecureContext || !state.location)) startBrowserLocation();
+        if (canShareLocation() && watchId == null) startBrowserLocation();
+        else if (!state.location) { try { sessionStorage.removeItem("locCardClosed"); } catch { /* privémodus */ } renderLocationCard(); }
         if (state.location) map.setView([state.location.lat, state.location.lon], Math.max(map.getZoom(), 15));
       });
       return btn;
@@ -3087,6 +3203,7 @@ async function init() {
   connectEvents();
 
   addLocateControl();
+  initLocationUi();
   if (state.config.browser_location && store.get("browserLocation") === "1") startBrowserLocation();
 }
 $("panel-toggle").addEventListener("click", () => {

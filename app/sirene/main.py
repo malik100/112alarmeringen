@@ -117,6 +117,26 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         await svc.set_location(Location(body.lat, body.lon, body.accuracy, "browser", time.time()))
         return svc.locations.current.to_dict()
 
+    @app.get("/api/location/home")
+    def get_home():
+        return svc.locations.home
+
+    @app.put("/api/location/home")
+    async def put_home(body: LocationIn):
+        """Vaste plek (bijv. thuis) instellen vanuit het paneel."""
+        svc.locations.set_home(body.lat, body.lon)
+        loc = svc.locations.current
+        if loc and loc.source == "vast":
+            svc.bus.publish("location", loc.to_dict())
+        return svc.locations.home
+
+    @app.delete("/api/location/home")
+    async def delete_home():
+        svc.locations.set_home(None, None)
+        loc = svc.locations.current
+        svc.bus.publish("location", loc.to_dict() if loc else None)
+        return {"ok": True}
+
     @app.get("/api/incidents")
     def get_incidents(minutes: int = Query(default=None, ge=1, le=24 * 60)):
         minutes = minutes or svc.cfg["map"]["default_window_minutes"]

@@ -24,6 +24,16 @@
   </header>
 
   <div id="alert" class="alert" role="alert" hidden></div>
+  <div id="loc-card" class="loc-card" role="status" hidden>
+    <b id="loc-card-title">Nog geen locatie</b>
+    <p id="loc-card-text">Deel je locatie, dan zie je wat er in jouw buurt speelt.</p>
+    <div class="loc-card-actions">
+      <button type="button" class="btn primary" id="loc-share">Deel mijn locatie</button>
+      <button type="button" class="btn" id="loc-pick">Kies een plek op de kaart</button>
+      <button type="button" class="btn" id="loc-center">Gebruik het midden van de kaart</button>
+    </div>
+    <button type="button" class="loc-card-close" id="loc-card-close" aria-label="Sluiten"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#x"/></svg></button>
+  </div>
   <div id="zoom-hint" class="zoom-hint" role="status" hidden>
     <span id="zoom-hint-text"></span>
     <button type="button" id="zoom-hint-btn">Inzoomen</button>
@@ -407,6 +417,16 @@
               <select id="nav-app"></select>
             </label>
             <p class="hint">Reistijden zijn een schatting op basis van de afstand. <span id="notify-state"></span></p>
+          </fieldset>
+          <fieldset class="filters">
+            <legend>Vaste plek (thuis)</legend>
+            <p class="hint" id="home-state">Geen vaste plek ingesteld.</p>
+            <div class="chips">
+              <button type="button" class="btn" id="home-pick">Kies op de kaart</button>
+              <button type="button" class="btn" id="home-center">Midden van de kaart</button>
+              <button type="button" class="btn" id="home-clear" hidden>Wissen</button>
+            </div>
+            <p class="hint">Zonder live locatie (telefoon of browser) gebruikt de app deze plek.</p>
           </fieldset>
         </div>
       </section>

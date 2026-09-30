@@ -35,12 +35,35 @@ class LocationStore:
         self._current: Location | None = Location(**saved) if saved else None
 
     @property
+    def home(self) -> dict[str, float] | None:
+        """Vaste plek (bijv. thuis): ingesteld in het paneel, anders uit config.yaml."""
+        saved = self.db.meta_get("home")
+        if saved:
+            return {"lat": float(saved["lat"]), "lon": float(saved["lon"])}
+        if self.fallback.get("lat") is not None and self.fallback.get("lon") is not None:
+            return {"lat": float(self.fallback["lat"]), "lon": float(self.fallback["lon"])}
+        return None
+
+    def set_home(self, lat: float | None, lon: float | None) -> None:
+        """Vaste plek instellen (None = wissen; dan geldt weer config.yaml, als daar iets staat)."""
+        if lat is None or lon is None:
+            self.db.meta_set("home", None)
+            if self._current and self._current.source == "vast":
+                self._current = None
+                self.db.meta_set("location", None)
+            return
+        self.db.meta_set("home", {"lat": lat, "lon": lon})
+        # Een live locatie (telefoon, browser) van vandaag blijft voorgaan op de vaste plek.
+        if self._current is None or self._current.source == "vast" or time.time() - self._current.ts > 6 * 3600:
+            self.update(Location(lat, lon, None, "vast", time.time()))
+
+    @property
     def current(self) -> Location | None:
         if self._current:
             return self._current
-        if self.fallback.get("lat") is not None and self.fallback.get("lon") is not None:
-            return Location(float(self.fallback["lat"]), float(self.fallback["lon"]),
-                            None, "vast", time.time())
+        home = self.home
+        if home:
+            return Location(home["lat"], home["lon"], None, "vast", time.time())
         return None
 
     def update(self, loc: Location) -> bool:

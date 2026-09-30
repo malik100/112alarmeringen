@@ -763,3 +763,20 @@ fieldset { min-width: 0; }
 .item.fuel .bar.noshop { background: #fca5a5; }
 .item.fuel .bar.unknown { background: var(--border); }
 @media (prefers-color-scheme: dark) { .fu-shop.shop { color: #f87171; } }
+
+/* --- locatiekaartje (geen locatie bekend) --- */
+.loc-card {
+  position: fixed; z-index: 1001; top: calc(max(10px, env(safe-area-inset-top)) + 44px);
+  left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 20px));
+  background: var(--bg); color: var(--fg); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px 40px 12px 14px; font-size: 14px;
+}
+.loc-card p { margin: 4px 0 8px; color: var(--fg-muted); }
+.loc-card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.loc-card-close {
+  position: absolute; right: 8px; top: 8px; border: 0; background: none; color: var(--fg-muted);
+  cursor: pointer; padding: 4px; border-radius: 6px;
+}
+.loc-card-close .i { width: 16px; height: 16px; }
+#map.picking { cursor: crosshair; }
+#st-loc { cursor: pointer; }

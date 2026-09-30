@@ -154,12 +154,17 @@ Kies één of beide manieren:
    4. Zet in `config.yaml` de optie `location.homeassistant.enabled: true`.
    5. Voor een nauwkeurige positie: zet in de app bij *Instellingen → Companion app →
       Sensoren beheren* de locatiesensoren aan en kies een korte update-interval.
-2. **Browser**: tik op de locatieknop linksonder op de kaart. Browsers geven je locatie alleen
-   via HTTPS (of op `localhost`) door. Zet dus een reverse proxy met HTTPS voor de server (bijvoorbeeld Caddy)
-   of gebruik die van Home Assistant.
-
-Zonder live locatie kun je in `config.yaml` een vaste locatie opgeven onder `location.fallback`,
-bijvoorbeeld je huis.
+2. **Browser**: bij de eerste keer verschijnt een kaartje *Nog geen locatie* met de knop
+   *Deel mijn locatie*; later kun je de locatieknop linksonder gebruiken. Browsers geven je locatie
+   alleen door via HTTPS of op `localhost`. Op de pc waar de app draait: open
+   `http://localhost:8080`. Vanaf een ander apparaat via een IP-adres (`http://192.168...`) lukt
+   het niet; zet dan een reverse proxy met HTTPS voor de server (bijvoorbeeld Caddy) of gebruik
+   die van Home Assistant. Weigert de browser, of kan je pc geen positie bepalen (geen gps of
+   wifi-positie), dan legt het kaartje uit wat je kunt doen.
+3. **Vaste plek**: geen live locatie nodig. Kies in het kaartje *Kies een plek op de kaart* of
+   *Gebruik het midden van de kaart*, of later onder *Instellingen → Vaste plek (thuis)*. Een live
+   locatie van je telefoon of browser gaat altijd voor op de vaste plek. In `config.yaml` kan het
+   ook, onder `location.fallback`.
 
 Buiten je thuisnetwerk: bereik je server via een eigen VPN (WireGuard) of een reverse proxy.
 De kaart kun je ook in Home Assistant zelf tonen via *Instellingen → Dashboards → Webpagina*.

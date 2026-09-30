@@ -49,3 +49,22 @@ def test_frontend_is_revalidated_after_updates(client):
     etag = client.get("/static/style.css").headers["etag"]
     assert client.get("/static/style.css", headers={"If-None-Match": etag}).status_code == 304
     assert "cache-control" not in client.get("/static/vendor/leaflet/leaflet.js").headers
+
+
+def test_home_location(service):
+    with TestClient(create_app(service, start_background=False)) as client:
+        assert client.get("/api/location/home").json() is None
+        assert client.get("/api/location").json() is None
+        home = client.put("/api/location/home", json={"lat": 52.378, "lon": 4.846}).json()
+        assert home == {"lat": 52.378, "lon": 4.846}
+        loc = client.get("/api/location").json()
+        assert loc["source"] == "vast" and loc["lat"] == 52.378
+        # Een live locatie gaat voor op de vaste plek ...
+        client.post("/api/location", json={"lat": 52.1, "lon": 5.1, "accuracy": 5})
+        assert client.get("/api/location").json()["source"] == "browser"
+        # ... en de vaste plek opnieuw kiezen verdringt een verse live locatie niet.
+        client.put("/api/location/home", json={"lat": 52.0, "lon": 5.0})
+        assert client.get("/api/location").json()["source"] == "browser"
+        client.delete("/api/location/home")
+        assert client.get("/api/location/home").json() is None
+        assert client.put("/api/location/home", json={"lat": 99, "lon": 5}).status_code == 422
