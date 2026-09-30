@@ -550,6 +550,8 @@ cd app
 pip install -r requirements-dev.txt
 pytest                                  # Python-tests
 node --test "tests/js/*.test.js"        # openingstijden, parkeren, laden, ov (Node 18+)
+playwright install chromium             # eenmalig, voor de rooktest in een echte browser
+pytest tests/e2e                        # laadt de kaart, zet elke laag aan, let op fouten
 SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:app --reload --port 8080
 ```
 

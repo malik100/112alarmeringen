@@ -379,7 +379,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         return works[:limit]
 
     @app.get("/api/charging")
-    def get_charging(bbox: str = Query(description="west,zuid,oost,noord in graden"),
+    async def get_charging(bbox: str = Query(description="west,zuid,oost,noord in graden"),
                      plugs: str | None = Query(default=None, description="bijv. 'CCS,CHAdeMO'"),
                      min_kw: float = Query(default=0, ge=0, le=1000),
                      available: bool = False, card: bool = False, public: bool = False,
