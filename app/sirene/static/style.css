@@ -814,3 +814,8 @@ fieldset { min-width: 0; }
   width: 18px; height: 18px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
   background: var(--brandweer); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4);
 }
+
+/* --- presets (snel kiezen) in het kaartlagenmenu --- */
+.presets { padding: 6px 6px 4px; margin: 0 0 2px; border-bottom: 1px solid var(--border); }
+.presets .chip { font-size: 12px; padding: 3px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+.presets .chip.active { background: var(--fg); border-color: var(--fg); color: var(--bg); }

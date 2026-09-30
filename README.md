@@ -20,6 +20,9 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   zoals wasstraat of bandenlucht.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
+- **Snel kiezen**: bovenaan het kaartlagenmenu staan de presets *Onderweg* (ov, tankstations,
+  wegwerk, flitsers, parkeren, laadpalen), *Thuis* (nieuws, bekendmakingen, 112, wegwerk),
+  *Boodschappen* (winkels, statiegeld, parkeren) en *Alles uit*. Eén tik in plaats van tien schakelaars.
 - **Zoeken**: een adres, straat, plaats, postcode of ov-halte opzoeken in de balk bovenaan (via PDOK
   en de eigen dienstregeling). Een halte opent meteen het vertrekbord; een adres krijgt een speld
   met *Route* en *Als vaste plek*.

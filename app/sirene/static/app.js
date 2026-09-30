@@ -2693,6 +2693,47 @@ function setLayer(layer, on) {
   renderSections();  renderZoomHint();
 }
 
+// Snel kiezen: één tik zet precies de lagen aan die bij een situatie horen.
+const PRESETS = {
+  onderweg: ["ov", "fuel", "roadworks", "cams", "parking", "charging"],
+  thuis: ["news", "announcements", "incidents", "roadworks"],
+  boodschappen: ["shops", "statiegeld", "parking"],
+  uit: [],
+};
+const ALL_LAYERS = ["parking", "statiegeld", "shops", "fuel", "roadworks", "ov", "cams", "charging", "news",
+  "announcements", "incidents"];
+
+function applyPreset(name) {
+  const on = new Set(PRESETS[name] || []);
+  for (const layer of ALL_LAYERS) setLayer(layer, on.has(layer));
+  renderPresets();
+}
+
+/** Markeer de preset die precies overeenkomt met wat er nu aanstaat (als die er is). */
+function layerIsOn(layer) {
+  return { parking: state.pk.show, statiegeld: state.sg.show, shops: state.sh.show, fuel: state.fu.show,
+    roadworks: state.rw.show, ov: state.ov.show, cams: state.showCams, charging: state.ch.show,
+    news: state.nw.show, announcements: state.bk.show, incidents: state.showIncidents }[layer];
+}
+
+function renderPresets() {
+  if (!state.config) return;
+  const c = state.config;
+  const enabled = (layer) => ({ parking: c.parking.enabled, statiegeld: c.statiegeld.enabled, shops: c.shops.enabled,
+    fuel: c.fuel.enabled, roadworks: c.roadworks.enabled, ov: c.ov.enabled, cams: c.speedcams_enabled,
+    charging: c.charging.enabled, news: c.local.news, announcements: c.local.announcements, incidents: true })[layer];
+  const current = ALL_LAYERS.filter((l) => layerIsOn(l) && enabled(l)).join(",");
+  document.querySelectorAll("[data-preset]").forEach((btn) => {
+    const want = ALL_LAYERS.filter((l) => PRESETS[btn.dataset.preset].includes(l) && enabled(l)).join(",");
+    btn.classList.toggle("active", want === current);
+  });
+}
+
+function initPresets() {
+  document.querySelectorAll("[data-preset]").forEach((btn) => btn.addEventListener("click", () => applyPreset(btn.dataset.preset)));
+  renderPresets();
+}
+
 // Lagen die pas vanaf een bepaald zoomniveau getekend worden (anders te veel/te zwaar).
 const ZOOM_LAYERS = [
   { layer: "parking", input: "pk-show", name: "parkeerzones", on: () => state.pk.show, zoom: () => state.config.parking.min_zoom, enabled: () => state.config.parking.enabled },
@@ -3308,6 +3349,7 @@ async function init() {
   initOv();
   initSections();
   initZoomHelp();
+  initPresets();
   connectEvents();
 
   addLocateControl();

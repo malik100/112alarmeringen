@@ -50,6 +50,12 @@
       <svg class="i" aria-hidden="true"><use href="/static/icons.svg#layers"/></svg><span>Kaartlagen</span><svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
     </button>
     <div class="layers-body" id="layers-body">
+      <div class="presets chips" id="presets" aria-label="Snel kiezen">
+        <button type="button" class="chip" data-preset="onderweg">Onderweg</button>
+        <button type="button" class="chip" data-preset="thuis">Thuis</button>
+        <button type="button" class="chip" data-preset="boodschappen">Boodschappen</button>
+        <button type="button" class="chip" data-preset="uit">Alles uit</button>
+      </div>
       <label class="layer-row" id="pk-show-chip" hidden>
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#square-parking"/></svg></span><span class="layer-name">Parkeerzones &amp; tarieven</span>
         <input type="checkbox" class="toggle" id="pk-show">
