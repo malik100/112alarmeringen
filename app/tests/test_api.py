@@ -82,3 +82,29 @@ def test_search(service):
             got = client.get("/api/search?q=bos en lommerplein").json()
             assert got == [{"name": "Bos en Lommerplein, Amsterdam", "type": "weg", "lat": 52.3776, "lon": 4.8459}]
             assert client.get("/api/search?q=b").status_code == 422
+
+
+def test_password_protection(cfg):
+    import httpx as _httpx
+    from sirene.service import Service
+    cfg["access"]["password"] = "geheim"
+    svc = Service(cfg, client=_httpx.AsyncClient())
+    with TestClient(create_app(svc, start_background=False)) as client:
+        assert client.get("/healthz").json() == {"ok": True}
+        assert client.get("/api/config").status_code == 401
+        r = client.get("/", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"].startswith("/login")
+        assert "Wachtwoord" in client.get("/login").text
+        assert client.post("/api/login", json={"password": "fout"}).status_code == 401
+        assert client.post("/api/login", json={"password": "geheim"}).status_code == 200
+        assert client.get("/api/config").json()["password_protected"] is True
+        assert "Buurtradar" in client.get("/").text
+        assert client.post("/api/logout").status_code == 200
+        assert client.get("/api/config").status_code == 401
+        assert client.get("/api/config", headers={"Authorization": "Bearer geheim"}).status_code == 200
+        assert client.get("/api/config", headers={"Authorization": "Bearer nee"}).status_code == 401
+
+
+def test_no_password_means_open(client):
+    assert client.get("/api/config").json()["password_protected"] is False
+    assert client.get("/login", follow_redirects=False).status_code == 303

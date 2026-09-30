@@ -14,6 +14,11 @@ DEFAULTS: dict[str, Any] = {
     "database": "/data/sirene.db",
     # Leeg = "Buurtradar/<versie> (self-hosted, persoonlijk gebruik)".
     "user_agent": "",
+    "access": {
+        # Wachtwoord voor de hele app (leeg = geen wachtwoord, prima op je thuisnetwerk).
+        # Zet dit als je de server van buiten bereikbaar maakt. Ook via BUURTRADAR_PASSWORD in .env.
+        "password": "",
+    },
     "p2000": {
         "feeds": ["https://alarmeringen.nl/feeds/all.rss"],
         "poll_interval_s": 60,
@@ -176,6 +181,7 @@ ENV_OVERRIDES: dict[str, tuple[str, ...]] = {
     "HA_TOKEN": ("location", "homeassistant", "token"),
     "HA_ENTITY_ID": ("location", "homeassistant", "entity_id"),
     "NTFY_TOKEN": ("notifications", "ntfy", "token"),
+    "BUURTRADAR_PASSWORD": ("access", "password"),
     "SIRENE_DB": ("database",),
 }
 

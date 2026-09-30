@@ -110,6 +110,7 @@ function isVisible(inc) {
 
 async function api(path, options) {
   const resp = await fetch(path, options);
+  if (resp.status === 401) { location.href = "/login"; throw new Error("Inloggen vereist"); }
   if (!resp.ok) throw new Error(`${path}: ${resp.status}`);
   return resp.json();
 }
@@ -3272,6 +3273,15 @@ function pickOnMap() {
   $("zoom-hint-btn").onclick = done;
 }
 
+function initAccess() {
+  if (!state.config.password_protected) return;
+  $("access-box").hidden = false;
+  $("logout").addEventListener("click", async () => {
+    await api("/api/logout", { method: "POST" });
+    location.href = "/login";
+  });
+}
+
 function initLocationUi() {
   $("loc-share").addEventListener("click", startBrowserLocation);
   $("loc-pick").addEventListener("click", pickOnMap);
@@ -3355,6 +3365,7 @@ async function init() {
   addLocateControl();
   initLocationUi();
   initSearch();
+  initAccess();
   if (state.config.browser_location && store.get("browserLocation") === "1") startBrowserLocation();
 }
 $("panel-toggle").addEventListener("click", () => {

@@ -12,10 +12,11 @@ from pathlib import Path
 import httpx
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .auth import OPEN_PATHS, Access, login_page
 from .config import load_config
 from .events import format_sse
 from .location import Location
@@ -54,6 +55,10 @@ class LocationIn(BaseModel):
     accuracy: float | None = Field(default=None, ge=0)
 
 
+class LoginIn(BaseModel):
+    password: str = Field(max_length=200)
+
+
 def create_app(service: Service | None = None, start_background: bool = True) -> FastAPI:
     svc = service or Service(load_config())
 
@@ -66,6 +71,35 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
 
     app = FastAPI(title="Buurtradar", lifespan=lifespan)
     app.state.service = svc
+    access = Access(svc.db, svc.cfg["access"]["password"])
+    app.state.access = access
+
+    @app.middleware("http")
+    async def require_login(request: Request, call_next):
+        """Met een wachtwoord in de configuratie: alles achter het inlogscherm, behalve statische
+        bestanden, de gezondheidscheck en het inloggen zelf."""
+        path = request.url.path
+        if access.enabled and not path.startswith(OPEN_PATHS) and not access.is_authenticated(request):
+            if path.startswith("/api/"):
+                return JSONResponse({"error": "Inloggen vereist"}, status_code=401)
+            return RedirectResponse(f"/login?next={path}", status_code=303)
+        return await call_next(request)
+
+    @app.get("/login")
+    def get_login(request: Request):
+        if not access.enabled or access.is_authenticated(request):
+            return RedirectResponse("/", status_code=303)
+        return login_page()
+
+    @app.post("/api/login")
+    async def post_login(request: Request, body: LoginIn):
+        if not access.enabled:
+            return {"ok": True}
+        return await access.login(request, body.password)
+
+    @app.post("/api/logout")
+    def post_logout():
+        return access.logout()
 
     @app.middleware("http")
     async def no_stale_frontend(request: Request, call_next):
@@ -90,6 +124,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "browser_location": cfg["location"]["browser"],
             "homeassistant_location": cfg["location"]["homeassistant"]["enabled"],
             "notifications_enabled": cfg["notifications"]["enabled"],
+            "password_protected": access.enabled,
             "speedcams_enabled": cfg["speedcams"]["enabled"],
             "statiegeld": {k: cfg["statiegeld"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "parking": {k: cfg["parking"][k] for k in ("enabled", "min_zoom")},

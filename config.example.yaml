@@ -1,6 +1,11 @@
 # Buurtradar – kopieer naar config.yaml en pas aan.
 # Alles wat je weglaat krijgt de standaardwaarde (zie app/sirene/config.py).
 
+# Wachtwoord voor de hele app. Leeg = open (prima op je thuisnetwerk). Liever in .env:
+# BUURTRADAR_PASSWORD=...
+access:
+  password: ""
+
 # Straal rond jouw locatie in meters: voor de lijst "in de buurt" en voor meldingen.
 radius_m: 1000
 

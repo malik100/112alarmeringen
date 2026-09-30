@@ -173,6 +173,11 @@ Kies één of beide manieren:
    ook, onder `location.fallback`.
 
 Buiten je thuisnetwerk: bereik je server via een eigen VPN (WireGuard) of een reverse proxy.
+Zet dan ook een **wachtwoord**: `BUURTRADAR_PASSWORD=...` in `.env` (of `access.password` in
+`config.yaml`). Iedereen krijgt dan eerst een inlogscherm; na het inloggen blijft een apparaat een
+jaar ingelogd (cookie). Scripts of Home Assistant sturen het wachtwoord mee als
+`Authorization: Bearer <wachtwoord>`. Uitloggen kan onder *Instellingen → Toegang*. Zonder
+wachtwoord kan iedereen op je netwerk de kaart zien én je locatie instellen.
 De kaart kun je ook in Home Assistant zelf tonen via *Instellingen → Dashboards → Webpagina*.
 
 ### Meldingen aanzetten (optioneel)
