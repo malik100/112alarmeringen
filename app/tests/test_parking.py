@@ -114,6 +114,11 @@ def test_contains_respects_holes():
     ([{"startdurationfarepart": "0", "enddurationfarepart": "60", "amountfarepart": "1.00", "stepsizefarepart": "60"},
       {"startdurationfarepart": "60", "enddurationfarepart": "999999", "amountfarepart": "0.05", "stepsizefarepart": "1"}],
      "eerste 1 uur €1,00 per uur; daarna €3,00 per uur", 1.0),
+    # Amsterdam-Noord "flatrate": vast bedrag voor de eerste 3 uur, daarna per uur.
+    ([{"startdurationfarepart": "0", "enddurationfarepart": "180", "amountfarepart": "1.72", "stepsizefarepart": "180"},
+      {"startdurationfarepart": "180", "enddurationfarepart": "999999", "amountfarepart": "0.02866667",
+       "stepsizefarepart": "1"}],
+     "eerste 3 uur samen €1,72; daarna €1,72 per uur", 1.72),
 ])
 def test_describe_fare(parts, text, rate):
     assert npr.describe_fare(parts) == {"text": text, "rate_h": rate}
@@ -133,6 +138,29 @@ def test_build_zones():
     garage = zones["363:GAR"]
     assert garage["kind"] == "garage" and garage["geometry"]["type"] == "Point"
     assert garage["capacity"] == 335 and garage["fares"]["G24"]["text"] == "€3,00 per uur"
+
+
+def test_area_with_several_polygons_keeps_all_of_them():
+    """Amsterdam registreert één tariefzone als veel losse vlakken met dezelfde gebiedscode.
+
+    Vroeger overschreef elk vlak het vorige (zelfde id in de database), waardoor van een zone
+    als T12B (Oost, De Pijp) maar één klein stukje overbleef.
+    """
+    data = dataset()
+    east = "POLYGON ((4.92 52.36, 4.93 52.36, 4.93 52.37, 4.92 52.37, 4.92 52.36))"
+    old = "POLYGON ((5.00 52.00, 5.01 52.00, 5.01 52.01, 5.00 52.01, 5.00 52.00))"
+    data["geometrie"] += [
+        dict(data["geometrie"][0], areageometryastext=east),
+        dict(data["geometrie"][0], areageometryastext=SQUARE),  # exact dubbel: één keer bewaren
+        dict(data["geometrie"][0], areageometryastext=old, enddatearea="2023-07-03T00:00:00.000"),
+    ]
+    zones = {z["id"]: z for z in npr.build_zones(data, TODAY)}
+    assert sorted(zones) == ["363:GAR", "363:T11V"]
+    geom = zones["363:T11V"]["geometry"]
+    assert geom["type"] == "MultiPolygon" and len(geom["coordinates"]) == 2
+    assert npr.contains(geom, 4.895, 52.375) and npr.contains(geom, 4.925, 52.365)
+    assert not npr.contains(geom, 5.005, 52.005)                # opgeheven vlak telt niet
+    assert zones["363:T11V"]["bbox"] == [4.89, 52.36, 4.93, 52.38]
 
 
 def test_duplicate_registrations_are_merged():

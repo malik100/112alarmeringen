@@ -119,6 +119,32 @@ def wkt_to_geojson(wkt: str) -> dict[str, Any] | None:
     return None
 
 
+def merge_geometries(geoms: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Meerdere vlakken van hetzelfde gebied -> één (Multi)Polygon, zonder dubbele vlakken.
+
+    Sommige gemeenten (bijv. Amsterdam) registreren één tariefzone als tientallen losse
+    vlakken onder dezelfde gebiedscode.
+    """
+    polygons: list = []
+    points: list = []
+    for g in geoms:
+        if g["type"] == "Polygon":
+            parts = [g["coordinates"]]
+        elif g["type"] == "MultiPolygon":
+            parts = g["coordinates"]
+        else:
+            points.append(g)
+            continue
+        for poly in parts:
+            if poly not in polygons:
+                polygons.append(poly)
+    if not polygons:
+        return points[0] if points else None
+    if len(polygons) == 1:
+        return {"type": "Polygon", "coordinates": polygons[0]}
+    return {"type": "MultiPolygon", "coordinates": polygons}
+
+
 def geometry_bbox(geom: dict[str, Any]) -> tuple[float, float, float, float]:
     if geom["type"] == "Point":
         x, y = geom["coordinates"]
@@ -170,15 +196,25 @@ def describe_fare(parts: list[dict[str, Any]]) -> dict[str, Any]:
     parts = sorted(parts, key=lambda p: _num(p.get("startdurationfarepart")))
     if not parts:
         return {"text": "tarief onbekend", "rate_h": None}
-    first_text, first_rate = _price(_num(parts[0].get("amountfarepart")),
-                                    _num(parts[0].get("stepsizefarepart"), 1))
+    first_amount = _num(parts[0].get("amountfarepart"))
+    first_step = _num(parts[0].get("stepsizefarepart"), 1)
+    first_text, first_rate = _price(first_amount, first_step)
     if len(parts) == 1:
         return {"text": first_text, "rate_h": round(first_rate, 2)}
     lines = []
     for i, p in enumerate(parts):
         start = _num(p.get("startdurationfarepart"))
         end = _num(p.get("enddurationfarepart"), 999999)
-        text, _ = _price(_num(p.get("amountfarepart")), _num(p.get("stepsizefarepart"), 1))
+        amount, step = _num(p.get("amountfarepart")), _num(p.get("stepsizefarepart"), 1)
+        if step == end - start and step > 60 and amount > 0:
+            # Vast bedrag voor een blok (bijv. Amsterdam-Noord: €1,72 voor de eerste 3 uur).
+            label = f"eerste {_duration(end)}" if start == 0 else f"{_duration(start)}–{_duration(end)}"
+            lines.append(f"{label} samen {eur(amount)}")
+            if i == 0:
+                # Je betaalt het blokbedrag al voor een kwartier: dat is de eerlijkste "uurprijs".
+                first_rate = amount
+            continue
+        text, _ = _price(amount, step)
         if i == len(parts) - 1 or end >= 999999:
             label = "daarna" if start > 0 else "altijd"
         elif start == 0:
@@ -280,12 +316,18 @@ def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None
             periods.sort(key=lambda p: p["s"])
         return days, special
 
-    zones = []
-    seen: dict[str, dict[str, Any]] = {}
+    # Alle geldende vlakken per gebied verzamelen (volgorde van eerste voorkomen behouden).
+    area_geoms: dict[tuple, list[dict]] = {}
     for r in data["geometrie"]:
-        key = (r["areamanagerid"], r["areaid"])
         if not r.get("areageometryastext") or not is_active(r.get("startdatearea"), r.get("enddatearea"), t):
             continue
+        g = wkt_to_geojson(r["areageometryastext"])
+        if g:
+            area_geoms.setdefault((r["areamanagerid"], r["areaid"]), []).append(g)
+
+    zones = []
+    seen: dict[str, dict[str, Any]] = {}
+    for key, geoms in area_geoms.items():
         regs = area_regs.get(key)
         if not regs:
             continue
@@ -296,7 +338,7 @@ def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None
         kind = classify(tops)
         if not kind:
             continue
-        geom = wkt_to_geojson(r["areageometryastext"])
+        geom = merge_geometries(geoms)
         if not geom:
             continue
 
