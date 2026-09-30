@@ -96,19 +96,14 @@ Open daarna `http://<ip-van-je-server>:8080`.
 voer de stappen hierboven uit en open `http://localhost:8080`. Stoppen: `docker compose down`
 (je gegevens blijven bewaard in het volume `sirene-data`).
 
-**Zonder Docker** (Python 3.11 of nieuwer):
+**Zonder Docker** (Python 3.11 of nieuwer): gebruik het startscript. De eerste keer maakt het
+`config.yaml` en een Python-omgeving aan en installeert het de pakketten; daarna start het direct.
+Het opent ook je browser.
 
-```bash
-cd buurtradar/app
-python -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-# macOS/Linux:
-SIRENE_CONFIG=../config.yaml SIRENE_DB=./buurtradar.db uvicorn --factory sirene.main:app --port 8080
-# Windows (PowerShell):
-#   $env:SIRENE_CONFIG="../config.yaml"; $env:SIRENE_DB="./buurtradar.db"
-#   uvicorn --factory sirene.main:app --port 8080
-```
+- **Windows**: dubbelklik `start.bat` in de projectmap (of typ `start.bat` in de terminal).
+- **macOS/Linux**: typ `./start.sh` in de projectmap.
+
+Andere poort? `start.bat 8081` of `./start.sh 8081`. Stoppen: Ctrl+C of het venster sluiten.
 
 Op `http://localhost` mag de browser je locatie gewoon doorgeven (HTTPS is alleen nodig voor
 andere adressen): klik op de locatieknop linksonder op de kaart. De eerste keer duurt het een paar
