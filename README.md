@@ -20,6 +20,9 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   zoals wasstraat of bandenlucht.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
+- **Zoeken**: een adres, straat, plaats, postcode of ov-halte opzoeken in de balk bovenaan (via PDOK
+  en de eigen dienstregeling). Een halte opent meteen het vertrekbord; een adres krijgt een speld
+  met *Route* en *Als vaste plek*.
 - **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
   een iPhone; te wijzigen naar Google Maps, Waze of OpenStreetMap onder *Overzicht → Instellingen*).
   De lijsten tonen een geschatte reistijd, bijv. "4 min lopen · 1 min fietsen" (hemelsbreed × 1,3,

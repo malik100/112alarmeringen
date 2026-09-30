@@ -68,3 +68,17 @@ def test_home_location(service):
         client.delete("/api/location/home")
         assert client.get("/api/location/home").json() is None
         assert client.put("/api/location/home", json={"lat": 99, "lon": 5}).status_code == 422
+
+
+def test_search(service):
+    import respx
+    from sirene.config import DEFAULTS
+    from tests.conftest import pdok_response, pdok_doc
+    with respx.mock:
+        respx.get(DEFAULTS["geocoder"]["pdok_url"]).mock(return_value=pdok_response(
+            pdok_doc("Bos en Lommerplein", "Amsterdam", 4.8459, 52.3776),
+            {"type": "woonplaats", "weergavenaam": "Amsterdam, Amsterdam"}))  # zonder punt: overslaan
+        with TestClient(create_app(service, start_background=False)) as client:
+            got = client.get("/api/search?q=bos en lommerplein").json()
+            assert got == [{"name": "Bos en Lommerplein, Amsterdam", "type": "weg", "lat": 52.3776, "lon": 4.8459}]
+            assert client.get("/api/search?q=b").status_code == 422

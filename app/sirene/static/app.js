@@ -2999,6 +2999,114 @@ function connectEvents() {
   es.addEventListener("open", () => loadIncidents().then(renderAll).catch(console.error));
 }
 
+// ---------- zoeken ----------
+
+const SEARCH_ICON = { adres: "map-pin", weg: "map-pin", woonplaats: "map-pin", gemeente: "map-pin", postcode: "map-pin", halte: "bus" };
+const SEARCH_TYPE = { adres: "adres", weg: "straat", woonplaats: "plaats", gemeente: "gemeente", postcode: "postcode", halte: "halte" };
+const searchLayer = L.layerGroup().addTo(map);
+let searchSeq = 0;
+let searchTimer = null;
+let searchItems = [];
+let searchIndex = -1;
+
+function searchRender(items, text) {
+  const list = $("search-results");
+  searchItems = items;
+  searchIndex = -1;
+  list.replaceChildren(...(items.length ? items : [null]).map((it, i) => {
+    const li = document.createElement("li");
+    if (!it) { li.className = "empty"; li.textContent = `Niets gevonden voor "${text}".`; return li; }
+    li.setAttribute("role", "option");
+    li.append(iconEl(SEARCH_ICON[it.type] || "map-pin"), it.name);
+    const small = document.createElement("small");
+    small.textContent = it.type === "halte" ? (it.modes || []).map((m) => Ov.modeInfo(m).label.toLowerCase()).join(", ") : SEARCH_TYPE[it.type] || "";
+    li.append(small);
+    li.addEventListener("mousedown", (e) => e.preventDefault());  // focus houden
+    li.addEventListener("click", () => searchPick(i));
+    return li;
+  }));
+  list.hidden = false;
+}
+
+function searchClose() {
+  $("search-results").hidden = true;
+  searchItems = [];
+}
+
+/** Resultaat kiezen: kaart erheen, marker met popup; een halte opent meteen het vertrekbord. */
+function searchPick(i) {
+  const it = searchItems[i];
+  if (!it) return;
+  searchClose();
+  $("search-q").blur();
+  if (isPhone()) setPanel(false);
+  searchLayer.clearLayers();
+  if (it.type === "halte" && state.config.ov.enabled) {
+    ovPendingPopup = it.halte;
+    if (!state.ov.parts.has("stops")) ovSetPart("stops", true);
+    setLayer("ov", true);
+    map.setView([it.lat, it.lon], Math.max(map.getZoom(), state.config.ov.stops_min_zoom, 16));
+    scheduleOvViewport();
+    return;
+  }
+  const zoom = { adres: 17, postcode: 16, weg: 16, woonplaats: 13, gemeente: 12 }[it.type] || 15;
+  map.setView([it.lat, it.lon], zoom);
+  const marker = L.marker([it.lat, it.lon], {
+    icon: L.divIcon({ className: "", html: '<div class="search-pin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+    zIndexOffset: 1500,
+  }).addTo(searchLayer);
+  marker.bindPopup(() => {
+    const d = state.location ? haversine(state.location.lat, state.location.lon, it.lat, it.lon) : null;
+    return `<b>${esc(it.name)}</b><br><small>${esc(SEARCH_TYPE[it.type] || "")}${d != null ? ` · ${esc(fmtDistance(d))} van jou` : ""}</small>
+      <div class="popup-links">${routeLink(it.lat, it.lon)}
+      <a href="#" class="search-home">${icon("locate-fixed")}Als vaste plek</a>
+      <a href="#" class="search-clear">${icon("x")}Weg</a></div>`;
+  }, { maxWidth: 280 }).openPopup();
+  marker.on("popupopen", (e) => {
+    e.popup.getElement().querySelector(".search-home")?.addEventListener("click", (ev) => {
+      ev.preventDefault(); setHome(it.lat, it.lon).catch(console.error); marker.closePopup();
+    });
+    e.popup.getElement().querySelector(".search-clear")?.addEventListener("click", (ev) => {
+      ev.preventDefault(); searchLayer.clearLayers();
+    });
+  });
+}
+
+async function searchRun(text) {
+  const seq = ++searchSeq;
+  try {
+    const items = await api(`/api/search?q=${encodeURIComponent(text)}`);
+    if (seq !== searchSeq) return;
+    searchRender(items, text);
+  } catch (err) { console.warn("Zoeken:", err.message); }
+}
+
+function initSearch() {
+  const input = $("search-q");
+  input.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    const text = input.value.trim();
+    if (text.length < 2) { searchClose(); return; }
+    searchTimer = setTimeout(() => searchRun(text), 250);
+  });
+  input.addEventListener("focus", () => { if (searchItems.length) $("search-results").hidden = false; });
+  input.addEventListener("blur", () => setTimeout(searchClose, 150));
+  input.addEventListener("keydown", (e) => {
+    const list = $("search-results");
+    if (e.key === "Escape") { searchClose(); input.blur(); return; }
+    if (!searchItems.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      searchIndex = (searchIndex + (e.key === "ArrowDown" ? 1 : -1) + searchItems.length) % searchItems.length;
+      [...list.children].forEach((li, i) => li.setAttribute("aria-selected", String(i === searchIndex)));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      searchPick(searchIndex >= 0 ? searchIndex : 0);
+    }
+  });
+  $("search").addEventListener("submit", (e) => { e.preventDefault(); if (searchItems.length) searchPick(0); });
+}
+
 // ---------- locatie via de browser ----------
 
 let watchId = null;
@@ -3204,6 +3312,7 @@ async function init() {
 
   addLocateControl();
   initLocationUi();
+  initSearch();
   if (state.config.browser_location && store.get("browserLocation") === "1") startBrowserLocation();
 }
 $("panel-toggle").addEventListener("click", () => {

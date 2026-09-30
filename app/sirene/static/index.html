@@ -21,6 +21,11 @@
       <h1>Buurtradar</h1>
     </div>
     <span class="pill" id="st-loc" hidden></span>
+    <form class="search" id="search" role="search" autocomplete="off">
+      <svg class="i" aria-hidden="true"><use href="/static/icons.svg#search"/></svg>
+      <input type="search" id="search-q" placeholder="Zoek adres, plaats of halte" aria-label="Zoeken" enterkeyhint="search">
+      <ul class="search-results" id="search-results" role="listbox" hidden></ul>
+    </form>
   </header>
 
   <div id="alert" class="alert" role="alert" hidden></div>

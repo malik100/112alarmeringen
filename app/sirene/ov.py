@@ -188,6 +188,16 @@ class OvStore:
         out.sort(key=lambda h: h["distance_m"])
         return out[:limit]
 
+    def search_haltes(self, text: str, limit: int = 5) -> list[dict[str, Any]]:
+        """Haltes op naam, bijv. "bos en lommer"; stations en grote haltes eerst."""
+        if not self.ready or len(text.strip()) < 2:
+            return []
+        pattern = f"%{text.strip().lower()}%"
+        rows = self.conn.execute(
+            "SELECT * FROM haltes WHERE lower(name) LIKE ? ORDER BY length(lines) DESC LIMIT ?",
+            (pattern, limit)).fetchall()
+        return [self._halte(r) for r in rows]
+
     def halte(self, halte_id: int) -> dict[str, Any] | None:
         if not self.ready:
             return None

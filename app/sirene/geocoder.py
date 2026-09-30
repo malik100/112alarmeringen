@@ -116,3 +116,23 @@ class Geocoder:
     def _result(doc: dict, precision: str) -> GeoResult:
         lat, lon = _point(doc["centroide_ll"])
         return GeoResult(lat, lon, precision, doc.get("weergavenaam", ""))
+
+
+SEARCH_TYPES = "type:(adres OR weg OR woonplaats OR gemeente OR postcode)"
+
+
+async def search_places(client: httpx.AsyncClient, pdok_url: str, text: str,
+                        rows: int = 6) -> list[dict]:
+    """Zoeken op adres, straat, plaats of postcode (PDOK); geeft naam, soort en coördinaten."""
+    resp = await client.get(pdok_url, params={
+        "q": text, "rows": rows, "fl": "weergavenaam,type,centroide_ll", "fq": SEARCH_TYPES,
+    }, timeout=10)
+    resp.raise_for_status()
+    out = []
+    for doc in resp.json().get("response", {}).get("docs", []):
+        if not doc.get("centroide_ll"):
+            continue
+        lat, lon = _point(doc["centroide_ll"])
+        out.append({"name": doc.get("weergavenaam", ""), "type": doc.get("type", ""),
+                    "lat": round(lat, 6), "lon": round(lon, 6)})
+    return out

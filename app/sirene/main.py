@@ -9,6 +9,8 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,10 +21,13 @@ from .events import format_sse
 from .location import Location
 from .service import Service
 from .geo import haversine_m
+from .geocoder import search_places
 from .sources.charging import matches as charging_matches
 from .sources.roadworks import is_active, relevance as roadwork_relevance
 from .sources.npr import contains
 from .sources.shops import link_statiegeld
+
+log = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 HEARTBEAT_S = 20
@@ -136,6 +141,21 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         loc = svc.locations.current
         svc.bus.publish("location", loc.to_dict() if loc else None)
         return {"ok": True}
+
+    @app.get("/api/search")
+    async def search(q: str = Query(min_length=2, max_length=100)):
+        """Zoeken naar een adres, straat, plaats, postcode of ov-halte."""
+        places: list = []
+        if svc.cfg["geocoder"]["pdok_enabled"]:
+            try:
+                places = await search_places(svc.client, svc.cfg["geocoder"]["pdok_url"], q)
+            except (httpx.HTTPError, ValueError) as exc:
+                log.warning("Zoeken via PDOK mislukt: %s", exc)
+        haltes = [{"name": h["name"], "type": "halte", "lat": h["lat"], "lon": h["lon"], "halte": h["id"],
+                   "modes": h["modes"]} for h in svc.ov.search_haltes(q, 4)] if svc.cfg["ov"]["enabled"] else []
+        # Haltes bovenaan als de zoekterm precies een haltenaam is; anders adressen eerst.
+        exact = [h for h in haltes if q.strip().lower() in h["name"].lower().split(",")[-1].strip().lower()]
+        return (exact + places + [h for h in haltes if h not in exact])[:10]
 
     @app.get("/api/incidents")
     def get_incidents(minutes: int = Query(default=None, ge=1, le=24 * 60)):
