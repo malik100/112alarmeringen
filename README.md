@@ -16,6 +16,9 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Openbaar vervoer**: haltes met live vertrektijden (vertraging, "rijdt niet", spoorwijziging),
   alle lijnen op de kaart en bussen, trams en metro's die nu rijden. Van alle vervoerders in
   Nederland, uit de open data van het NDOV Loket via OVapi.
+- **AED's, openbare toiletten en drinkwaterpunten** uit OpenStreetMap, met toegang (openbaar, voor
+  klanten), binnen of buiten, openingstijden en bij een AED de precieze plek. De lijst zet de
+  dichtstbijzijnde AED bovenaan.
 - **Tankstations**, met of zonder winkel (onbemand), met openingstijden, brandstoffen en extra's
   zoals wasstraat of bandenlucht.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
@@ -321,6 +324,15 @@ zoom 12), met rechts de dichtstbijzijnde binnen 5 km (`fuel.list_radius_m`).
 - **Prijzen** staan er niet bij: daar is in Nederland geen open bron voor.
 - **Verversen**: één keer per dag (`fuel.refresh_hours`).
 
+## AED, toilet en drinkwater
+
+De laag **AED, toilet & drinkwater** toont ~4.300 AED's, ~3.400 openbare toiletten en ~2.800
+drinkwaterpunten uit OpenStreetMap (vanaf zoom 14), met rechts per soort de drie dichtstbijzijnde
+binnen 1,5 km (`amenities.list_radius_m`). Een gestippeld icoon betekent beperkt bereikbaar: niet
+openbaar, alleen voor klanten, of nu gesloten. Bij een AED staat waar hij hangt ("naast de ingang,
+kastje met code") en of hij binnen hangt. Privétoiletten laten we weg; een AED met beperkte toegang
+tonen we wel, want in nood is die soms toch bereikbaar. Bel bij een hartstilstand altijd eerst 112.
+
 ## Laadpalen
 
 Bron: [NDW open data](https://opendata.ndw.nu): alle ~79.000 openbare laadlocaties in Nederland.
@@ -569,6 +581,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/sources/bekendmakingen.py` | bekendmakingen (overheid.nl) en plaatsen rond je locatie (PDOK) |
 | `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
 | `app/sirene/sources/fuel.py` | tankstations (OSM), met of zonder winkel             |
+| `app/sirene/sources/amenities.py` | AED's, toiletten en drinkwater (OSM)             |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
 | `app/sirene/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |
 | `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |

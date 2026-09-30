@@ -38,6 +38,8 @@ METER_NEAR_M = 200  # "waarschijnlijk hier": parkeerautomaat van een zone zonder
 CHARGING_LIMIT = 1500
 SHOPS_LIMIT = 2000
 FUEL_LIMIT = 2000
+AMENITIES_LIMIT = 3000
+AMENITY_KINDS = ("aed", "toilet", "water")
 ROADWORKS_LIMIT = 1500
 ROADWORKS_STREETS = 25   # zoveel werken per lijst krijgen een straatnaam (PDOK, gecachet)
 PARKING_KINDS = {"betaald", "blauw", "vergunning", "garage"}
@@ -131,6 +133,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "charging": {k: cfg["charging"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "shops": {k: cfg["shops"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "fuel": {k: cfg["fuel"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
+            "amenities": {k: cfg["amenities"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "roadworks": {k: cfg["roadworks"][k] for k in ("enabled", "min_zoom", "list_radius_m", "ahead_days")},
             "ov": {**{k: cfg["ov"][k] for k in ("enabled", "stops_min_zoom", "lines_min_zoom",
                                                  "vehicles_min_zoom", "list_radius_m")},
@@ -151,14 +154,15 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         import shutil
         names = {"p2000": "112-meldingen", "news": "Nieuws", "announcements": "Bekendmakingen",
                  "roadworks": "Wegwerk", "parking": "Parkeren", "statiegeld": "Statiegeld", "shops": "Winkels",
-                 "fuel": "Tankstations", "charging": "Laadpalen", "charging_status": "Laadpalen (beschikbaarheid)",
+                 "fuel": "Tankstations", "amenities": "AED, toilet, water", "charging": "Laadpalen", "charging_status": "Laadpalen (beschikbaarheid)",
                  "speedcams": "Flitsers", "ov": "OV-dienstregeling", "ov_realtime": "OV actueel",
                  "homeassistant": "Home Assistant"}
         enabled = {"p2000": True, "news": svc.cfg["news"]["enabled"],
                    "announcements": svc.cfg["announcements"]["enabled"],
                    "roadworks": svc.cfg["roadworks"]["enabled"], "parking": svc.cfg["parking"]["enabled"],
                    "statiegeld": svc.cfg["statiegeld"]["enabled"], "shops": svc.cfg["shops"]["enabled"],
-                   "fuel": svc.cfg["fuel"]["enabled"], "charging": svc.cfg["charging"]["enabled"],
+                   "fuel": svc.cfg["fuel"]["enabled"], "amenities": svc.cfg["amenities"]["enabled"],
+                   "charging": svc.cfg["charging"]["enabled"],
                    "charging_status": svc.cfg["charging"]["enabled"],
                    "speedcams": svc.cfg["speedcams"]["enabled"], "ov": svc.cfg["ov"]["enabled"],
                    "ov_realtime": svc.cfg["ov"]["enabled"],
@@ -340,6 +344,21 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         if east - west > 1.5 or north - south > 1.5:
             raise HTTPException(422, "Gebied te groot: zoom verder in")
         return svc.db.fuel_in_bbox(south, west, north, east, FUEL_LIMIT)
+
+    @app.get("/api/amenities")
+    def get_amenities(bbox: str = Query(description="west,zuid,oost,noord in graden"),
+                      kinds: str | None = Query(default=None, description="bijv. aed,toilet")):
+        """AED's, openbare toiletten en drinkwaterpunten in een gebied."""
+        if not svc.cfg["amenities"]["enabled"]:
+            return []
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > 1 or north - south > 1:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        wanted = [k for k in (kinds or "").split(",") if k in AMENITY_KINDS] or None
+        return svc.db.amenities_in_bbox(south, west, north, east, wanted, AMENITIES_LIMIT)
 
     @app.get("/api/roadworks")
     async def get_roadworks(bbox: str = Query(description="west,zuid,oost,noord in graden"),

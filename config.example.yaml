@@ -83,6 +83,12 @@ fuel:                   # tankstations (OSM), met of zonder winkel
   min_zoom: 12
   list_radius_m: 5000   # straal voor de lijst "tankstations in de buurt"
 
+amenities:              # AED's, openbare toiletten, drinkwaterpunten (OSM)
+  enabled: true
+  refresh_hours: 24
+  min_zoom: 14
+  list_radius_m: 1500
+
 charging:
   enabled: true
   refresh_hours: 24         # details: stekkers, tarieven, toegang

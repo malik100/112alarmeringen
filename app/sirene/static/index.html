@@ -76,6 +76,15 @@
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#fuel"/></svg></span><span class="layer-name">Tankstations</span>
         <input type="checkbox" class="toggle" id="fu-show">
       </label>
+      <label class="layer-row" id="am-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#heart-pulse"/></svg></span><span class="layer-name">AED, toilet &amp; drinkwater</span>
+        <input type="checkbox" class="toggle" id="am-show">
+      </label>
+      <div class="layer-sub chips" id="am-kinds" hidden>
+        <label class="chip"><input type="checkbox" data-am-kind="aed" checked> AED</label>
+        <label class="chip"><input type="checkbox" data-am-kind="toilet" checked> Toilet</label>
+        <label class="chip"><input type="checkbox" data-am-kind="water" checked> Drinkwater</label>
+      </div>
       <label class="layer-row" id="rw-show-chip" hidden>
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#construction"/></svg></span><span class="layer-name">Wegwerkzaamheden</span>
         <input type="checkbox" class="toggle" id="rw-show">
@@ -230,6 +239,22 @@
           <h2 id="fu-title">Tankstations in de buurt</h2>
           <ol class="list" id="list-fu"></ol>
           <p class="empty" id="empty-fu" hidden></p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="voorzieningen" data-layer="amenities" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#heart-pulse"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">AED, toilet &amp; drinkwater</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <p class="hint">Bij een hartstilstand: bel eerst 112. De dichtstbijzijnde AED staat bovenaan.</p>
+        <section>
+          <h2 id="am-title">Dichtstbij</h2>
+          <ol class="list" id="list-am"></ol>
+          <p class="empty" id="empty-am" hidden></p>
         </section>
         </div>
       </section>

@@ -37,6 +37,7 @@ const state = {
   // Standaard wat je merkt op straat (verkeer, evenementen); bouw en vergunningen zijn een optie.
   bk: { show: false, focus: null, items: [], cats: new Set(["verkeer", "evenementen"]), important: true,
         sort: "relevant", showAll: false },
+  am: { show: false, kinds: new Set(["aed", "toilet", "water"]), points: [], near: [], nearFrom: null },
   fu: { show: false, shops: new Set(["ja", "nee", "onbekend"]), onlyOpen: false, points: [], near: [], nearFrom: null },
   ch: { show: false, profile: "snel", custom: null, stations: [], near: [], statusTs: null, nearFrom: null },
   ov: { show: false, parts: new Set(["stops", "lines", "vehicles"]),
@@ -1561,6 +1562,209 @@ function initFuel() {
   loadFuelNear(true).catch(console.error);
 }
 
+// ---------- AED, toilet, drinkwater ----------
+
+const AM_KIND = {
+  aed: { label: "AED", icon: "heart-pulse", color: "#dc2626" },
+  toilet: { label: "Toilet", icon: "bath", color: "#2563eb" },
+  water: { label: "Drinkwater", icon: "droplets", color: "#0891b2" },
+};
+const amLayer = L.layerGroup().addTo(map);
+const amMarkers = new Map();
+let amPendingPopup = null;
+
+function amStatus(a) {
+  return OpeningHours.status(a.hours);
+}
+
+/** "openbaar · buiten · 24 uur open" of "voor klanten · binnen · gesloten". */
+function amDetails(a) {
+  const parts = [];
+  if (a.access) parts.push(a.access);
+  if (a.indoor === true) parts.push("binnen");
+  else if (a.indoor === false) parts.push("buiten");
+  if (a.hours) parts.push(amStatus(a).text);
+  if (a.kind === "toilet") {
+    if (a.fee === true) parts.push("betaald");
+    else if (a.fee === false) parts.push("gratis");
+    if (a.changing_table) parts.push("verschoontafel");
+  }
+  if (a.kind === "water" && a.bottle) parts.push("fles vullen");
+  if (a.wheelchair) parts.push("rolstoel");
+  return parts;
+}
+
+function amLimited(a) {
+  return a.access === "niet openbaar" || a.access === "voor klanten" || (a.hours && amStatus(a).state === "closed");
+}
+
+function amPopup(a) {
+  const k = AM_KIND[a.kind];
+  const d = state.location ? haversine(state.location.lat, state.location.lon, a.lat, a.lon) : null;
+  const [osmType, osmId] = a.id.split("/");
+  return `
+    <b>${esc(a.name || k.label)}</b>${a.name ? `<br><small>${esc(k.label)}</small>` : ""}<br>
+    ${a.address ? `${esc(a.address)}<br>` : ""}
+    ${amDetails(a).length ? `<span>${esc(amDetails(a).join(" · "))}</span><br>` : ""}
+    ${a.location ? `<div><small>Waar: ${esc(a.location)}</small></div>` : ""}
+    ${a.description ? `<div><small>${esc(a.description)}</small></div>` : ""}
+    ${a.operator ? `<div><small>Beheer: ${esc(a.operator)}</small></div>` : ""}
+    ${d != null ? `<div><small>${esc(fmtDistance(d))} · ${esc(Nav.eta(d))}</small></div>` : ""}
+    ${a.hours ? `<table class="sg-hours">${shWeekRows(a)}</table>` : ""}
+    ${a.kind === "aed" ? '<div class="pk-note">Bel bij een hartstilstand altijd eerst 112. Bron: OpenStreetMap; controleer ter plekke.</div>' : '<div class="pk-note">Bron: OpenStreetMap.</div>'}
+    <div class="popup-links">${routeLink(a.lat, a.lon)}<a href="https://www.openstreetmap.org/${esc(osmType)}/${esc(osmId)}" target="_blank" rel="noopener noreferrer">${icon("pencil")}Aanpassen</a></div>`;
+}
+
+function renderAmenities() {
+  const reopen = amPendingPopup ?? openPopupId(amMarkers);
+  amLayer.clearLayers();
+  amMarkers.clear();
+  const cfg = state.config.amenities;
+  if (!cfg.enabled || !state.am.show || map.getZoom() < cfg.min_zoom) return;
+  const items = state.am.points.filter((a) => state.am.kinds.has(a.kind));
+  const offsets = spreadOffsets(items, 22);
+  items.forEach((a, i) => {
+    const k = AM_KIND[a.kind];
+    const html = `<div class="am-sign${amLimited(a) ? " limited" : ""}" style="--c:${k.color}">${icon(k.icon)}</div>`;
+    const marker = spreadMarker(a.lat, a.lon, html, "am-marker", 22, offsets[i], a.name || k.label, -350)
+      .bindPopup(() => amPopup(a), { maxWidth: 290 });
+    marker.addTo(amLayer);
+    amMarkers.set(a.id, marker);
+  });
+  if (reopen != null && amMarkers.has(reopen)) {
+    amMarkers.get(reopen).openPopup();
+    amPendingPopup = null;
+  }
+}
+
+function amNearItems() {
+  if (!state.location) return [];
+  return state.am.near
+    .filter((a) => state.am.kinds.has(a.kind))
+    .map((a) => ({ a, d: haversine(state.location.lat, state.location.lon, a.lat, a.lon) }))
+    .filter((x) => x.d <= state.config.amenities.list_radius_m)
+    .sort((x, y) => x.d - y.d);
+}
+
+function amListItem({ a, d }) {
+  const k = AM_KIND[a.kind];
+  const li = document.createElement("li");
+  li.className = "item amenity";
+  li.style.setProperty("--c", amLimited(a) ? "#9ca3af" : k.color);
+  li.tabIndex = 0;
+  const bar = document.createElement("span");
+  bar.className = "bar";
+  const what = document.createElement("span");
+  what.className = "what";
+  what.textContent = a.name ? `${k.label} · ${a.name}` : k.label;
+  const distEl = document.createElement("span");
+  distEl.className = "dist";
+  distEl.textContent = fmtDistance(d);
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.append([...amDetails(a), a.location, a.address].filter(Boolean).join(" · "), " · ", etaSpan(Nav.eta(d)));
+  li.append(bar, what, distEl, meta);
+  const open = () => {
+    amPendingPopup = a.id;
+    setLayer("amenities", true);
+    map.setView([a.lat, a.lon], Math.max(map.getZoom(), state.config.amenities.min_zoom, 17));
+    scheduleAmenitiesViewport();
+    if (isPhone()) setPanel(false);
+  };
+  li.addEventListener("click", open);
+  li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  return li;
+}
+
+function renderAmenitiesList() {
+  const cfg = state.config.amenities;
+  if (!cfg.enabled) return;
+  $("am-title").textContent = `Binnen ${fmtDistance(cfg.list_radius_m)}`;
+  const empty = $("empty-am");
+  if (!state.location) {
+    $("list-am").replaceChildren();
+    empty.textContent = "Nog geen locatie bekend.";
+    empty.hidden = false;
+  } else {
+    // Per soort de drie dichtstbijzijnde, AED's eerst.
+    const items = amNearItems();
+    const shown = ["aed", "toilet", "water"].flatMap((kind) => items.filter((x) => x.a.kind === kind).slice(0, 3));
+    $("list-am").replaceChildren(...shown.map(amListItem));
+    empty.textContent = "Niets gevonden in de buurt.";
+    empty.hidden = shown.length > 0;
+  }
+  renderOverview();
+}
+
+function amSummary() {
+  const items = amNearItems();
+  const aed = items.find((x) => x.a.kind === "aed" && !amLimited(x.a)) || items.find((x) => x.a.kind === "aed");
+  const toilet = items.find((x) => x.a.kind === "toilet");
+  const parts = [];
+  if (aed) parts.push(`AED ${fmtDistance(aed.d)}`);
+  if (toilet) parts.push(`toilet ${fmtDistance(toilet.d)}`);
+  return parts.length ? parts.join(" · ") : "Niets in de buurt";
+}
+
+let amSeq = 0;
+let amTimer = null;
+function scheduleAmenitiesViewport() {
+  clearTimeout(amTimer);
+  amTimer = setTimeout(async () => {
+    const cfg = state.config.amenities;
+    if (!cfg.enabled || !state.am.show || map.getZoom() < cfg.min_zoom) {
+      state.am.points = [];
+      renderAmenities();
+      return;
+    }
+    const b = map.getBounds();
+    const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map((v) => v.toFixed(5)).join(",");
+    const seq = ++amSeq;
+    try {
+      const points = await api(`/api/amenities?bbox=${bbox}`);
+      if (seq !== amSeq) return;
+      state.am.points = points;
+      renderAmenities();
+    } catch (err) { console.warn("Voorzieningen:", err.message); }
+  }, 250);
+}
+
+async function loadAmenitiesNear(force) {
+  const cfg = state.config.amenities;
+  const loc = state.location;
+  if (!cfg.enabled || !loc) return renderAmenitiesList();
+  const from = state.am.nearFrom;
+  if (!force && from && haversine(from.lat, from.lon, loc.lat, loc.lon) < cfg.list_radius_m / 4) {
+    return renderAmenitiesList();
+  }
+  state.am.nearFrom = { lat: loc.lat, lon: loc.lon };
+  const bbox = bboxAround(loc.lat, loc.lon, cfg.list_radius_m * 1.2).map((v) => v.toFixed(5)).join(",");
+  state.am.near = await api(`/api/amenities?bbox=${bbox}`);
+  renderAmenitiesList();
+}
+
+function initAmenities() {
+  if (!state.config.amenities.enabled) return;
+  $("am-show-chip").hidden = false;
+  state.am.show = store.get("amShow") === "1";
+  const saved = store.get("amKinds");
+  if (saved != null) state.am.kinds = new Set(saved.split(",").filter(Boolean));
+  $("am-show").checked = state.am.show;
+  $("am-kinds").hidden = !state.am.show;
+  $("am-show").addEventListener("change", (e) => setLayer("amenities", e.target.checked));
+  document.querySelectorAll("[data-am-kind]").forEach((el) => {
+    el.checked = state.am.kinds.has(el.dataset.amKind);
+    el.addEventListener("change", () => {
+      el.checked ? state.am.kinds.add(el.dataset.amKind) : state.am.kinds.delete(el.dataset.amKind);
+      store.set("amKinds", [...state.am.kinds].join(","));
+      renderAmenities();
+      renderAmenitiesList();
+    });
+  });
+  scheduleAmenitiesViewport();
+  loadAmenitiesNear(true).catch(console.error);
+}
+
 // ---------- nieuws en bekendmakingen uit de buurt ----------
 
 const BK_ICON = { bouwen: "construction", verkeer: "traffic-cone", evenementen: "party-popper",
@@ -2671,7 +2875,7 @@ function initNav() {
 function setLayer(layer, on) {
   const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show", shops: "sh-show",
     charging: "ch-show", statiegeld: "sg-show", announcements: "bk-show", roadworks: "rw-show",
-    news: "nw-show", ov: "ov-show", fuel: "fu-show" }[layer];
+    news: "nw-show", ov: "ov-show", fuel: "fu-show", amenities: "am-show" }[layer];
   if ($(el)) $(el).checked = on;
   if (layer === "incidents") { state.showIncidents = on; store.set("showIncidents", on ? "1" : "0"); renderIncidents(); }
   if (layer === "cams") { state.showCams = on; store.set("showCams", on ? "1" : "0"); $("cam-layers").hidden = !on; renderCams(); }
@@ -2679,6 +2883,7 @@ function setLayer(layer, on) {
   if (layer === "charging") { state.ch.show = on; store.set("chShow", on ? "1" : "0"); scheduleChargingViewport(); }
   if (layer === "shops") { state.sh.show = on; store.set("shShow", on ? "1" : "0"); scheduleShopsViewport(); }
   if (layer === "fuel") { state.fu.show = on; store.set("fuShow", on ? "1" : "0"); scheduleFuelViewport(); }
+  if (layer === "amenities") { state.am.show = on; store.set("amShow", on ? "1" : "0"); $("am-kinds").hidden = !on; scheduleAmenitiesViewport(); }
   if (layer === "roadworks") { state.rw.show = on; store.set("rwShow", on ? "1" : "0"); scheduleRoadworksViewport(); }
   if (layer === "announcements") { state.bk.show = on; store.set("bkShow", on ? "1" : "0"); renderBkLayer(); }
   if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
@@ -2696,12 +2901,12 @@ function setLayer(layer, on) {
 
 // Snel kiezen: één tik zet precies de lagen aan die bij een situatie horen.
 const PRESETS = {
-  onderweg: ["ov", "fuel", "roadworks", "cams", "parking", "charging"],
+  onderweg: ["ov", "fuel", "roadworks", "cams", "parking", "charging", "amenities"],
   thuis: ["news", "announcements", "incidents", "roadworks"],
   boodschappen: ["shops", "statiegeld", "parking"],
   uit: [],
 };
-const ALL_LAYERS = ["parking", "statiegeld", "shops", "fuel", "roadworks", "ov", "cams", "charging", "news",
+const ALL_LAYERS = ["parking", "statiegeld", "shops", "fuel", "amenities", "roadworks", "ov", "cams", "charging", "news",
   "announcements", "incidents"];
 
 function applyPreset(name) {
@@ -2713,6 +2918,7 @@ function applyPreset(name) {
 /** Markeer de preset die precies overeenkomt met wat er nu aanstaat (als die er is). */
 function layerIsOn(layer) {
   return { parking: state.pk.show, statiegeld: state.sg.show, shops: state.sh.show, fuel: state.fu.show,
+    amenities: state.am.show,
     roadworks: state.rw.show, ov: state.ov.show, cams: state.showCams, charging: state.ch.show,
     news: state.nw.show, announcements: state.bk.show, incidents: state.showIncidents }[layer];
 }
@@ -2721,7 +2927,7 @@ function renderPresets() {
   if (!state.config) return;
   const c = state.config;
   const enabled = (layer) => ({ parking: c.parking.enabled, statiegeld: c.statiegeld.enabled, shops: c.shops.enabled,
-    fuel: c.fuel.enabled, roadworks: c.roadworks.enabled, ov: c.ov.enabled, cams: c.speedcams_enabled,
+    fuel: c.fuel.enabled, amenities: c.amenities.enabled, roadworks: c.roadworks.enabled, ov: c.ov.enabled, cams: c.speedcams_enabled,
     charging: c.charging.enabled, news: c.local.news, announcements: c.local.announcements, incidents: true })[layer];
   const current = ALL_LAYERS.filter((l) => layerIsOn(l) && enabled(l)).join(",");
   document.querySelectorAll("[data-preset]").forEach((btn) => {
@@ -2741,6 +2947,7 @@ const ZOOM_LAYERS = [
   { layer: "statiegeld", input: "sg-show", name: "statiegeldpunten", on: () => state.sg.show, zoom: () => state.config.statiegeld.min_zoom, enabled: () => state.config.statiegeld.enabled },
   { layer: "shops", input: "sh-show", name: "winkels", on: () => state.sh.show, zoom: () => state.config.shops.min_zoom, enabled: () => state.config.shops.enabled },
   { layer: "fuel", input: "fu-show", name: "tankstations", on: () => state.fu.show, zoom: () => state.config.fuel.min_zoom, enabled: () => state.config.fuel.enabled },
+  { layer: "amenities", input: "am-show", name: "AED's en toiletten", on: () => state.am.show, zoom: () => state.config.amenities.min_zoom, enabled: () => state.config.amenities.enabled },
   { layer: "roadworks", input: "rw-show", name: "wegwerk", on: () => state.rw.show, zoom: () => state.config.roadworks.min_zoom, enabled: () => state.config.roadworks.enabled },
   { layer: "ov", input: "ov-show", name: "openbaar vervoer", on: () => state.ov.show, zoom: () => state.config.ov.lines_min_zoom, enabled: () => state.config.ov.enabled },
   { layer: "cams", input: "layer-cams", name: "flitsers", on: () => state.showCams, zoom: () => CAM_MIN_ZOOM, enabled: () => state.config.speedcams_enabled },
@@ -2785,6 +2992,7 @@ const SECTION_ON = {
   statiegeld: () => state.config.statiegeld.enabled && state.sg.show,
   shops: () => state.config.shops.enabled && state.sh.show,
   fuel: () => state.config.fuel.enabled && state.fu.show,
+  amenities: () => state.config.amenities.enabled && state.am.show,
   roadworks: () => state.config.roadworks.enabled && state.rw.show,
   ov: () => state.config.ov.enabled && state.ov.show,
   charging: () => state.config.charging.enabled && state.ch.show,
@@ -2931,6 +3139,7 @@ function renderOverview() {
   }
   if (state.config.ov.enabled && state.ov.show) setSectionSummary("ov", ovSummary());
   if (state.config.fuel.enabled) setSectionSummary("tanken", fuSummary());
+  if (state.config.amenities.enabled) setSectionSummary("voorzieningen", amSummary());
   if (state.config.shops.enabled) {
     const items = shNearItems().filter((x) => state.sh.kinds.has(x.p.kind));
     const open = items.filter((x) => x.st.state === "open");
@@ -3011,6 +3220,11 @@ function connectEvents() {
     loadRoadworksNear().catch(console.error);
     loadOvNear().catch(console.error);
     loadFuelNear().catch(console.error);
+    loadAmenitiesNear().catch(console.error);
+  });
+  es.addEventListener("amenities", () => {
+    scheduleAmenitiesViewport();
+    loadAmenitiesNear(true).catch(console.error);
   });
   es.addEventListener("ov", ovReloadConfig);
   es.addEventListener("fuel", () => {
@@ -3407,6 +3621,7 @@ async function init() {
   initCharging();
   initShops();
   initFuel();
+  initAmenities();
   initLocal();
   initRoadworks();
   initOv();
@@ -3450,7 +3665,7 @@ $("window").addEventListener("change", async (e) => {
 });
 map.on("moveend", () => {
   renderCams(); renderList(); scheduleSgViewport(); scheduleParkingViewport(); scheduleChargingViewport(); scheduleShopsViewport();
-  scheduleRoadworksViewport(); scheduleOvViewport(); scheduleFuelViewport();
+  scheduleRoadworksViewport(); scheduleOvViewport(); scheduleFuelViewport(); scheduleAmenitiesViewport();
 });
 
 // Relatieve tijden bijwerken en verlopen incidenten laten verdwijnen.
@@ -3461,7 +3676,7 @@ setInterval(() => {
   renderStatus();
   if (state.config) {
     renderPois(); renderSgList(); renderParking(); renderParkingHere(); renderChargingList(); renderShopsList();
-    renderFuel(); renderFuelList();
+    renderFuel(); renderFuelList(); renderAmenities(); renderAmenitiesList();
   }
 }, 30000);
 

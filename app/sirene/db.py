@@ -109,6 +109,15 @@ CREATE TABLE IF NOT EXISTS fuel (
 );
 CREATE INDEX IF NOT EXISTS fuel_lat_lon ON fuel (lat, lon);
 
+CREATE TABLE IF NOT EXISTS amenities (
+    id   TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    lat  REAL NOT NULL,
+    lon  REAL NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS amenities_lat_lon ON amenities (lat, lon);
+
 CREATE TABLE IF NOT EXISTS announcements (
     id       TEXT PRIMARY KEY,
     gemeente TEXT NOT NULL,
@@ -394,6 +403,29 @@ class Database:
 
     def fuel_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM fuel").fetchone()[0]
+
+    # --- voorzieningen (AED, toilet, water) ----------------------------------
+
+    def replace_amenities(self, items: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM amenities")
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO amenities (id, kind, lat, lon, data) VALUES (?, ?, ?, ?, ?)",
+                [(a["id"], a["kind"], a["lat"], a["lon"], json.dumps(a, ensure_ascii=False)) for a in items],
+            )
+
+    def amenities_in_bbox(self, south: float, west: float, north: float, east: float,
+                          kinds: list[str] | None, limit: int) -> list[dict[str, Any]]:
+        sql = "SELECT data FROM amenities WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?"
+        params: list[Any] = [south, north, west, east]
+        if kinds:
+            sql += f" AND kind IN ({','.join('?' * len(kinds))})"
+            params += kinds
+        rows = self.conn.execute(sql + " LIMIT ?", (*params, limit)).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def amenities_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM amenities").fetchone()[0]
 
     # --- lokaal nieuws ----------------------------------------------------
 

@@ -133,6 +133,13 @@ DEFAULTS: dict[str, Any] = {
         # Straal voor de lijst "tankstations in de buurt".
         "list_radius_m": 5000,
     },
+    "amenities": {
+        # Voorzieningen onderweg (OpenStreetMap): AED's, openbare toiletten, drinkwaterpunten.
+        "enabled": True,
+        "refresh_hours": 24,
+        "min_zoom": 14,
+        "list_radius_m": 1500,
+    },
     "charging": {
         "enabled": True,
         # Details (stekkers, tarieven, toegang) één keer per dag; beschikbaarheid vaker.

@@ -830,3 +830,13 @@ fieldset { min-width: 0; }
 .status-list .dot.warn { background: var(--warn); } .status-list .dot.err { background: var(--err); } .status-list .dot.none { background: var(--border); }
 .status-list .err-text { flex-basis: 100%; color: var(--err); font-size: 12px; padding-left: 16px; }
 .status-list li.has-error { flex-wrap: wrap; }
+
+/* --- AED, toilet, drinkwater --- */
+.am-marker { background: none; border: 0; }
+.am-sign {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--c); color: #fff; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+.am-sign .i { width: 13px; height: 13px; }
+.am-sign.limited { opacity: .6; border-style: dashed; }
+.item.amenity .bar { background: var(--c); }
