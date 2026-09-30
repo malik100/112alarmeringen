@@ -58,6 +58,20 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
     app = FastAPI(title="Buurtradar", lifespan=lifespan)
     app.state.service = svc
 
+    @app.middleware("http")
+    async def no_stale_frontend(request: Request, call_next):
+        """Laat de browser pagina, stijl en scripts altijd controleren op een nieuwe versie.
+
+        Zonder deze kop bewaart een browser style.css en app.js soms dagenlang; na een update
+        krijg je dan een nieuwe pagina met een oude opmaak. Ongewijzigde bestanden kosten alleen
+        een korte controle (304 Not Modified), geen nieuwe download.
+        """
+        response = await call_next(request)
+        path = request.url.path
+        if path == "/" or (path.startswith("/static/") and "/vendor/" not in path):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     @app.get("/api/config")
     def get_config():
         cfg = svc.cfg

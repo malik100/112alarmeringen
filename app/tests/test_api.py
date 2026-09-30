@@ -38,3 +38,14 @@ def test_browser_location_can_be_disabled(client, service):
 
 def test_invalid_location_rejected(client):
     assert client.post("/api/location", json={"lat": 123, "lon": 5}).status_code == 422
+
+
+def test_frontend_is_revalidated_after_updates(client):
+    """Na een update mag de browser geen oude style.css/app.js bij een nieuwe pagina gebruiken."""
+    for path in ("/", "/static/style.css", "/static/app.js", "/static/icons.svg"):
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", path
+    # Ongewijzigd bestand: alleen een korte controle, geen nieuwe download.
+    etag = client.get("/static/style.css").headers["etag"]
+    assert client.get("/static/style.css", headers={"If-None-Match": etag}).status_code == 304
+    assert "cache-control" not in client.get("/static/vendor/leaflet/leaflet.js").headers
