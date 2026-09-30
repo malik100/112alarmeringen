@@ -3,3 +3,6 @@ uvicorn[standard]==0.54.0
 httpx==0.28.1
 PyYAML==6.0.1
 ijson==3.5.1
+gtfs-realtime-bindings==3.0.0
+protobuf==7.36.2
+tzdata==2026.4

@@ -8,3 +8,5 @@ __pycache__/
 *.db
 *.db-*
 .venv/
+*.db.new
+gtfs-nl.zip*

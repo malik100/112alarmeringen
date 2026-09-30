@@ -129,6 +129,22 @@ DEFAULTS: dict[str, Any] = {
         # Straal voor de lijst "laden in de buurt".
         "list_radius_m": 3000,
     },
+    "ov": {
+        # Openbaar vervoer: haltes, vertrektijden, lijnen en voertuigen (OVapi, open data).
+        "enabled": True,
+        "gtfs_url": "",       # leeg = landelijke dienstregeling van OVapi (~250 MB, dagelijks)
+        "realtime_url": "",   # leeg = actuele gegevens van OVapi
+        # Eigen bestand voor de dienstregeling (~450 MB); leeg = ov.db naast de database.
+        "database": "",
+        "refresh_hours": 24,
+        "days": 7,            # zoveel dagen vooruit inlezen
+        # Actuele tijden en voertuigen: hooguit zo vaak, en alleen als iemand kijkt.
+        "realtime_interval_s": 30,
+        "stops_min_zoom": 15,
+        "lines_min_zoom": 13,
+        "vehicles_min_zoom": 13,
+        "list_radius_m": 800,
+    },
     "map": {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",

@@ -1,7 +1,7 @@
 # Buurtradar
 
 Een live kaart van wat er in je buurt gebeurt: supermarkten en avondwinkels, parkeerzones,
-laadpalen, statiegeld-inleverpunten, lokaal nieuws en bekendmakingen van de gemeente, wegwerkzaamheden en afsluitingen, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
+laadpalen, statiegeld-inleverpunten, openbaar vervoer met live vertrektijden, lokaal nieuws en bekendmakingen van de gemeente, wegwerkzaamheden en afsluitingen, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
 Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
@@ -13,6 +13,9 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   evenementen, vergunningen), met de reactietermijn erbij.
 - **Wegwerkzaamheden en afsluitingen**: van gemeente, provincie en Rijkswaterstaat, ook in je eigen
   straat. Afgesloten wegdelen als rode lijn op de kaart, met omleiding, periode en soort werk.
+- **Openbaar vervoer**: haltes met live vertrektijden (vertraging, "rijdt niet", spoorwijziging),
+  alle lijnen op de kaart en bussen, trams en metro's die nu rijden. Van alle vervoerders in
+  Nederland, uit de open data van het NDOV Loket via OVapi.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
 - **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
@@ -26,7 +29,7 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
   `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
 - **Twee panelen**: links *Kaartlagen* (per laag een schakelaar: parkeren, statiegeld, winkels,
-  wegwerk, flitsers met roodlicht/traject apart, laadpalen, nieuws, bekendmakingen, 112), rechts
+  wegwerk, openbaar vervoer, flitsers met roodlicht/traject apart, laadpalen, nieuws, bekendmakingen, 112), rechts
   de inhoud van precies de lagen die aanstaan, in dezelfde volgorde. Elke sectie heeft een kop
   met een korte samenvatting ("Parkeren · Nu €5,37 per uur") en klap je apart in. Beide panelen
   klap je ook helemaal in; de app onthoudt alles per apparaat. Op de telefoon is *Kaartlagen*
@@ -427,6 +430,46 @@ een afgesloten straat in je eigen wijk staat erin.
 
 Een melding in Melvin is een planning: soms begint een werk later of is het eerder klaar.
 
+## Openbaar vervoer
+
+De laag **Openbaar vervoer** toont het ov van heel Nederland: trein, metro, tram, bus en veer, van
+alle vervoerders (NS, GVB, RET, HTM, Arriva, Connexxion, Qbuzz, EBS, Keolis en de rest). De bron is
+[OVapi](https://gtfs.ovapi.nl), dat de open data van het [NDOV Loket](https://ndovloket.nl)
+omzet naar het standaardformaat GTFS.
+
+- **Haltes in de buurt** (rechts): de haltes binnen 800 m (`ov.list_radius_m`) met de lijnen die er
+  stoppen en de eerstvolgende vertrekken. Een groene stip betekent een actuele tijd; rood is
+  vertraging, doorgestreept betekent dat de rit niet rijdt. De sectiekop zegt wat er als eerste
+  vertrekt, bijv. "Tram 7 over 3 min · Bos en Lommerplein".
+- **Vertrekbord**: tik op een halte op de kaart (vanaf zoom 15). Je ziet alle vertrekken van de komende
+  24 uur, van alle perrons samen (beide kanten van de straat, of trein en bus bij een station), met
+  perron of spoor en een spoorwijziging. Storingen voor die halte of lijn staan erboven. Het bord
+  ververst zichzelf elke 30 seconden zolang het openstaat.
+- **Rit**: tik op een vertrek of een voertuig voor de hele rit, met alle haltes en (verwachte) tijden,
+  en het tracé op de kaart.
+- **Lijnen** (vanaf zoom 13) in de kleur van de vervoerder. Tik op een lijn: op een drukke plek
+  zie je alle lijnen die daar rijden.
+- **Live voertuigen** (vanaf zoom 13): bussen, trams en metro's die nu rijden, met hun lijnnummer.
+  Een rode rand betekent 3 minuten of meer vertraging. Treinen zitten (nog) niet in de open
+  voertuigposities, wel in de vertrektijden.
+- **Filters** onder de schakelaar links: haltes, lijnen en voertuigen apart, en per soort vervoer.
+
+**Wat het vraagt van je computer.** De dienstregeling (~250 MB) wordt één keer per dag
+gedownload en ingelezen in een eigen bestand `ov.db` naast de database (~450 MB, 7 dagen vooruit:
+`ov.days`). Inlezen duurt ongeveer anderhalve minuut op een pc en gebruikt ~300 MB geheugen; de
+app blijft ondertussen gewoon werken met de vorige dienstregeling. Daarna wordt de download
+weggegooid. Bij de allereerste start duurt het dus even voordat er vertrektijden zijn.
+
+De actuele gegevens (~3 MB per keer) worden alleen opgehaald als iemand de ov-laag bekijkt, en
+hooguit elke 30 seconden (`ov.realtime_interval_s`). Niemand kijkt? Dan niets.
+
+Liever niet (bijv. op een Raspberry Pi met een kleine SD-kaart)? Zet de laag uit met
+`ov: {enabled: false}` in `config.yaml`.
+
+Niet alle ritten hebben actuele gegevens: sommige vervoerders of ritten leveren niets, en dan
+staat er de geplande tijd (zonder groene stip). OVapi is een gratis dienst van vrijwilligers,
+zonder garantie; valt die even uit, dan zie je de dienstregeling.
+
 ## Nauwkeurigheid van de locatie
 
 P2000-berichten bevatten geen coördinaten. De locatie wordt bepaald uit postcode, straat en
@@ -467,7 +510,7 @@ Een lange straat kan honderden meters afwijken. Houd daar rekening mee bij een s
 cd app
 pip install -r requirements-dev.txt
 pytest                                  # Python-tests
-node --test "tests/js/*.test.js"        # openingstijden-logica (Node 18+)
+node --test "tests/js/*.test.js"        # openingstijden, parkeren, laden, ov (Node 18+)
 SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:app --reload --port 8080
 ```
 
@@ -489,6 +532,10 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
 | `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
 | `app/sirene/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |
+| `app/sirene/sources/gtfs.py` | dienstregeling (GTFS) → ov.db: haltes, ritten, lijnen |
+| `app/sirene/sources/gtfs_rt.py` | actuele ov-gegevens (GTFS-realtime): tijden, voertuigen, storingen |
+| `app/sirene/ov.py`         | vertrektijden, ritten, lijnen en voertuigen, met actuele tijden |
+| `app/sirene/static/ov.js`  | lijnbordjes, vertraging en vertrektijd tonen            |
 
 De code gebruikt intern nog de oorspronkelijke werknaam `sirene` (de map `app/sirene`, de
 database `sirene.db` en het Docker-volume `sirene-data`). Dat is bewust: zo blijven bestaande
@@ -504,6 +551,8 @@ installaties en hun gegevens werken.
 - Winkels en markten: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Laadpalen: [NDW open data](https://opendata.ndw.nu) (OCPI).
 - Wegwerkzaamheden: [NDW open data](https://opendata.ndw.nu), planningsfeed uit Melvin (DATEX II).
+- Openbaar vervoer: [OVapi](https://gtfs.ovapi.nl) (GTFS en GTFS-realtime), op basis van de open
+  data van het [NDOV Loket](https://ndovloket.nl).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Iconen: [Lucide](https://lucide.dev), ISC-licentie, zie `app/sirene/static/vendor/lucide/LICENSE`.

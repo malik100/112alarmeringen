@@ -51,6 +51,22 @@
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#construction"/></svg></span><span class="layer-name">Wegwerkzaamheden</span>
         <input type="checkbox" class="toggle" id="rw-show">
       </label>
+      <label class="layer-row" id="ov-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#bus"/></svg></span><span class="layer-name">Openbaar vervoer</span>
+        <input type="checkbox" class="toggle" id="ov-show">
+      </label>
+      <div class="layer-sub chips" id="ov-layers" hidden>
+        <label class="chip"><input type="checkbox" data-ovpart="stops" checked> Haltes</label>
+        <label class="chip"><input type="checkbox" data-ovpart="lines" checked> Lijnen</label>
+        <label class="chip"><input type="checkbox" data-ovpart="vehicles" checked> Live voertuigen</label>
+      </div>
+      <div class="layer-sub chips" id="ov-modes" hidden>
+        <label class="chip"><input type="checkbox" data-ovmode="trein" checked> Trein</label>
+        <label class="chip"><input type="checkbox" data-ovmode="metro" checked> Metro</label>
+        <label class="chip"><input type="checkbox" data-ovmode="tram" checked> Tram</label>
+        <label class="chip"><input type="checkbox" data-ovmode="bus" checked> Bus</label>
+        <label class="chip"><input type="checkbox" data-ovmode="veer" checked> Veer</label>
+      </div>
       <label class="layer-row">
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#camera"/></svg></span><span class="layer-name">Flitsers &amp; trajectcontroles</span>
         <input type="checkbox" class="toggle" id="layer-cams">
@@ -185,6 +201,27 @@
           <ol class="list" id="list-rw"></ol>
           <button type="button" class="more-btn" id="rw-more" hidden>Meer tonen</button>
           <p class="empty" id="empty-rw" hidden></p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="ov" data-layer="ov" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#bus"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Openbaar vervoer</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <p class="hint" id="ov-status"></p>
+        <p class="legend">
+          <span><span class="ov-live"></span>actuele tijd</span>
+          <span><span class="ov-late">+3 min</span> vertraging</span>
+          <span><s>12:04</s> rijdt niet</span>
+        </p>
+        <section>
+          <h2 id="ov-title">Haltes in de buurt</h2>
+          <ol class="list" id="list-ov"></ol>
+          <p class="empty" id="empty-ov" hidden></p>
         </section>
         </div>
       </section>
@@ -346,7 +383,8 @@
 
       <footer class="credits">
         Bronnen: alarmeringen.nl (P2000), PDOK, OpenStreetMap-bijdragers, Statiegeld Nederland, RDW,
-        NDW (laadpalen, wegwerk), overheid.nl (bekendmakingen) en regionale omroepen. Iconen: Lucide.
+        NDW (laadpalen, wegwerk), overheid.nl (bekendmakingen), OVapi/NDOV Loket (openbaar vervoer) en
+        regionale omroepen. Iconen: Lucide.
       </footer>
     </div>
   </aside>
@@ -356,6 +394,7 @@
   <script src="/static/parking.js"></script>
   <script src="/static/charging.js"></script>
   <script src="/static/nav.js"></script>
+  <script src="/static/ov.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

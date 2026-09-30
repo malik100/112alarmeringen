@@ -6,7 +6,10 @@ import asyncio
 import datetime as dt
 import logging
 import math
+import sqlite3
 import time
+import zipfile
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -27,6 +30,11 @@ from .sources.roadworks import fetch_roadworks, fetch_street
 from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import PARSER_VERSION as PARKING_PARSER_VERSION
 from .sources.npr import fetch_zones
+from .ov import OvStore, Realtime
+from .sources.gtfs import DEFAULT_URL as GTFS_URL
+from .sources.gtfs import download_gtfs, import_gtfs
+from .sources.gtfs_rt import DEFAULT_URL as OV_REALTIME_URL
+from .sources.gtfs_rt import fetch_alerts, fetch_trip_updates, fetch_vehicles
 from .sources.shops import fetch_shops, is_late, same_store
 from .sources.speedcams import fetch_speedcams
 from .sources.statiegeld import DEFAULT_URL as STATIEGELD_URL
@@ -48,6 +56,7 @@ AREA_SEARCH_M = 6000
 MAX_GEMEENTEN = 4
 LOCAL_NEWS_LIMIT = 40
 ANNOUNCEMENTS_LIMIT = 300
+OV_ALERTS_INTERVAL_S = 300  # storingen veranderen minder vaak dan vertrektijden
 
 
 class Service:
@@ -73,6 +82,8 @@ class Service:
             "charging": {"last_ok": None, "last_error": None, "count": 0},
             "shops": {"last_ok": None, "last_error": None, "count": 0},
             "roadworks": {"last_ok": None, "last_error": None, "count": 0},
+            "ov": {"last_ok": None, "last_error": None, "count": 0, "importing": False},
+            "ov_realtime": {"last_ok": None, "last_error": None},
             "announcements": {"last_ok": None, "last_error": None, "gemeenten": []},
             "charging_status": {"last_ok": None, "last_error": None},
             "homeassistant": {"last_ok": None, "last_error": None},
@@ -87,6 +98,12 @@ class Service:
         self.area: dict[str, Any] | None = self.db.meta_get("area")
         self._area_lock = asyncio.Lock()
         self._announcements_lock = asyncio.Lock()
+        # Openbaar vervoer: dienstregeling in een eigen bestand, actuele gegevens in het geheugen.
+        self.ov = OvStore(self.ov_path())
+        self.ov_rt = Realtime()
+        self._ov_rt_lock = asyncio.Lock()
+        self._ov_rt_try = 0.0
+        self._ov_alerts_try = 0.0
 
     # --- incidenten -------------------------------------------------------
 
@@ -485,6 +502,86 @@ class Service:
         self.status["roadworks"]["last_ok"] = time.time()
         return True
 
+    # --- openbaar vervoer ------------------------------------------------------
+
+    def ov_path(self) -> Path:
+        path = self.cfg["ov"]["database"]
+        if path:
+            return Path(path)
+        if self.cfg["database"] == ":memory:":
+            return Path("ov.db")
+        return Path(self.cfg["database"]).with_name("ov.db")
+
+    async def refresh_ov_once(self) -> bool:
+        """Dienstregeling downloaden en inlezen (duurt een paar minuten, in een aparte thread)."""
+        ocfg = self.cfg["ov"]
+        path = self.ov_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        zip_path = path.with_name("gtfs-nl.zip")
+        new_path = path.with_name(path.name + ".new")
+        self.status["ov"]["importing"] = True
+        try:
+            await download_gtfs(self.client, zip_path, ocfg["gtfs_url"] or GTFS_URL)
+            counts = await asyncio.to_thread(import_gtfs, zip_path, new_path, dt.date.today(), ocfg["days"])
+            self.ov.swap(new_path)
+        except (httpx.HTTPError, ValueError, OSError, KeyError, sqlite3.DatabaseError,
+                zipfile.BadZipFile) as exc:
+            log.warning("Dienstregeling OV ophalen mislukt: %s", exc)
+            self.status["ov"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        finally:
+            self.status["ov"]["importing"] = False
+            new_path.unlink(missing_ok=True)
+            zip_path.unlink(missing_ok=True)  # 250 MB; morgen is er toch een nieuwe
+        log.info("Dienstregeling OV ingelezen: %s", counts)
+        self.db.meta_set("ov_updated", time.time())
+        self.status["ov"].update(last_ok=time.time(), count=counts.get("haltes", 0), last_error=None)
+        self.bus.publish("ov", {"count": counts.get("haltes", 0)})
+        return True
+
+    async def ov_realtime(self) -> Realtime:
+        """Actuele ritten, voertuigen en storingen; alleen opgehaald als iemand erom vraagt en
+        hooguit elke `realtime_interval_s` (storingen elke 5 minuten)."""
+        interval = self.cfg["ov"]["realtime_interval_s"]
+        if (time.time() - self._ov_rt_try < interval
+                and time.time() - self._ov_alerts_try < OV_ALERTS_INTERVAL_S):
+            return self.ov_rt
+        async with self._ov_rt_lock:
+            now = time.time()
+            base = self.cfg["ov"]["realtime_url"] or OV_REALTIME_URL
+            jobs = []
+            if now - self._ov_rt_try >= interval:
+                self._ov_rt_try = now
+                jobs.append(self._ov_fetch_trips(base))
+            if now - self._ov_alerts_try >= OV_ALERTS_INTERVAL_S:
+                self._ov_alerts_try = now
+                jobs.append(self._ov_fetch_alerts(base))
+            await asyncio.gather(*jobs)
+        return self.ov_rt
+
+    async def _ov_fetch_trips(self, base: str) -> None:
+        trips, vehicles = await asyncio.gather(fetch_trip_updates(self.client, base),
+                                               fetch_vehicles(self.client, base), return_exceptions=True)
+        errors = [str(r) for r in (trips, vehicles) if isinstance(r, BaseException)]
+        if not isinstance(trips, BaseException):
+            self.ov_rt.trips = trips
+            self.ov_rt.ts = time.time()
+            self.status["ov_realtime"]["last_ok"] = self.ov_rt.ts
+        if not isinstance(vehicles, BaseException):
+            self.ov_rt.vehicles = vehicles
+        if errors:
+            log.warning("Actuele OV-gegevens ophalen mislukt: %s", "; ".join(errors))
+            self.status["ov_realtime"]["last_error"] = f"{time.time():.0f}: {'; '.join(errors)}"
+
+    async def _ov_fetch_alerts(self, base: str) -> None:
+        try:
+            self.ov_rt.alerts = await fetch_alerts(self.client, base)
+            self.ov_rt.alerts_ts = time.time()
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("OV-storingen ophalen mislukt: %s", exc)
+        except Exception as exc:  # kapot protobuf-bestand e.d.: dan zonder storingen verder
+            log.warning("OV-storingen onleesbaar: %s", exc)
+
     async def street_at(self, lat: float, lon: float) -> str | None:
         """Straatnaam bij een punt (gecachet); None als PDOK niets vindt of niet bereikbaar is."""
         key = f"straat:{lat:.4f},{lon:.4f}"
@@ -593,6 +690,14 @@ class Service:
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "parking", self.cfg["parking"]["refresh_hours"] * 3600,
                 self.refresh_parking_once)))
+        if self.cfg["ov"]["enabled"]:
+            self.status["ov"]["count"] = self.ov.info.get("haltes", 0)
+            if not self.ov.covers(dt.date.today() + dt.timedelta(days=1)):
+                self.db.meta_set("ov_updated", 0)  # geen of verouderde dienstregeling: meteen inlezen
+            elif not self.db.meta_get("ov_updated"):
+                self.db.meta_set("ov_updated", self.ov_path().stat().st_mtime)
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "ov", self.cfg["ov"]["refresh_hours"] * 3600, self.refresh_ov_once)))
         ha = self.cfg["location"]["homeassistant"]
         if ha["enabled"]:
             if not ha["token"]:
@@ -605,4 +710,5 @@ class Service:
         for task in self._tasks:
             task.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
+        self.ov.close()
         await self.client.aclose()

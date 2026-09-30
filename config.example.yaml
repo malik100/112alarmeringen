@@ -57,6 +57,15 @@ roadworks:              # wegwerkzaamheden en afsluitingen (NDW/Melvin)
   min_zoom: 12
   list_radius_m: 3000
 
+ov:                     # openbaar vervoer (OVapi/NDOV Loket)
+  enabled: true         # ~250 MB download per dag, ~450 MB op schijf (ov.db naast de database)
+  days: 7               # zoveel dagen vooruit inlezen
+  realtime_interval_s: 30  # actuele tijden/voertuigen: hooguit zo vaak, alleen als iemand kijkt
+  stops_min_zoom: 15
+  lines_min_zoom: 13
+  vehicles_min_zoom: 13
+  list_radius_m: 800    # straal voor "haltes in de buurt"
+
 shops:
   enabled: true
   refresh_hours: 24

@@ -34,6 +34,7 @@ SHOPS_LIMIT = 2000
 ROADWORKS_LIMIT = 1500
 ROADWORKS_STREETS = 25   # zoveel werken per lijst krijgen een straatnaam (PDOK, gecachet)
 PARKING_KINDS = {"betaald", "blauw", "vergunning", "garage"}
+OV_MODES = {"trein", "metro", "tram", "bus", "veer"}
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -89,6 +90,9 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "charging": {k: cfg["charging"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "shops": {k: cfg["shops"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "roadworks": {k: cfg["roadworks"][k] for k in ("enabled", "min_zoom", "list_radius_m", "ahead_days")},
+            "ov": {**{k: cfg["ov"][k] for k in ("enabled", "stops_min_zoom", "lines_min_zoom",
+                                                 "vehicles_min_zoom", "list_radius_m")},
+                   "ready": svc.ov.ready, "importing": svc.status["ov"]["importing"]},
             "local": {"news": cfg["news"]["enabled"],
                       "announcements": cfg["announcements"]["enabled"],
                       "radius_m": cfg["announcements"]["radius_m"],
@@ -268,6 +272,85 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             stations.sort(key=lambda s: s["distance_m"])
         return {"stations": stations[:limit], "status_ts": svc.charging_status_ts,
                 "truncated": len(stations) > limit}
+
+    # --- openbaar vervoer ---------------------------------------------------
+
+    def ov_bbox(bbox: str, max_deg: float) -> tuple[float, float, float, float]:
+        if not svc.cfg["ov"]["enabled"]:
+            raise HTTPException(404, "Openbaar vervoer staat uit in de configuratie")
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > max_deg or north - south > max_deg:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        return south, west, north, east
+
+    def ov_modes(modes: str | None) -> set[str] | None:
+        wanted = {m for m in (modes or "").split(",") if m in OV_MODES}
+        return wanted or None
+
+    def ov_ready() -> None:
+        if not svc.cfg["ov"]["enabled"]:
+            raise HTTPException(404, "Openbaar vervoer staat uit in de configuratie")
+        if not svc.ov.ready:
+            raise HTTPException(503, "De dienstregeling wordt nog ingelezen, probeer het over een paar minuten")
+
+    @app.get("/api/ov/haltes")
+    def get_ov_haltes(bbox: str = Query(description="west,zuid,oost,noord in graden")):
+        """Haltes en stations in een gebied, met de lijnen die er stoppen."""
+        return svc.ov.haltes_in_bbox(*ov_bbox(bbox, 0.3))
+
+    @app.get("/api/ov/near")
+    async def get_ov_near(lat: float = Query(ge=-90, le=90), lon: float = Query(ge=-180, le=180),
+                          limit: int = Query(default=6, ge=1, le=20),
+                          departures: int = Query(default=4, ge=0, le=10)):
+        """Dichtstbijzijnde haltes met hun eerstvolgende vertrekken."""
+        ov_ready()
+        realtime = await svc.ov_realtime()
+        now = time.time()
+        haltes = svc.ov.haltes_near(lat, lon, svc.cfg["ov"]["list_radius_m"], limit)
+        for h in haltes:
+            h["departures"] = svc.ov.departures(h["id"], now, realtime, departures)
+        return {"haltes": haltes, "realtime_ts": realtime.ts}
+
+    @app.get("/api/ov/departures")
+    async def get_ov_departures(halte: int, limit: int = Query(default=30, ge=1, le=100)):
+        """Vertrektijden bij een halte (alle perrons), met actuele tijden en storingen."""
+        ov_ready()
+        info = svc.ov.halte(halte)
+        if info is None:
+            raise HTTPException(404, "Onbekende halte")
+        realtime = await svc.ov_realtime()
+        now = time.time()
+        deps = svc.ov.departures(halte, now, realtime, limit)
+        alerts = svc.ov.alerts_for(realtime, halte, {d["route_id"] for d in deps}, now)
+        return {"halte": info, "departures": deps, "alerts": alerts, "realtime_ts": realtime.ts}
+
+    @app.get("/api/ov/trip")
+    async def get_ov_trip(trip: str, date: str = Query(pattern=r"^\d{8}$")):
+        """Eén rit: alle haltes met (verwachte) tijden en het tracé."""
+        ov_ready()
+        realtime = await svc.ov_realtime()
+        result = svc.ov.trip(trip, date, realtime)
+        if result is None:
+            raise HTTPException(404, "Onbekende rit")
+        return result
+
+    @app.get("/api/ov/lines")
+    def get_ov_lines(bbox: str = Query(description="west,zuid,oost,noord in graden"),
+                     detailed: bool = False, modes: str | None = None):
+        """Lijnen (tracés) in een gebied."""
+        return svc.ov.lines_in_bbox(*ov_bbox(bbox, 1.0), detailed=detailed, modes=ov_modes(modes))
+
+    @app.get("/api/ov/vehicles")
+    async def get_ov_vehicles(bbox: str = Query(description="west,zuid,oost,noord in graden"),
+                              modes: str | None = None):
+        """Voertuigen die nu rijden (positie van hooguit een paar minuten oud)."""
+        area = ov_bbox(bbox, 1.0)
+        realtime = await svc.ov_realtime()
+        return {"vehicles": svc.ov.vehicles_in_bbox(realtime, *area, time.time(), ov_modes(modes)),
+                "realtime_ts": realtime.ts}
 
     @app.get("/api/local")
     async def get_local(lat: float | None = Query(default=None, ge=-90, le=90),
