@@ -6,9 +6,8 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
   "0 meldingen · 4 winkels open · €8,01/u parkeren · 5 laadpunten vrij · 8 statiegeldpunten open"
-  (met iconen). Daaronder tabbladen (Overzicht, Nieuws, Wegwerk, Winkels,
-  Parkeren, Laden, Statiegeld, 112). Het overzicht toont per onderwerp het belangrijkste op jouw plek. Is er een
-  melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
+  (met iconen). Een melding met sirene dichtbij kleurt de 112-sectie rood en geeft een waarschuwing
+  bovenaan het scherm.
 - **Nieuws en bekendmakingen uit je buurt**: recente artikelen die je eigen of een nabije plaats
   noemen, en officiële bekendmakingen van je gemeente binnen 1,5 km (bouwaanvragen, verkeersbesluiten,
   evenementen, vergunningen), met de reactietermijn erbij.
@@ -27,10 +26,11 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
   `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
 - **Twee panelen**: links *Kaartlagen* (per laag een schakelaar: parkeren, statiegeld, winkels,
-  wegwerk, flitsers met roodlicht/traject apart, laadpalen, bekendmakingen, 112), rechts de
-  inhoud met de tabbladen. Beide klap je in met één klik; de app onthoudt dat per apparaat.
-  Op de telefoon is *Kaartlagen* een uitklapmenu en de inhoud een vel onderaan.
-  Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
+  wegwerk, flitsers met roodlicht/traject apart, laadpalen, nieuws, bekendmakingen, 112), rechts
+  de inhoud van precies de lagen die aanstaan, in dezelfde volgorde. Elke sectie heeft een kop
+  met een korte samenvatting ("Parkeren · Nu €5,37 per uur") en klap je apart in. Beide panelen
+  klap je ook helemaal in; de app onthoudt alles per apparaat. Op de telefoon is *Kaartlagen*
+  een uitklapmenu en de inhoud een vel onderaan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
   met sirene (A0/A1/P1) pulseren.
 - **Jouw locatie** met een instelbare straal (standaard 1 km). Wat daarbinnen gebeurt staat
@@ -319,7 +319,7 @@ Feeds toevoegen of weghalen kan in `config.yaml` onder `news.feeds`. Uitzetten k
 
 ## Nieuws en bekendmakingen uit je buurt
 
-Het tabblad **Nieuws** heeft twee delen.
+Nieuws en bekendmakingen zijn twee lagen (en secties) met elk een eigen schakelaar.
 
 **Nieuws uit je buurt.** Uit dezelfde nieuwsfeeds als hierboven, alleen artikelen van de
 afgelopen 48 uur die een plaats noemen binnen 5 km van je locatie (`news.local_radius_m`), met de
@@ -373,7 +373,7 @@ bekendmakingen over. Je keuzes worden per apparaat onthouden.
 
 ## Wegwerkzaamheden en afsluitingen
 
-Het tabblad **Wegwerk** toont werkzaamheden, afsluitingen en evenementen op de weg binnen 3 km
+De laag **Wegwerkzaamheden** toont werkzaamheden, afsluitingen en evenementen op de weg binnen 3 km
 (`roadworks.list_radius_m`). De bron is de open planningsfeed van NDW, gevuld vanuit
 [Melvin](https://melvin.ndw.nu/public): het landelijke systeem waarin gemeenten, provincies,
 waterschappen en Rijkswaterstaat hun werkzaamheden melden. Het gros komt van gemeenten, dus ook

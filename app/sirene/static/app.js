@@ -32,7 +32,7 @@ const state = {
   sh: { show: false, points: [], near: [], kinds: new Set(["supermarkt", "buurtwinkel", "markt"]),
         onlyOpen: false, lateOnly: false, nearFrom: null },
   rw: { show: false, planned: false, onlyClosed: false, items: [], near: [], nearFrom: null, showAll: false },
-  nw: { items: [], showAll: false, place: null, from: null, loading: false },
+  nw: { show: true, items: [], showAll: false, place: null, from: null, loading: false },
   // Standaard wat je merkt op straat (verkeer, evenementen); bouw en vergunningen zijn een optie.
   bk: { show: false, focus: null, items: [], cats: new Set(["verkeer", "evenementen"]), important: true,
         sort: "relevant", showAll: false },
@@ -572,7 +572,6 @@ async function loadSgNear(force) {
 
 function initStatiegeld() {
   if (!state.config.statiegeld.enabled) return;
-  document.querySelector('[data-tab="statiegeld"]').hidden = false;
   $("sg-show-chip").hidden = false;
   state.sg.show = store.get("sgShow") === "1";
   state.sg.onlyOpen = store.get("sgOnlyOpen") === "1";
@@ -774,7 +773,6 @@ async function loadParkingHere(force) {
 
 function initParking() {
   if (!state.config.parking.enabled) return;
-  document.querySelector('[data-tab="parkeren"]').hidden = false;
   $("pk-show-chip").hidden = false;
   state.pk.show = store.get("pkShow") !== "0";
   $("pk-show").checked = state.pk.show;
@@ -992,7 +990,6 @@ function chReadFilters() {
 
 function initCharging() {
   if (!state.config.charging.enabled) return;
-  document.querySelector('[data-tab="laden"]').hidden = false;
   $("ch-show-chip").hidden = false;
   state.ch.show = store.get("chShow") === "1";
   state.ch.profile = store.get("chProfile") || "snel";
@@ -1194,7 +1191,6 @@ async function loadShopsNear(force) {
 
 function initShops() {
   if (!state.config.shops.enabled) return;
-  document.querySelector('[data-tab="winkels"]').hidden = false;
   $("sh-show-chip").hidden = false;
   state.sh.show = store.get("shShow") === "1";
   state.sh.onlyOpen = store.get("shOpen") === "1";
@@ -1439,7 +1435,12 @@ async function loadLocal(force) {
 function initLocal() {
   const cfg = state.config.local;
   if (!cfg.news && !cfg.announcements) return;
-  document.querySelector('[data-tab="nieuws"]').hidden = false;
+  if (cfg.news) {
+    $("nw-show-chip").hidden = false;
+    state.nw.show = store.get("nwShow") !== "0";
+    $("nw-show").checked = state.nw.show;
+    $("nw-show").addEventListener("change", (e) => setLayer("news", e.target.checked));
+  }
   if (cfg.announcements) {
     $("bk-show-chip").hidden = false;
     state.bk.show = store.get("bkShow") === "1";
@@ -1683,7 +1684,6 @@ async function loadRoadworksNear(force) {
 
 function initRoadworks() {
   if (!state.config.roadworks.enabled) return;
-  document.querySelector('[data-tab="wegwerk"]').hidden = false;
   $("rw-show-chip").hidden = false;
   state.rw.show = store.get("rwShow") === "1";
   state.rw.planned = store.get("rwPlanned") === "1";
@@ -1744,7 +1744,8 @@ function initNav() {
 /** Zet een kaartlaag aan of uit (en onthoud dat per apparaat). */
 function setLayer(layer, on) {
   const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show", shops: "sh-show",
-    charging: "ch-show", statiegeld: "sg-show", announcements: "bk-show", roadworks: "rw-show" }[layer];
+    charging: "ch-show", statiegeld: "sg-show", announcements: "bk-show", roadworks: "rw-show",
+    news: "nw-show" }[layer];
   if ($(el)) $(el).checked = on;
   if (layer === "incidents") { state.showIncidents = on; store.set("showIncidents", on ? "1" : "0"); renderIncidents(); }
   if (layer === "cams") { state.showCams = on; store.set("showCams", on ? "1" : "0"); $("cam-layers").hidden = !on; renderCams(); }
@@ -1754,19 +1755,53 @@ function setLayer(layer, on) {
   if (layer === "roadworks") { state.rw.show = on; store.set("rwShow", on ? "1" : "0"); scheduleRoadworksViewport(); }
   if (layer === "announcements") { state.bk.show = on; store.set("bkShow", on ? "1" : "0"); renderBkLayer(); }
   if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
+  if (layer === "news") { state.nw.show = on; store.set("nwShow", on ? "1" : "0"); }
+  // Rechts staat de inhoud van precies de lagen die links aanstaan.
+  renderSections();
 }
 
-function setTab(tab) {
-  const btn = document.querySelector(`[data-tab="${tab}"]`);
-  if (!btn || btn.hidden) tab = "overzicht";
-  state.tab = tab;
-  store.set("tab", tab);
-  document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
-  document.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== tab; });
-  // Wie een onderwerp opent, wil het meestal ook op de kaart zien.
-  const layer = { 112: "incidents", wegwerk: "roadworks", winkels: "shops", parkeren: "parking", laden: "charging", statiegeld: "statiegeld" }[tab];
-  if (layer) setLayer(layer, true);
-  $("panel-body").scrollTop = 0;
+// Rechterpaneel: één sectie per ingeschakelde kaartlaag, in dezelfde volgorde als links.
+const SECTION_ON = {
+  parking: () => state.config.parking.enabled && state.pk.show,
+  statiegeld: () => state.config.statiegeld.enabled && state.sg.show,
+  shops: () => state.config.shops.enabled && state.sh.show,
+  roadworks: () => state.config.roadworks.enabled && state.rw.show,
+  charging: () => state.config.charging.enabled && state.ch.show,
+  news: () => state.config.local.news && state.nw.show,
+  announcements: () => state.config.local.announcements && state.bk.show,
+  incidents: () => state.showIncidents,
+};
+
+function renderSections() {
+  if (!state.config) return;
+  let any = false;
+  document.querySelectorAll(".lsec[data-layer]").forEach((sec) => {
+    const on = SECTION_ON[sec.dataset.layer];
+    if (!on) return;  // bijv. Instellingen: altijd zichtbaar
+    sec.hidden = !on();
+    any = any || !sec.hidden;
+  });
+  $("no-sections").hidden = any;
+}
+
+function setSectionOpen(sec, open) {
+  sec.classList.toggle("collapsed", !open);
+  sec.querySelector(".lsec-head").setAttribute("aria-expanded", String(open));
+}
+
+function initSections() {
+  let closed;
+  try { closed = new Set(JSON.parse(store.get("closedSections") || '["instellingen"]')); } catch { closed = new Set(); }
+  document.querySelectorAll(".lsec").forEach((sec) => {
+    setSectionOpen(sec, !closed.has(sec.dataset.sec));
+    sec.querySelector(".lsec-head").addEventListener("click", () => {
+      const open = sec.classList.contains("collapsed");
+      setSectionOpen(sec, open);
+      open ? closed.delete(sec.dataset.sec) : closed.add(sec.dataset.sec);
+      store.set("closedSections", JSON.stringify([...closed]));
+    });
+  });
+  renderSections();
 }
 
 function incidentsNear() {
@@ -1783,25 +1818,6 @@ function sgNearItems() {
     .map((p) => ({ p, st: sgStatus(p), d: haversine(state.location.lat, state.location.lon, p.lat, p.lon) }))
     .filter((x) => x.d <= state.config.statiegeld.list_radius_m)
     .sort((a, b) => a.d - b.d);
-}
-
-function card(tab, title, summary, items, tone) {
-  const sec = document.createElement("section");
-  sec.className = `card${tone ? ` ${tone}` : ""}`;
-  const h = document.createElement("h2");
-  const link = document.createElement("button");
-  link.className = "card-link";
-  link.append(title, iconEl("chevron-right"));
-  link.addEventListener("click", () => setTab(tab));
-  h.append(link);
-  const p = document.createElement("p");
-  p.className = "card-sum";
-  p.textContent = summary;
-  const ol = document.createElement("ol");
-  ol.className = "list";
-  ol.append(...items);
-  sec.append(h, p, ol);
-  return sec;
 }
 
 /** Samenvatting per onderwerp: icoon + korte waarde. */
@@ -1852,89 +1868,69 @@ function renderSummary() {
   }));
 }
 
+function setSectionSummary(key, text, tone = "") {
+  const sec = document.querySelector(`.lsec[data-sec="${key}"]`);
+  if (!sec) return;
+  sec.querySelector(".lsec-sum").textContent = text;
+  sec.classList.toggle("urgent", tone === "urgent");
+}
+
+/** Bovenste regel en de korte samenvatting in elke sectiekop bijwerken. */
 function renderOverview() {
   if (!state.config) return;
   renderSummary();
-  const cards = [];
+  renderSections();
   if (!state.location) {
-    const p = document.createElement("p");
-    p.className = "empty";
-    p.textContent = "Tik op de locatieknop op de kaart, of stel een vaste locatie in. Dan zie je hier wat er in je buurt speelt.";
-    $("ov-cards").replaceChildren(p);
+    document.querySelectorAll(".lsec-sum").forEach((el) => { el.textContent = ""; });
     return;
   }
   const radius = fmtDistance(state.config.radius_m);
-
-  // 112: bovenaan bij een recente sirene dichtbij, anders onderaan.
   const near = incidentsNear();
   const recentSirene = near.some((x) => x.inc.sirene && Date.now() / 1000 - x.inc.ts < OLD_INCIDENT_S);
-  const inc112 = card("112", "112-meldingen",
-    near.length
-      ? `${near.length} melding${near.length > 1 ? "en" : ""} binnen ${radius} (${fmtWindow(state.windowMin)})`
-      : `Rustig: geen meldingen binnen ${radius} (${fmtWindow(state.windowMin)}).`,
-    near.slice(0, 2).map((x) => listItem(x.inc, x.d)), recentSirene ? "urgent" : "");
+  setSectionSummary("112", near.length
+    ? `${near.length} melding${near.length > 1 ? "en" : ""} binnen ${radius} (${fmtWindow(state.windowMin)})`
+    : `Rustig binnen ${radius} (${fmtWindow(state.windowMin)})`, recentSirene ? "urgent" : "");
 
-  const topical = [];
   const lc = state.config.local;
-  if (lc.news || lc.announcements) {
-    const nws = state.nw.items;
-    const bks = bkItems().sort(BK_SORT.relevant);
-    const parts = [];
-    if (lc.news) parts.push(`${nws.length || "Geen"} bericht${nws.length === 1 ? "" : "en"} uit de buurt`);
-    if (lc.announcements) parts.push(`${bks.length} ${state.bk.important ? "belangrijke " : ""}bekendmaking${bks.length === 1 ? "" : "en"} binnen ${fmtDistance(lc.radius_m)}`);
-    const show = [...nws.slice(0, 2).map(nwListItem), ...bks.slice(0, nws.length ? 1 : 2).map(bkListItem)];
-    topical.push(card("nieuws", "Nieuws & bekendmakingen", state.nw.loading ? "Laden…" : parts.join(" · "), show));
+  if (lc.news) {
+    const n = state.nw.items.length;
+    setSectionSummary("nieuws", state.nw.loading ? "Laden…" : n ? `${n} bericht${n === 1 ? "" : "en"}` : "Geen recent nieuws");
+  }
+  if (lc.announcements) {
+    const n = bkItems().length;
+    setSectionSummary("bekendmakingen", state.nw.loading ? "Laden…"
+      : `${n} ${state.bk.important ? "belangrijke " : ""}binnen ${fmtDistance(lc.radius_m)}`);
   }
   if (state.config.roadworks.enabled) {
     const now = rwNearItems().filter((w) => w.active);
     const closed = now.filter((w) => w.closed).length;
-    const radius = fmtDistance(state.config.roadworks.list_radius_m);
-    topical.push(card("wegwerk", "Wegwerk",
-      now.length
-        ? `${closed} afsluiting${closed === 1 ? "" : "en"} · ${now.length} werk${now.length === 1 ? "" : "en"} nu binnen ${radius}`
-        : `Geen wegwerkzaamheden nu binnen ${radius}.`,
-      now.slice(0, 2).map(rwListItem)));
+    setSectionSummary("wegwerk", now.length
+      ? `${closed} afsluiting${closed === 1 ? "" : "en"} · ${now.length} werk${now.length === 1 ? "" : "en"} nu`
+      : "Niets nu binnen " + fmtDistance(state.config.roadworks.list_radius_m));
   }
-
   if (state.config.shops.enabled) {
     const items = shNearItems().filter((x) => state.sh.kinds.has(x.p.kind));
     const open = items.filter((x) => x.st.state === "open");
-    const late = open.filter((x) => x.p.late);
-    const show = (open.length ? open : items).slice(0, 2);
-    const extra = late.length ? ` · ${late.length} laat open` : "";
-    topical.push(card("winkels", "Winkels",
-      items.length
-        ? `${open.length} van ${items.length} winkels binnen ${fmtDistance(state.config.shops.list_radius_m)} nu open${extra}`
-        : "Geen winkels of markten in de buurt.",
-      show.map(shListItem)));
+    const late = open.filter((x) => x.p.late).length;
+    setSectionSummary("winkels", items.length
+      ? `${open.length} van ${items.length} nu open${late ? ` · ${late} laat open` : ""}` : "Geen winkels in de buurt");
   }
   if (state.config.parking.enabled) {
     const zones = state.pk.here.filter((z) => z.kind !== "vergunning");
     const permit = state.pk.here.some((z) => z.kind === "vergunning");
     const first = zones[0] && Parking.status(zones[0]);
-    topical.push(card("parkeren", "Parkeren hier",
-      first ? first.text : permit ? "Alleen vergunninghouders op deze plek." : "Geen parkeerregeling bekend; meestal vrij parkeren.",
-      zones.slice(0, 1).map(pkListItem)));
+    setSectionSummary("parkeren", first ? first.text : permit ? "Alleen met vergunning" : "Geen regeling bekend");
   }
   if (state.config.charging.enabled) {
     const free = state.ch.near.filter((s) => Charging.availability(s).state === "free").length;
-    topical.push(card("laden", "Laden",
-      state.ch.near.length
-        ? `${free} van ${state.ch.near.length} dichtstbijzijnde vrij · ${chProfile().label}`
-        : `Niets gevonden binnen ${fmtDistance(state.config.charging.list_radius_m)} · ${chProfile().label}`,
-      state.ch.near.slice(0, 2).map(chListItem)));
+    setSectionSummary("laden", state.ch.near.length ? `${free} van ${state.ch.near.length} vrij · ${chProfile().label}`
+      : chProfile().label);
   }
   if (state.config.statiegeld.enabled) {
     const items = sgNearItems();
-    const open = items.filter((x) => x.st.state === "open");
-    const show = (open.length ? open : items).slice(0, 2);
-    topical.push(card("statiegeld", "Statiegeld",
-      items.length ? `${open.length} van ${items.length} punten binnen ${fmtDistance(state.config.statiegeld.list_radius_m)} nu open`
-        : "Geen inleverpunten in de buurt.",
-      show.map((x) => sgListItem(x.p, x.st, x.d))));
+    const open = items.filter((x) => x.st.state === "open").length;
+    setSectionSummary("statiegeld", items.length ? `${open} van ${items.length} nu open` : "Geen punten in de buurt");
   }
-  cards.push(...(recentSirene ? [inc112, ...topical] : [...topical, inc112]));
-  $("ov-cards").replaceChildren(...cards);
 }
 
 function fmtWindow(min) {
@@ -1949,7 +1945,6 @@ function initOverview() {
   $("cam-layers").hidden = !state.showCams;
   $("layer-incidents").addEventListener("change", (e) => setLayer("incidents", e.target.checked));
   $("layer-cams").addEventListener("change", (e) => setLayer("cams", e.target.checked));
-  document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
 }
 
 // ---------- data ----------
@@ -2098,7 +2093,7 @@ async function init() {
   initShops();
   initLocal();
   initRoadworks();
-  setTab(store.get("tab") || "overzicht");
+  initSections();
   connectEvents();
 
   addLocateControl();

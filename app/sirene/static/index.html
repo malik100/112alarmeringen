@@ -60,6 +60,10 @@
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#zap"/></svg></span><span class="layer-name">Laadpalen</span>
         <input type="checkbox" class="toggle" id="ch-show">
       </label>
+      <label class="layer-row" id="nw-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#newspaper"/></svg></span><span class="layer-name">Nieuws uit de buurt</span>
+        <input type="checkbox" class="toggle" id="nw-show">
+      </label>
       <label class="layer-row" id="bk-show-chip" hidden>
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#stamp"/></svg></span><span class="layer-name">Bekendmakingen</span>
         <input type="checkbox" class="toggle" id="bk-show">
@@ -79,139 +83,23 @@
     </button>
 
     <div class="panel-body" id="panel-body">
-      <nav class="tabs" role="tablist" aria-label="Onderwerpen">
-        <button role="tab" data-tab="overzicht">Overzicht</button>
-        <button role="tab" data-tab="nieuws" hidden>Nieuws</button>
-        <button role="tab" data-tab="wegwerk" hidden>Wegwerk</button>
-        <button role="tab" data-tab="winkels" hidden>Winkels</button>
-        <button role="tab" data-tab="parkeren" hidden>Parkeren</button>
-        <button role="tab" data-tab="laden" hidden>Laden</button>
-        <button role="tab" data-tab="statiegeld" hidden>Statiegeld</button>
-        <button role="tab" data-tab="112">112</button>
-      </nav>
 
-      <!-- Overzicht: per onderwerp het belangrijkste op jouw plek -->
-      <div data-panel="overzicht" role="tabpanel">
-        <div id="ov-cards"></div>
-        <fieldset class="filters">
-          <legend>Instellingen</legend>
-          <label class="select nav-select">
-            Navigatie-app
-            <select id="nav-app"></select>
-          </label>
-          <p class="hint">Reistijden zijn een schatting op basis van de afstand. <span id="notify-state"></span></p>
-        </fieldset>
-      </div>
 
-      <!-- Nieuws en bekendmakingen uit je buurt -->
-      <div data-panel="nieuws" role="tabpanel" hidden>
-        <section id="nw-section">
-          <h2 id="nw-title">Nieuws uit je buurt</h2>
-          <ol class="list" id="list-nw"></ol>
-          <button type="button" class="more-btn" id="nw-more" hidden>Meer tonen</button>
-          <p class="empty" id="empty-nw" hidden></p>
-        </section>
-        <section id="bk-section">
-          <h2 id="bk-title">Bekendmakingen</h2>
-          <div class="chips">
-            <label class="chip"><input type="checkbox" data-bk="verkeer"> Verkeer</label>
-            <label class="chip"><input type="checkbox" data-bk="evenementen"> Evenementen</label>
-            <label class="chip"><input type="checkbox" data-bk="bouwen,vergunning"> Bouw &amp; vergunningen</label>
-            <label class="chip"><input type="checkbox" data-bk="overig"> Overig</label>
-          </div>
-          <div class="row">
-            <label class="switch" title="Verberg administratieve en kleine zaken (dakkapel, kozijn, mandaatregeling)">
-              <input type="checkbox" id="bk-important"> Alleen belangrijk</label>
-            <label class="select">Sorteren
-              <select id="bk-sort">
-                <option value="relevant">Belangrijkst</option>
-                <option value="new">Nieuwste</option>
-                <option value="near">Dichtstbij</option>
-              </select>
-            </label>
-          </div>
-          <ol class="list" id="list-bk"></ol>
-          <button type="button" class="more-btn" id="bk-more" hidden>Meer tonen</button>
-          <p class="empty" id="empty-bk" hidden></p>
-        </section>
-      </div>
 
-      <!-- Wegwerkzaamheden, afsluitingen en evenementen op de weg -->
-      <div data-panel="wegwerk" role="tabpanel" hidden>
-        <div class="chips">
-          <label class="chip"><input type="checkbox" id="rw-closed"> Alleen afsluitingen</label>
-          <label class="chip"><input type="checkbox" id="rw-planned"> Ook gepland</label>
-        </div>
-        <p class="legend">
-          <span><span class="swatch" style="--c:#dc2626"></span>weg dicht</span>
-          <span><span class="swatch" style="--c:#ea580c"></span>hinder</span>
-          <span><span class="swatch" style="--c:#7c3aed"></span>evenement</span>
-          <span><span class="swatch dashed" style="--c:#6b7280"></span>gepland</span>
-        </p>
-        <section>
-          <h2 id="rw-title">Wegwerk in de buurt</h2>
-          <ol class="list" id="list-rw"></ol>
-          <button type="button" class="more-btn" id="rw-more" hidden>Meer tonen</button>
-          <p class="empty" id="empty-rw" hidden></p>
-        </section>
-      </div>
 
-      <!-- 112-meldingen -->
-      <div data-panel="112" role="tabpanel" hidden>
-        <fieldset class="filters">
-          <legend>Diensten</legend>
-          <div class="chips">
-            <label class="chip"><input type="checkbox" data-disc="brandweer" checked> Brandweer</label>
-            <label class="chip"><input type="checkbox" data-disc="ambulance" checked> Ambulance</label>
-            <label class="chip"><input type="checkbox" data-disc="politie" checked> Politie</label>
-            <label class="chip"><input type="checkbox" data-disc="onbekend" checked> Overig</label>
-          </div>
-          <div class="row">
-            <label class="switch"><input type="checkbox" id="only-sirene"> Met sirene</label>
-            <label class="select">
-              Periode
-              <select id="window">
-                <option value="30">30 min</option>
-                <option value="60">1 uur</option>
-                <option value="120">2 uur</option>
-                <option value="360">6 uur</option>
-                <option value="1440">24 uur</option>
-              </select>
-            </label>
-          </div>
-        </fieldset>
-        <section>
-          <h2 id="near-title">In de buurt</h2>
-          <ol class="list" id="list-near"></ol>
-          <p class="empty" id="empty-near" hidden>Geen meldingen binnen je straal.</p>
-        </section>
-        <section>
-          <h2>Op de kaart</h2>
-          <ol class="list" id="list-view"></ol>
-          <p class="empty" id="empty-view" hidden>Geen meldingen in dit kaartgebied.</p>
-        </section>
-      </div>
 
-      <!-- Winkels -->
-      <div data-panel="winkels" role="tabpanel" hidden>
-        <div class="chips">
-          <label class="chip"><input type="checkbox" data-sh-kind="supermarkt" checked> Supermarkten</label>
-          <label class="chip"><input type="checkbox" data-sh-kind="buurtwinkel" checked> Buurt- &amp; avondwinkels</label>
-          <label class="chip"><input type="checkbox" data-sh-kind="markt" checked> Markten</label>
-        </div>
-        <div class="chips">
-          <label class="chip"><input type="checkbox" id="sh-open"> Nu open</label>
-          <label class="chip"><input type="checkbox" id="sh-late"> Open na 22:00</label>
-        </div>
-        <section>
-          <h2 id="sh-title">Winkels in de buurt</h2>
-          <ol class="list" id="list-sh"></ol>
-          <p class="empty" id="empty-sh" hidden></p>
-        </section>
-      </div>
 
-      <!-- Parkeren -->
-      <div data-panel="parkeren" role="tabpanel" hidden>
+
+
+      <p class="empty" id="no-sections" hidden>Zet links een kaartlaag aan. De inhoud verschijnt dan hier, in dezelfde volgorde.</p>
+
+      <section class="lsec" data-sec="parkeren" data-layer="parking" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#square-parking"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Parkeren</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
         <div id="pk-controls">
           <div class="chips">
             <label class="chip" title="Betaald parkeren en blauwe zones (zichtbaar vanaf ingezoomd niveau)">
@@ -232,10 +120,84 @@
           <ol class="list" id="list-pk"></ol>
           <p class="empty" id="empty-pk" hidden></p>
         </section>
-      </div>
+        </div>
+      </section>
 
-      <!-- Laden -->
-      <div data-panel="laden" role="tabpanel" hidden>
+      <section class="lsec" data-sec="statiegeld" data-layer="statiegeld" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#recycle"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Statiegeld</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <div class="chips">
+          <label class="chip"><input type="checkbox" id="sg-open"> Nu open</label>
+        </div>
+        <section id="sg-section">
+          <h2 id="sg-title">Statiegeld in de buurt</h2>
+          <ol class="list" id="list-sg"></ol>
+          <p class="empty" id="empty-sg" hidden></p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="winkels" data-layer="shops" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#shopping-cart"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Supermarkten &amp; avondwinkels</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <div class="chips">
+          <label class="chip"><input type="checkbox" data-sh-kind="supermarkt" checked> Supermarkten</label>
+          <label class="chip"><input type="checkbox" data-sh-kind="buurtwinkel" checked> Buurt- &amp; avondwinkels</label>
+          <label class="chip"><input type="checkbox" data-sh-kind="markt" checked> Markten</label>
+        </div>
+        <div class="chips">
+          <label class="chip"><input type="checkbox" id="sh-open"> Nu open</label>
+          <label class="chip"><input type="checkbox" id="sh-late"> Open na 22:00</label>
+        </div>
+        <section>
+          <h2 id="sh-title">Winkels in de buurt</h2>
+          <ol class="list" id="list-sh"></ol>
+          <p class="empty" id="empty-sh" hidden></p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="wegwerk" data-layer="roadworks" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#construction"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Wegwerkzaamheden</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <div class="chips">
+          <label class="chip"><input type="checkbox" id="rw-closed"> Alleen afsluitingen</label>
+          <label class="chip"><input type="checkbox" id="rw-planned"> Ook gepland</label>
+        </div>
+        <p class="legend">
+          <span><span class="swatch" style="--c:#dc2626"></span>weg dicht</span>
+          <span><span class="swatch" style="--c:#ea580c"></span>hinder</span>
+          <span><span class="swatch" style="--c:#7c3aed"></span>evenement</span>
+          <span><span class="swatch dashed" style="--c:#6b7280"></span>gepland</span>
+        </p>
+        <section>
+          <h2 id="rw-title">Wegwerk in de buurt</h2>
+          <ol class="list" id="list-rw"></ol>
+          <button type="button" class="more-btn" id="rw-more" hidden>Meer tonen</button>
+          <p class="empty" id="empty-rw" hidden></p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="laden" data-layer="charging" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#zap"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Laadpalen</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
         <div id="ch-controls">
           <label class="select ch-profile-select">
             Profiel
@@ -273,19 +235,116 @@
           <ol class="list" id="list-ch"></ol>
           <p class="empty" id="empty-ch" hidden></p>
         </section>
-      </div>
-
-      <!-- Statiegeld -->
-      <div data-panel="statiegeld" role="tabpanel" hidden>
-        <div class="chips">
-          <label class="chip"><input type="checkbox" id="sg-open"> Nu open</label>
         </div>
-        <section id="sg-section">
-          <h2 id="sg-title">Statiegeld in de buurt</h2>
-          <ol class="list" id="list-sg"></ol>
-          <p class="empty" id="empty-sg" hidden></p>
+      </section>
+
+      <section class="lsec" data-sec="nieuws" data-layer="news" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#newspaper"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Nieuws uit de buurt</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <section id="nw-section">
+          <h2 id="nw-title">Nieuws uit je buurt</h2>
+          <ol class="list" id="list-nw"></ol>
+          <button type="button" class="more-btn" id="nw-more" hidden>Meer tonen</button>
+          <p class="empty" id="empty-nw" hidden></p>
         </section>
-      </div>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="bekendmakingen" data-layer="announcements" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#stamp"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Bekendmakingen</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <section id="bk-section">
+          <h2 id="bk-title">Bekendmakingen</h2>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" data-bk="verkeer"> Verkeer</label>
+            <label class="chip"><input type="checkbox" data-bk="evenementen"> Evenementen</label>
+            <label class="chip"><input type="checkbox" data-bk="bouwen,vergunning"> Bouw &amp; vergunningen</label>
+            <label class="chip"><input type="checkbox" data-bk="overig"> Overig</label>
+          </div>
+          <div class="row">
+            <label class="switch" title="Verberg administratieve en kleine zaken (dakkapel, kozijn, mandaatregeling)">
+              <input type="checkbox" id="bk-important"> Alleen belangrijk</label>
+            <label class="select">Sorteren
+              <select id="bk-sort">
+                <option value="relevant">Belangrijkst</option>
+                <option value="new">Nieuwste</option>
+                <option value="near">Dichtstbij</option>
+              </select>
+            </label>
+          </div>
+          <ol class="list" id="list-bk"></ol>
+          <button type="button" class="more-btn" id="bk-more" hidden>Meer tonen</button>
+          <p class="empty" id="empty-bk" hidden></p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="112" data-layer="incidents" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#siren"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">112-meldingen</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <fieldset class="filters">
+          <legend>Diensten</legend>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" data-disc="brandweer" checked> Brandweer</label>
+            <label class="chip"><input type="checkbox" data-disc="ambulance" checked> Ambulance</label>
+            <label class="chip"><input type="checkbox" data-disc="politie" checked> Politie</label>
+            <label class="chip"><input type="checkbox" data-disc="onbekend" checked> Overig</label>
+          </div>
+          <div class="row">
+            <label class="switch"><input type="checkbox" id="only-sirene"> Met sirene</label>
+            <label class="select">
+              Periode
+              <select id="window">
+                <option value="30">30 min</option>
+                <option value="60">1 uur</option>
+                <option value="120">2 uur</option>
+                <option value="360">6 uur</option>
+                <option value="1440">24 uur</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+        <section>
+          <h2 id="near-title">In de buurt</h2>
+          <ol class="list" id="list-near"></ol>
+          <p class="empty" id="empty-near" hidden>Geen meldingen binnen je straal.</p>
+        </section>
+        <section>
+          <h2>Op de kaart</h2>
+          <ol class="list" id="list-view"></ol>
+          <p class="empty" id="empty-view" hidden>Geen meldingen in dit kaartgebied.</p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="instellingen" data-layer="settings">
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#pencil"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Instellingen</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+          <fieldset class="filters">
+            <label class="select nav-select">
+              Navigatie-app
+              <select id="nav-app"></select>
+            </label>
+            <p class="hint">Reistijden zijn een schatting op basis van de afstand. <span id="notify-state"></span></p>
+          </fieldset>
+        </div>
+      </section>
 
       <footer class="credits">
         Bronnen: alarmeringen.nl (P2000), PDOK, OpenStreetMap-bijdragers, Statiegeld Nederland, RDW,
