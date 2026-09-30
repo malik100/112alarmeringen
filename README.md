@@ -114,6 +114,30 @@ Op `http://localhost` mag de browser je locatie gewoon doorgeven (HTTPS is allee
 andere adressen): klik op de locatieknop linksonder op de kaart. De eerste keer duurt het een paar
 minuten voordat alles binnen is; laadpalen (~210 MB downloaden) het langst.
 
+### Bijwerken naar de nieuwste versie
+
+Eén keer handmatig:
+
+```bash
+./scripts/update.sh                                              # macOS/Linux
+powershell -ExecutionPolicy Bypass -File scripts\update.ps1      # Windows
+```
+
+Het script haalt de nieuwste code op (`git pull`) en bouwt en herstart de container alleen als er
+iets veranderd is. Draai je zonder Docker, dan werkt het de Python-pakketten bij en moet je de server
+zelf herstarten. Je `config.yaml`, `.env` en opgeslagen gegevens blijven staan.
+
+**Automatisch** (bijvoorbeeld elke nacht om 4:00):
+
+- **macOS/Linux**: `crontab -e` en voeg toe
+  `0 4 * * * /pad/naar/buurtradar/scripts/update.sh >> /tmp/buurtradar-update.log 2>&1`
+- **Windows**: Taakplanner → *Basistaak maken* → Dagelijks 04:00 → *Programma starten*:
+  `powershell.exe`, argumenten
+  `-ExecutionPolicy Bypass -File C:\pad\naar\buurtradar\scripts\update.ps1`
+
+Heb je zelf bestanden in het project aangepast (anders dan `config.yaml` en `.env`), dan stopt de
+update met een melding in plaats van je wijzigingen te overschrijven.
+
 ### Je locatie doorgeven
 
 Kies één of beide manieren:
