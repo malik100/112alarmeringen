@@ -50,6 +50,13 @@ announcements:          # bekendmakingen van je gemeente (overheid.nl)
   days: 30
   radius_m: 1500
 
+roadworks:              # wegwerkzaamheden en afsluitingen (NDW/Melvin)
+  enabled: true
+  refresh_minutes: 120  # ~17 MB per keer; ongewijzigd = niet opnieuw downloaden
+  ahead_days: 14        # "Ook gepland": werk dat binnen zoveel dagen begint
+  min_zoom: 12
+  list_radius_m: 3000
+
 shops:
   enabled: true
   refresh_hours: 24

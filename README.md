@@ -1,17 +1,19 @@
 # Buurtradar
 
 Een live kaart van wat er in je buurt gebeurt: supermarkten en avondwinkels, parkeerzones,
-laadpalen, statiegeld-inleverpunten, lokaal nieuws en bekendmakingen van de gemeente, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
+laadpalen, statiegeld-inleverpunten, lokaal nieuws en bekendmakingen van de gemeente, wegwerkzaamheden en afsluitingen, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
 Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 
 - **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
   "0 meldingen · 4 winkels open · €8,01/u parkeren · 5 laadpunten vrij · 8 statiegeldpunten open"
-  (met iconen). Daaronder tabbladen (Overzicht, Nieuws, Winkels,
+  (met iconen). Daaronder tabbladen (Overzicht, Nieuws, Wegwerk, Winkels,
   Parkeren, Laden, Statiegeld, 112). Het overzicht toont per onderwerp het belangrijkste op jouw plek. Is er een
   melding met sirene dichtbij, dan staat 112 bovenaan; is het rustig, dan staat 112 onderaan.
 - **Nieuws en bekendmakingen uit je buurt**: recente artikelen die je eigen of een nabije plaats
   noemen, en officiële bekendmakingen van je gemeente binnen 1,5 km (bouwaanvragen, verkeersbesluiten,
   evenementen, vergunningen), met de reactietermijn erbij.
+- **Wegwerkzaamheden en afsluitingen**: van gemeente, provincie en Rijkswaterstaat, ook in je eigen
+  straat. Afgesloten wegdelen als rode lijn op de kaart, met omleiding, periode en soort werk.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
 - **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
@@ -24,7 +26,7 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
   locatiewaarschuwing verschijnt alleen als er iets mis is.
 - **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
   `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
-- **Kaartlagen** zet je los aan en uit (meldingen, bekendmakingen, winkels, flitsers, parkeren, laadpalen, statiegeld).
+- **Kaartlagen** zet je los aan en uit (meldingen, wegwerk, bekendmakingen, winkels, flitsers, parkeren, laadpalen, statiegeld).
   Het overzicht werkt ook als een laag uit staat; een tabblad openen zet de bijbehorende laag aan.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
   met sirene (A0/A1/P1) pulseren.
@@ -54,6 +56,7 @@ Flexflitsers zitten er (nog) niet in: daar bestaat geen open databron voor.
 alarmeringen.nl (P2000) ─┐
 Nieuwsfeeds (RSS) ───────┤
 overheid.nl (bekendm.) ──┤
+NDW/Melvin (wegwerk) ────┤
 OpenStreetMap (flitsers) ├─► Buurtradar ─► SQLite
 Statiegeld Nederland ────┤        │   ▲
 RDW (parkeren) ──────────┤        │   │
@@ -346,6 +349,32 @@ bekendmakingen over. Je keuzes worden per apparaat onthouden.
   gisteren is gewijzigd.
 - Uitzetten kan met `announcements.enabled: false`.
 
+## Wegwerkzaamheden en afsluitingen
+
+Het tabblad **Wegwerk** toont werkzaamheden, afsluitingen en evenementen op de weg binnen 3 km
+(`roadworks.list_radius_m`). De bron is de open planningsfeed van NDW, gevuld vanuit
+[Melvin](https://melvin.ndw.nu/public): het landelijke systeem waarin gemeenten, provincies,
+waterschappen en Rijkswaterstaat hun werkzaamheden melden. Het gros komt van gemeenten, dus ook
+een afgesloten straat in je eigen wijk staat erin.
+
+- **Op de kaart**: rode lijn = weg dicht, oranje = hinder (bijv. versmalling, alleen voor
+  langzaam verkeer, lagere snelheid), paars = evenement, grijs gestippeld = gepland.
+- **In de lijst**: straatnaam (via PDOK, bij het punt van het werk, niet bij jouw locatie),
+  wat je merkt ("Weg dicht in beide richtingen · omleiding"), tot wanneer, en het soort werk.
+  Belangrijkste eerst: afsluiting, omleiding, nu bezig en dichtbij tellen zwaarder; werk dat al
+  maanden loopt minder.
+- **Filters**: *Alleen afsluitingen* en *Ook gepland* (werk dat binnen 14 dagen begint,
+  `roadworks.ahead_days`).
+- **Popup**: begin en eind, toelichting van de wegbeheerder en, als die er is, een link naar de
+  tekening met de omleiding.
+- Werk waarvan de wegbeheerder zelf zegt "geen gevolgen voor verkeer" laten we weg.
+  Contactgegevens van uitvoerders die soms in de omschrijving staan (naam, e-mail, telefoon) tonen we niet.
+- **Verversen**: elke 2 uur (`roadworks.refresh_minutes`). Het bestand is ~17 MB; is het niet
+  veranderd, dan wordt het niet opnieuw gedownload. Verwerken kost ~10 seconden en ~90 MB geheugen,
+  in de achtergrond.
+
+Een melding in Melvin is een planning: soms begint een werk later of is het eerder klaar.
+
 ## Nauwkeurigheid van de locatie
 
 P2000-berichten bevatten geen coördinaten. De locatie wordt bepaald uit postcode, straat en
@@ -400,6 +429,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
 | `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
 | `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen, lokaal nieuws herkennen |
+| `app/sirene/sources/roadworks.py` | wegwerkzaamheden en afsluitingen (NDW/Melvin, DATEX II) |
 | `app/sirene/sources/bekendmakingen.py` | bekendmakingen (overheid.nl) en plaatsen rond je locatie (PDOK) |
 | `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
@@ -421,6 +451,7 @@ installaties en hun gegevens werken.
 - Bekendmakingen: [overheid.nl](https://repository.overheid.nl/sru) (open data, officiële publicaties).
 - Winkels en markten: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Laadpalen: [NDW open data](https://opendata.ndw.nu) (OCPI).
+- Wegwerkzaamheden: [NDW open data](https://opendata.ndw.nu), planningsfeed uit Melvin (DATEX II).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Iconen: [Lucide](https://lucide.dev), ISC-licentie, zie `app/sirene/static/vendor/lucide/LICENSE`.

@@ -101,6 +101,16 @@ DEFAULTS: dict[str, Any] = {
         # Alleen bekendmakingen binnen deze straal van je locatie.
         "radius_m": 1500,
     },
+    "roadworks": {
+        # Wegwerkzaamheden, afsluitingen en evenementen op de weg (NDW/Melvin).
+        "enabled": True,
+        "url": "",  # leeg = openbare planningsfeed van NDW
+        # ~17 MB per keer; ongewijzigd bestand wordt overgeslagen (ETag).
+        "refresh_minutes": 120,
+        "ahead_days": 14,       # ook geplande werken die binnen zoveel dagen beginnen
+        "min_zoom": 12,
+        "list_radius_m": 3000,
+    },
     "shops": {
         "enabled": True,
         "refresh_hours": 24,

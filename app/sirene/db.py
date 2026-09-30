@@ -111,6 +111,16 @@ CREATE TABLE IF NOT EXISTS announcements (
 );
 CREATE INDEX IF NOT EXISTS announcements_gemeente ON announcements (gemeente, ts);
 
+CREATE TABLE IF NOT EXISTS roadworks (
+    id    TEXT PRIMARY KEY,
+    lat   REAL NOT NULL,
+    lon   REAL NOT NULL,
+    start REAL,
+    end   REAL,
+    data  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS roadworks_lat_lon ON roadworks (lat, lon);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -391,6 +401,30 @@ class Database:
     def purge_announcements(self, older_than_ts: float) -> None:
         with self.conn:
             self.conn.execute("DELETE FROM announcements WHERE ts < ?", (older_than_ts,))
+
+    # --- wegwerkzaamheden ------------------------------------------------
+
+    def replace_roadworks(self, works: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM roadworks")
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO roadworks (id, lat, lon, start, end, data) VALUES (?, ?, ?, ?, ?, ?)",
+                [(w["id"], w["lat"], w["lon"], w["start"], w["end"], json.dumps(w, ensure_ascii=False))
+                 for w in works],
+            )
+
+    def roadworks_in_bbox(self, south: float, west: float, north: float, east: float,
+                          until_ts: float, now: float) -> list[dict[str, Any]]:
+        """Werken in een gebied die nog niet voorbij zijn en vóór `until_ts` beginnen."""
+        rows = self.conn.execute(
+            "SELECT data FROM roadworks WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? "
+            "AND (end IS NULL OR end >= ?) AND (start IS NULL OR start <= ?)",
+            (south, north, west, east, now, until_ts),
+        ).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def roadworks_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM roadworks").fetchone()[0]
 
     # --- meta -------------------------------------------------------------
 

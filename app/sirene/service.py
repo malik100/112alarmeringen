@@ -22,6 +22,8 @@ from .parser import parse_message
 from .sources.p2000_rss import FeedItem, fetch_feed
 from .sources.bekendmakingen import fetch_announcements, fetch_area
 from .sources.bekendmakingen import relevance as announcement_relevance
+from .sources.roadworks import DEFAULT_URL as ROADWORKS_URL
+from .sources.roadworks import fetch_roadworks, fetch_street
 from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import fetch_zones
 from .sources.shops import fetch_shops, is_late, same_store
@@ -69,6 +71,7 @@ class Service:
             "news": {"last_ok": None, "last_error": None},
             "charging": {"last_ok": None, "last_error": None, "count": 0},
             "shops": {"last_ok": None, "last_error": None, "count": 0},
+            "roadworks": {"last_ok": None, "last_error": None, "count": 0},
             "announcements": {"last_ok": None, "last_error": None, "gemeenten": []},
             "charging_status": {"last_ok": None, "last_error": None},
             "homeassistant": {"last_ok": None, "last_error": None},
@@ -461,6 +464,39 @@ class Service:
 
     # --- laadpalen ---------------------------------------------------------
 
+    async def refresh_roadworks_once(self) -> bool:
+        rcfg = self.cfg["roadworks"]
+        etag = self.db.meta_get("roadworks_etag") if self.db.roadworks_count() else None
+        try:
+            works, etag = await fetch_roadworks(self.client, rcfg["url"] or ROADWORKS_URL,
+                                                rcfg["ahead_days"], etag)
+        except (httpx.HTTPError, ValueError, OSError, EOFError) as exc:
+            log.warning("Wegwerkzaamheden ophalen mislukt: %s", exc)
+            self.status["roadworks"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        if works is not None:
+            self.db.replace_roadworks(works)
+            self.db.meta_set("roadworks_etag", etag)
+            self.status["roadworks"]["count"] = len(works)
+            self.bus.publish("roadworks", {"count": len(works)})
+        self.db.meta_set("roadworks_updated", time.time())
+        self.status["roadworks"]["last_ok"] = time.time()
+        return True
+
+    async def street_at(self, lat: float, lon: float) -> str | None:
+        """Straatnaam bij een punt (gecachet); None als PDOK niets vindt of niet bereikbaar is."""
+        key = f"straat:{lat:.4f},{lon:.4f}"
+        row = self.db.geocache_get(key)
+        if row is not None:
+            return row["label"]
+        try:
+            label = await fetch_street(self.client, lat, lon)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.debug("Straatnaam bij %s mislukt: %s", key, exc)
+            return None
+        self.db.geocache_put(key, lat, lon, "straat" if label else None, label)
+        return label
+
     async def refresh_charging_once(self) -> bool:
         try:
             stations = await fetch_stations(self.client)
@@ -531,6 +567,11 @@ class Service:
             # gebeurt hooguit elke `refresh_minutes`.
             self._tasks.append(asyncio.create_task(
                 self._loop("bekendmakingen", 15 * 60, self.refresh_announcements_once)))
+        if self.cfg["roadworks"]["enabled"]:
+            self.status["roadworks"]["count"] = self.db.roadworks_count()
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "roadworks", self.cfg["roadworks"]["refresh_minutes"] * 60,
+                self.refresh_roadworks_once)))
         if self.cfg["shops"]["enabled"]:
             self.status["shops"]["count"] = self.db.shops_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(

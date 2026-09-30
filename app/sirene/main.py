@@ -20,6 +20,7 @@ from .location import Location
 from .service import Service
 from .geo import haversine_m
 from .sources.charging import matches as charging_matches
+from .sources.roadworks import is_active, relevance as roadwork_relevance
 from .sources.npr import contains
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -28,6 +29,8 @@ STATIEGELD_LIMIT = 2000
 PARKING_LIMIT = 800
 CHARGING_LIMIT = 1500
 SHOPS_LIMIT = 2000
+ROADWORKS_LIMIT = 1500
+ROADWORKS_STREETS = 25   # zoveel werken per lijst krijgen een straatnaam (PDOK, gecachet)
 PARKING_KINDS = {"betaald", "blauw", "vergunning", "garage"}
 
 logging.basicConfig(
@@ -69,6 +72,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "parking": {k: cfg["parking"][k] for k in ("enabled", "min_zoom")},
             "charging": {k: cfg["charging"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "shops": {k: cfg["shops"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
+            "roadworks": {k: cfg["roadworks"][k] for k in ("enabled", "min_zoom", "list_radius_m", "ahead_days")},
             "local": {"news": cfg["news"]["enabled"],
                       "announcements": cfg["announcements"]["enabled"],
                       "radius_m": cfg["announcements"]["radius_m"],
@@ -155,6 +159,43 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         if east - west > 1 or north - south > 1:
             raise HTTPException(422, "Gebied te groot: zoom verder in")
         return svc.db.shops_in_bbox(south, west, north, east, SHOPS_LIMIT)
+
+    @app.get("/api/roadworks")
+    async def get_roadworks(bbox: str = Query(description="west,zuid,oost,noord in graden"),
+                            planned: bool = Query(default=False, description="ook geplande werken"),
+                            near: str | None = Query(default=None, description="lat,lon: afstand, "
+                                                     "relevantie en straatnaam, belangrijkste eerst"),
+                            limit: int = Query(default=ROADWORKS_LIMIT, ge=1, le=ROADWORKS_LIMIT)):
+        """Wegwerkzaamheden, afsluitingen en evenementen op de weg in een gebied."""
+        rcfg = svc.cfg["roadworks"]
+        if not rcfg["enabled"]:
+            return []
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > 1 or north - south > 1:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        now = time.time()
+        until = now + rcfg["ahead_days"] * 86400 if planned else now
+        works = svc.db.roadworks_in_bbox(south, west, north, east, until, now)
+        for w in works:
+            w["active"] = is_active(w, now)
+        if near:
+            try:
+                lat, lon = (float(v) for v in near.split(","))
+            except ValueError:
+                raise HTTPException(422, "near moet 'lat,lon' zijn")
+            for w in works:
+                w["distance_m"] = round(haversine_m(lat, lon, w["lat"], w["lon"]))
+                w["relevance"] = roadwork_relevance(w, w["distance_m"], rcfg["list_radius_m"], now)
+            works.sort(key=lambda w: (-w["relevance"], w["distance_m"]))
+            works = works[:limit]
+            top = works[:ROADWORKS_STREETS]
+            streets = await asyncio.gather(*(svc.street_at(w["lat"], w["lon"]) for w in top))
+            for w, street in zip(top, streets):
+                w["street"] = street
+        return works[:limit]
 
     @app.get("/api/charging")
     def get_charging(bbox: str = Query(description="west,zuid,oost,noord in graden"),
