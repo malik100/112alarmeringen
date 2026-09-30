@@ -49,3 +49,12 @@ def test_frontend_is_revalidated_after_updates(client):
     etag = client.get("/static/style.css").headers["etag"]
     assert client.get("/static/style.css", headers={"If-None-Match": etag}).status_code == 304
     assert "cache-control" not in client.get("/static/vendor/leaflet/leaflet.js").headers
+
+
+def test_proef_page(client):
+    """Proefversie met MapLibre: pagina, lokaal meegeleverde bibliotheek en de kaartstijlen."""
+    r = client.get("/proef")
+    assert r.status_code == 200 and "maplibre-gl.js" in r.text and r.headers["cache-control"] == "no-cache"
+    assert client.get("/static/vendor/maplibre/maplibre-gl.js").status_code == 200
+    m = client.get("/api/config").json()["map"]
+    assert m["vector_style_light"].startswith("https://") and m["vector_style_dark"].startswith("https://")

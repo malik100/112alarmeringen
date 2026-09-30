@@ -80,6 +80,9 @@ map:
   # niet je locatie of de incidenten. Later kun je hier een eigen tegelserver invullen.
   tile_url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
   attribution: "&copy; OpenStreetMap-bijdragers"
+  # Proefversie (/proef) met MapLibre: vectorkaart-stijlen voor licht en donker.
+  vector_style_light: https://tiles.openfreemap.org/styles/positron
+  vector_style_dark: https://tiles.openfreemap.org/styles/dark
   default_window_minutes: 120
 
 notifications:
