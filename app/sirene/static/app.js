@@ -1771,7 +1771,49 @@ function setLayer(layer, on) {
   if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
   if (layer === "news") { state.nw.show = on; store.set("nwShow", on ? "1" : "0"); }
   // Rechts staat de inhoud van precies de lagen die links aanstaan.
-  renderSections();
+  renderSections();  renderZoomHint();
+}
+
+// Lagen die pas vanaf een bepaald zoomniveau getekend worden (anders te veel/te zwaar).
+const ZOOM_LAYERS = [
+  { layer: "parking", input: "pk-show", name: "parkeerzones", on: () => state.pk.show, zoom: () => state.config.parking.min_zoom, enabled: () => state.config.parking.enabled },
+  { layer: "statiegeld", input: "sg-show", name: "statiegeldpunten", on: () => state.sg.show, zoom: () => state.config.statiegeld.min_zoom, enabled: () => state.config.statiegeld.enabled },
+  { layer: "shops", input: "sh-show", name: "winkels", on: () => state.sh.show, zoom: () => state.config.shops.min_zoom, enabled: () => state.config.shops.enabled },
+  { layer: "roadworks", input: "rw-show", name: "wegwerk", on: () => state.rw.show, zoom: () => state.config.roadworks.min_zoom, enabled: () => state.config.roadworks.enabled },
+  { layer: "cams", input: "layer-cams", name: "flitsers", on: () => state.showCams, zoom: () => CAM_MIN_ZOOM, enabled: () => state.config.speedcams_enabled },
+  { layer: "charging", input: "ch-show", name: "laadpalen", on: () => state.ch.show, zoom: () => state.config.charging.min_zoom, enabled: () => state.config.charging.enabled },
+];
+
+function joinNames(names) {
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} en ${names[names.length - 1]}` : names[0];
+}
+
+/** Melding "zoom in om … te zien" met één knop die precies ver genoeg inzoomt. */
+function renderZoomHint() {
+  if (!state.config) return;
+  const z = map.getZoom();
+  const hidden = ZOOM_LAYERS.filter((l) => l.enabled() && l.on() && z < l.zoom());
+  for (const l of ZOOM_LAYERS) {
+    const row = $(l.input)?.closest(".layer-row");
+    if (row) row.classList.toggle("needs-zoom", l.enabled() && l.on() && z < l.zoom());
+  }
+  $("zoom-hint").hidden = !hidden.length;
+  if (!hidden.length) return;
+  $("zoom-hint-text").textContent = `Zoom in om ${joinNames(hidden.map((l) => l.name))} te zien`;
+  // Eén klik: tot het laagste niveau waarop de eerste verborgen laag verschijnt.
+  $("zoom-hint-btn").onclick = () => map.setZoom(Math.min(...hidden.map((l) => l.zoom())));
+}
+
+function initZoomHelp() {
+  for (const l of ZOOM_LAYERS) {
+    // Wie een laag aanzet terwijl hij te ver is uitgezoomd, wil hem meteen zien.
+    $(l.input)?.addEventListener("change", (e) => {
+      if (e.target.checked && map.getZoom() < l.zoom()) map.setZoom(l.zoom());
+      renderZoomHint();
+    });
+  }
+  map.on("zoomend", renderZoomHint);
+  renderZoomHint();
 }
 
 // Rechterpaneel: één sectie per ingeschakelde kaartlaag, in dezelfde volgorde als links.
@@ -2108,6 +2150,7 @@ async function init() {
   initLocal();
   initRoadworks();
   initSections();
+  initZoomHelp();
   connectEvents();
 
   addLocateControl();

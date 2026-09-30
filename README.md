@@ -219,7 +219,10 @@ zo'n 5.900 zones opgebouwd.
   capaciteit en maximale hoogte (garages).
 - *Parkeren op jouw plek* toont de zones waarin je locatie ligt, met wat er nu geldt en tot wanneer.
 - De zone waar jij staat heeft een dikke rand. Wijs een zone aan met de muis voor naam en tarief.
-- Vlakken verschijnen vanaf zoomniveau 13 (instelbaar met `parking.min_zoom`).
+- Vlakken verschijnen vanaf zoomniveau 13 (instelbaar met `parking.min_zoom`). Ben je verder
+  uitgezoomd, dan staat bovenaan "Zoom in om parkeerzones te zien" met een knop **Inzoomen**, en
+  zet je de laag aan, dan zoomt de kaart vanzelf ver genoeg in. Dit geldt voor alle lagen met
+  een minimaal zoomniveau (winkels, laadpalen, statiegeld, wegwerk, flitsers).
 - Uurprijzen komen uit de tariefdelen: bijvoorbeeld €0,134 per minuut is €8,05 per uur. Tarieven
   die in delen oplopen worden als "eerste 1 uur …; daarna …" getoond.
 
