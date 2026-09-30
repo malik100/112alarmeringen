@@ -47,6 +47,10 @@
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#shopping-cart"/></svg></span><span class="layer-name">Supermarkten &amp; avondwinkels</span>
         <input type="checkbox" class="toggle" id="sh-show">
       </label>
+      <label class="layer-row" id="fu-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#fuel"/></svg></span><span class="layer-name">Tankstations</span>
+        <input type="checkbox" class="toggle" id="fu-show">
+      </label>
       <label class="layer-row" id="rw-show-chip" hidden>
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#construction"/></svg></span><span class="layer-name">Wegwerkzaamheden</span>
         <input type="checkbox" class="toggle" id="rw-show">
@@ -175,6 +179,32 @@
           <h2 id="sh-title">Winkels in de buurt</h2>
           <ol class="list" id="list-sh"></ol>
           <p class="empty" id="empty-sh" hidden></p>
+        </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="tanken" data-layer="fuel" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#fuel"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Tankstations</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+        <div class="chips">
+          <label class="chip"><input type="checkbox" data-fu-shop="ja" checked> Met winkel</label>
+          <label class="chip"><input type="checkbox" data-fu-shop="nee" checked> Zonder winkel</label>
+          <label class="chip"><input type="checkbox" data-fu-shop="onbekend" checked> Onbekend</label>
+          <label class="chip"><input type="checkbox" id="fu-open"> Alleen nu open</label>
+        </div>
+        <p class="legend">
+          <span><span class="fu-sign mini shop"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#fuel"/></svg></span> met winkel</span>
+          <span><span class="fu-sign mini noshop"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#fuel"/></svg></span> zonder winkel (onbemand)</span>
+          <span><span class="fu-sign mini unknown"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#fuel"/></svg></span> onbekend</span>
+        </p>
+        <section>
+          <h2 id="fu-title">Tankstations in de buurt</h2>
+          <ol class="list" id="list-fu"></ol>
+          <p class="empty" id="empty-fu" hidden></p>
         </section>
         </div>
       </section>

@@ -31,6 +31,7 @@ PARKING_LIMIT = 800
 METER_NEAR_M = 200  # "waarschijnlijk hier": parkeerautomaat van een zone zonder kaartvlak
 CHARGING_LIMIT = 1500
 SHOPS_LIMIT = 2000
+FUEL_LIMIT = 2000
 ROADWORKS_LIMIT = 1500
 ROADWORKS_STREETS = 25   # zoveel werken per lijst krijgen een straatnaam (PDOK, gecachet)
 PARKING_KINDS = {"betaald", "blauw", "vergunning", "garage"}
@@ -89,6 +90,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "parking": {k: cfg["parking"][k] for k in ("enabled", "min_zoom")},
             "charging": {k: cfg["charging"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "shops": {k: cfg["shops"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
+            "fuel": {k: cfg["fuel"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "roadworks": {k: cfg["roadworks"][k] for k in ("enabled", "min_zoom", "list_radius_m", "ahead_days")},
             "ov": {**{k: cfg["ov"][k] for k in ("enabled", "stops_min_zoom", "lines_min_zoom",
                                                  "vehicles_min_zoom", "list_radius_m")},
@@ -200,6 +202,19 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
                                                STATIEGELD_LIMIT * 2)
             link_statiegeld(shops, points)
         return shops
+
+    @app.get("/api/fuel")
+    def get_fuel(bbox: str = Query(description="west,zuid,oost,noord in graden")):
+        """Tankstations in een gebied, met of zonder winkel."""
+        if not svc.cfg["fuel"]["enabled"]:
+            return []
+        try:
+            west, south, east, north = (float(v) for v in bbox.split(","))
+        except ValueError:
+            raise HTTPException(422, "bbox moet 'west,zuid,oost,noord' zijn")
+        if east - west > 1.5 or north - south > 1.5:
+            raise HTTPException(422, "Gebied te groot: zoom verder in")
+        return svc.db.fuel_in_bbox(south, west, north, east, FUEL_LIMIT)
 
     @app.get("/api/roadworks")
     async def get_roadworks(bbox: str = Query(description="west,zuid,oost,noord in graden"),

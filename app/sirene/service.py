@@ -35,6 +35,7 @@ from .sources.gtfs import DEFAULT_URL as GTFS_URL
 from .sources.gtfs import download_gtfs, import_gtfs
 from .sources.gtfs_rt import DEFAULT_URL as OV_REALTIME_URL
 from .sources.gtfs_rt import fetch_alerts, fetch_trip_updates, fetch_vehicles
+from .sources.fuel import fetch_fuel
 from .sources.shops import fetch_shops, is_late, same_store
 from .sources.speedcams import fetch_speedcams
 from .sources.statiegeld import DEFAULT_URL as STATIEGELD_URL
@@ -81,6 +82,7 @@ class Service:
             "news": {"last_ok": None, "last_error": None},
             "charging": {"last_ok": None, "last_error": None, "count": 0},
             "shops": {"last_ok": None, "last_error": None, "count": 0},
+            "fuel": {"last_ok": None, "last_error": None, "count": 0},
             "roadworks": {"last_ok": None, "last_error": None, "count": 0},
             "ov": {"last_ok": None, "last_error": None, "count": 0, "importing": False},
             "ov_realtime": {"last_ok": None, "last_error": None},
@@ -481,6 +483,18 @@ class Service:
         self.bus.publish("shops", {"count": len(shops)})
         return True
 
+    async def refresh_fuel_once(self) -> bool:
+        try:
+            stations = await fetch_fuel(self.client, self.cfg["speedcams"]["overpass_urls"])
+        except RuntimeError as exc:
+            self.status["fuel"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        self.db.replace_fuel(stations)
+        self.db.meta_set("fuel_updated", time.time())
+        self.status["fuel"].update(last_ok=time.time(), count=len(stations))
+        self.bus.publish("fuel", {"count": len(stations)})
+        return True
+
     # --- laadpalen ---------------------------------------------------------
 
     async def refresh_roadworks_once(self) -> bool:
@@ -675,6 +689,10 @@ class Service:
             self.status["shops"]["count"] = self.db.shops_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "shops", self.cfg["shops"]["refresh_hours"] * 3600, self.refresh_shops_once)))
+        if self.cfg["fuel"]["enabled"]:
+            self.status["fuel"]["count"] = self.db.fuel_count()
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "fuel", self.cfg["fuel"]["refresh_hours"] * 3600, self.refresh_fuel_once)))
         if self.cfg["charging"]["enabled"]:
             self.status["charging"]["count"] = self.db.charging_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(

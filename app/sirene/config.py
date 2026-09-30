@@ -119,6 +119,15 @@ DEFAULTS: dict[str, Any] = {
         # Straal voor de lijst "boodschappen in de buurt".
         "list_radius_m": 1500,
     },
+    "fuel": {
+        # Tankstations (OpenStreetMap), met of zonder winkel.
+        "enabled": True,
+        "refresh_hours": 24,
+        # Pas vanaf dit zoomniveau tankstations op de kaart tekenen (er zijn er ~4.100).
+        "min_zoom": 12,
+        # Straal voor de lijst "tankstations in de buurt".
+        "list_radius_m": 5000,
+    },
     "charging": {
         "enabled": True,
         # Details (stekkers, tarieven, toegang) één keer per dag; beschikbaarheid vaker.

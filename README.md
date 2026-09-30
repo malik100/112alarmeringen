@@ -16,6 +16,8 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Openbaar vervoer**: haltes met live vertrektijden (vertraging, "rijdt niet", spoorwijziging),
   alle lijnen op de kaart en bussen, trams en metro's die nu rijden. Van alle vervoerders in
   Nederland, uit de open data van het NDOV Loket via OVapi.
+- **Tankstations**, met of zonder winkel (onbemand), met openingstijden, brandstoffen en extra's
+  zoals wasstraat of bandenlucht.
 - **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
   en "Open na 22:00", en een label "LAAT OPEN".
 - **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
@@ -29,7 +31,7 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
   `app/sirene/static/icons.svg`. Eigen favicon en iPhone-icoon voor "Zet op beginscherm".
 - **Twee panelen**: links *Kaartlagen* (per laag een schakelaar: parkeren, statiegeld, winkels,
-  wegwerk, openbaar vervoer, flitsers met roodlicht/traject apart, laadpalen, nieuws, bekendmakingen, 112), rechts
+  tankstations, wegwerk, openbaar vervoer, flitsers met roodlicht/traject apart, laadpalen, nieuws, bekendmakingen, 112), rechts
   de inhoud van precies de lagen die aanstaan, in dezelfde volgorde. Elke sectie heeft een kop
   met een korte samenvatting ("Parkeren · Nu €5,37 per uur") en klap je apart in. Beide panelen
   klap je ook helemaal in; de app onthoudt alles per apparaat. Op de telefoon is *Kaartlagen*
@@ -283,6 +285,25 @@ avondwinkels en toko's, en ~270 markten.
 - **Fouten verbeteren:** de popup linkt naar de winkel op OpenStreetMap. Een verbetering daar komt
   na de volgende dagelijkse verversing ook in Buurtradar.
 
+## Tankstations
+
+De laag **Tankstations** toont alle ~4.100 tankstations in Nederland uit OpenStreetMap (vanaf
+zoom 12), met rechts de dichtstbijzijnde binnen 5 km (`fuel.list_radius_m`).
+
+- **Met winkel** (rood met een tasje): volgens OpenStreetMap, of er staat een winkel of kiosk op
+  het terrein (binnen 60 m, bijv. "SPAR express", "AH to go", "Shell Select"). Dat geldt nu voor
+  ongeveer 1.200 stations.
+- **Zonder winkel** (rode rand): onbemande stations, zoals TinQ, Tango en de "Express"-stations
+  van Esso, Shell, BP, TotalEnergies, AVIA, OK en Tamoil, of stations die in OSM als automaat of
+  zonder winkel staan. Ongeveer 1.500 stations.
+- **Onbekend** (grijs gestippeld): OpenStreetMap zegt er niets over. Dat is een derde van de
+  stations; we gokken liever niet. In de popup staat steeds waarop het oordeel is gebaseerd.
+- **Filters**: met winkel, zonder winkel, onbekend, en *Alleen nu open*.
+- **Popup**: openingstijden, brandstoffen (Euro 95, Diesel, LPG, CNG, waterstof, AdBlue, …) en
+  extra's (vrachtwagens, wasstraat, bandenlucht, toilet), plus *Route* en *Aanpassen* op OpenStreetMap.
+- **Prijzen** staan er niet bij: daar is in Nederland geen open bron voor.
+- **Verversen**: één keer per dag (`fuel.refresh_hours`).
+
 ## Laadpalen
 
 Bron: [NDW open data](https://opendata.ndw.nu): alle ~79.000 openbare laadlocaties in Nederland.
@@ -527,6 +548,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/sources/roadworks.py` | wegwerkzaamheden en afsluitingen (NDW/Melvin, DATEX II) |
 | `app/sirene/sources/bekendmakingen.py` | bekendmakingen (overheid.nl) en plaatsen rond je locatie (PDOK) |
 | `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
+| `app/sirene/sources/fuel.py` | tankstations (OSM), met of zonder winkel             |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
 | `app/sirene/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |
 | `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
@@ -548,7 +570,7 @@ installaties en hun gegevens werken.
 - Statiegeld-inleverpunten: [Statiegeld Nederland](https://www.statiegeldnederland.nl/locatiewijzer).
 - Nieuws: RSS-feeds van de genoemde omroepen en sites; we tonen alleen titel, bron en link.
 - Bekendmakingen: [overheid.nl](https://repository.overheid.nl/sru) (open data, officiële publicaties).
-- Winkels en markten: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
+- Winkels, markten en tankstations: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Laadpalen: [NDW open data](https://opendata.ndw.nu) (OCPI).
 - Wegwerkzaamheden: [NDW open data](https://opendata.ndw.nu), planningsfeed uit Melvin (DATEX II).
 - Openbaar vervoer: [OVapi](https://gtfs.ovapi.nl) (GTFS en GTFS-realtime), op basis van de open

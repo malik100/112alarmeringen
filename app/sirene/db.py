@@ -101,6 +101,14 @@ CREATE TABLE IF NOT EXISTS shops (
 );
 CREATE INDEX IF NOT EXISTS shops_lat_lon ON shops (lat, lon);
 
+CREATE TABLE IF NOT EXISTS fuel (
+    id   TEXT PRIMARY KEY,
+    lat  REAL NOT NULL,
+    lon  REAL NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fuel_lat_lon ON fuel (lat, lon);
+
 CREATE TABLE IF NOT EXISTS announcements (
     id       TEXT PRIMARY KEY,
     gemeente TEXT NOT NULL,
@@ -365,6 +373,27 @@ class Database:
 
     def shops_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM shops").fetchone()[0]
+
+    # --- tankstations ------------------------------------------------------
+
+    def replace_fuel(self, stations: list[dict[str, Any]]) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM fuel")
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO fuel (id, lat, lon, data) VALUES (?, ?, ?, ?)",
+                [(s["id"], s["lat"], s["lon"], json.dumps(s, ensure_ascii=False)) for s in stations],
+            )
+
+    def fuel_in_bbox(self, south: float, west: float, north: float, east: float,
+                     limit: int) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT data FROM fuel WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT ?",
+            (south, north, west, east, limit),
+        ).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def fuel_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM fuel").fetchone()[0]
 
     # --- lokaal nieuws ----------------------------------------------------
 

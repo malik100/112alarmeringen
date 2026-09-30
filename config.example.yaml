@@ -72,6 +72,12 @@ shops:
   min_zoom: 13
   list_radius_m: 1500   # straal voor de lijst "boodschappen in de buurt"
 
+fuel:                   # tankstations (OSM), met of zonder winkel
+  enabled: true
+  refresh_hours: 24
+  min_zoom: 12
+  list_radius_m: 5000   # straal voor de lijst "tankstations in de buurt"
+
 charging:
   enabled: true
   refresh_hours: 24         # details: stekkers, tarieven, toegang

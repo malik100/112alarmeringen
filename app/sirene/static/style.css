@@ -735,3 +735,31 @@ fieldset { min-width: 0; }
 .ov-veh.late { outline: 2px solid var(--err); }
 .item.ov-halte .ov-deps { grid-column: 2 / span 2; }
 .item.ov-halte .ov-dep { padding: 3px 0; }
+
+/* --- tankstations --- */
+.fu-marker { background: none; border: 0; }
+.fu-sign {
+  position: relative; width: 24px; height: 24px; border-radius: 6px;
+  display: grid; place-items: center; box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  --c: #b91c1c;
+}
+.fu-sign .i { width: 14px; height: 14px; }
+.fu-sign.shop { background: var(--c); color: #fff; border: 2px solid #fff; }
+.fu-sign.noshop { background: #fff; color: var(--c); border: 2px solid var(--c); }
+.fu-sign.unknown { background: #fff; color: #6b7280; border: 2px dashed #9ca3af; }
+.fu-sign.closed { opacity: .5; }
+.fu-sign.mini { display: inline-grid; width: 16px; height: 16px; border-radius: 4px; border-width: 1.5px; vertical-align: -3px; margin-right: 2px; box-shadow: none; }
+.fu-sign.mini .i { width: 10px; height: 10px; }
+.fu-badge {
+  position: absolute; right: -7px; top: -7px; width: 15px; height: 15px; border-radius: 50%;
+  display: grid; place-items: center; background: #fff; color: #b91c1c; border: 1.5px solid #b91c1c;
+}
+.fu-badge .i { width: 9px; height: 9px; }
+.fu-shop { font-weight: 600; }
+.fu-shop .i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 3px; }
+.fu-shop.shop { color: #b91c1c; }
+.fu-shop.unknown { color: var(--fg-muted); font-weight: 400; }
+.item.fuel .bar { background: #b91c1c; }
+.item.fuel .bar.noshop { background: #fca5a5; }
+.item.fuel .bar.unknown { background: var(--border); }
+@media (prefers-color-scheme: dark) { .fu-shop.shop { color: #f87171; } }
