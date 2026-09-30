@@ -70,7 +70,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         """
         response = await call_next(request)
         path = request.url.path
-        if path in ("/", "/proef") or (path.startswith("/static/") and "/vendor/" not in path):
+        if path == "/" or (path.startswith("/static/") and "/vendor/" not in path):
             response.headers["Cache-Control"] = "no-cache"
         return response
 
@@ -303,11 +303,6 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
     @app.get("/")
     def index():
         return FileResponse(STATIC_DIR / "index.html")
-
-    @app.get("/proef")
-    def proef():
-        """Proefversie van de kaart met MapLibre (vectorkaart, draaien, kantelen)."""
-        return FileResponse(STATIC_DIR / "proef.html")
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

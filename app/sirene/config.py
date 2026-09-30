@@ -132,10 +132,6 @@ DEFAULTS: dict[str, Any] = {
     "map": {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",
-        # Proefversie met MapLibre (/proef): vectorkaart, licht en donker. OpenFreeMap is gratis,
-        # zonder account; later kan hier een eigen tegelserver staan.
-        "vector_style_light": "https://tiles.openfreemap.org/styles/positron",
-        "vector_style_dark": "https://tiles.openfreemap.org/styles/dark",
         "default_window_minutes": 120,
     },
     "notifications": {

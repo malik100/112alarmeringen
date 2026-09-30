@@ -427,26 +427,6 @@ een afgesloten straat in je eigen wijk staat erin.
 
 Een melding in Melvin is een planning: soms begint een werk later of is het eerder klaar.
 
-## Proefversie: nieuwe kaart met MapLibre
-
-Op `/proef` (link onder *Instellingen*) staat een proefversie van de kaart met
-[MapLibre GL JS](https://maplibre.org) (BSD-licentie, lokaal meegeleverd in
-`app/sirene/static/vendor/maplibre`). Verschil met de huidige kaart:
-
-- **Vectorkaart**: scherpe tekst en lijnen op elk zoomniveau, vloeiend zoomen.
-- **Draaien en kantelen**: rechtermuisknop slepen of twee vingers draaien; Ctrl + slepen of twee
-  vingers omhoog om te kantelen. Het kompas zet het noorden weer boven.
-- **Donkere kaart** die automatisch meeschakelt met de donkere modus van je systeem.
-- De videokaart tekent alles, dus ook veel parkeerzones blijven vlot.
-- Zelfde gegevens en principes: parkeerzones in tariefkleur (en automaten), wegwerk, flitsers,
-  winkels en statiegeld met één icoon per winkel, namen vanaf zoomniveau 16, zoomhulp.
-- **Kaarttegels** komen van [OpenFreeMap](https://openfreemap.org): gratis, zonder account of
-  sleutel. De tegelserver ziet welk kaartgebied je bekijkt, net als nu bij OpenStreetMap. Een eigen
-  stijl of tegelserver stel je in met `map.vector_style_light` en `map.vector_style_dark`.
-
-Nog niet in de proefversie: het inhoudspaneel rechts (lijsten, samenvattingen), laadpalen,
-bekendmakingen en 112-meldingen. Die volgen als de proef bevalt.
-
 ## Nauwkeurigheid van de locatie
 
 P2000-berichten bevatten geen coördinaten. De locatie wordt bepaald uit postcode, straat en
