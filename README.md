@@ -635,6 +635,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/service.py`    | ophalen, opslaan, live doorsturen, meldingen            |
 | `app/sirene/main.py`       | API en webserver                                        |
 | `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
+| `app/sirene/static/app/`   | de kaart per onderdeel: `00-core.js` (state, kaart, hulpfuncties), daarna één bestand per laag (`21-parkeren.js`, `31-ov.js`, …), `40-overzicht.js` (lagen, presets, secties), `50-locatie.js` (zoeken, locatie, status) en `90-start.js`; geladen in die volgorde als gewone scripts |
 | `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
 | `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen, lokaal nieuws herkennen |
 | `app/sirene/sources/roadworks.py` | wegwerkzaamheden en afsluitingen (NDW/Melvin, DATEX II) |

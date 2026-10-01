@@ -42,7 +42,7 @@ def test_invalid_location_rejected(client):
 
 def test_frontend_is_revalidated_after_updates(client):
     """Na een update mag de browser geen oude style.css/app.js bij een nieuwe pagina gebruiken."""
-    for path in ("/", "/static/style.css", "/static/app.js", "/static/icons.svg"):
+    for path in ("/", "/static/style.css", "/static/app/00-core.js", "/static/icons.svg"):
         r = client.get(path)
         assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", path
     # Ongewijzigd bestand: alleen een korte controle, geen nieuwe download.
