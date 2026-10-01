@@ -17,6 +17,7 @@ const state = {
   config: null,
   location: null,
   home: null,
+  centeredLive: false,   // al gecentreerd op een live locatie (telefoon/browser) deze sessie?
   incidents: new Map(),
   cams: [],
   windowMin: 120,
@@ -128,18 +129,10 @@ L.Popup.mergeOptions({
 });
 const map = L.map("map", { zoomControl: false, attributionControl: true }).setView(NL_CENTER, 8);
 
-/**
- * Standaardzoom rond je plek: de hele straal (radius_m) in beeld, en alle lagen zichtbaar.
- * Op een pc past 1 km straal bij zoom 15 (2,3 km breed in het vrije deel van de kaart); dat is ook het
- * niveau waarop haltes, AED's en lijnnummers verschijnen. Op een telefoon is het beeld maar ~1,1 km
- * breed bij zoom 15, dus daar één stap verder uit (zoom 14), anders valt de straal buiten beeld.
- * Een grotere straal zoomt verder uit (2 km -> 14 op de pc), een kleinere verder in; nooit boven 16.
- */
+/** Standaardzoom bij het openen en bij de locatieknop (map.default_zoom in config.yaml, standaard 15). */
 function homeZoom() {
-  const radius = (state.config && state.config.radius_m) || 1000;
-  const base = 15 - Math.log2(radius / 1000);
-  const phone = window.matchMedia("(max-width: 720px)").matches;
-  return Math.max(12, Math.min(16, Math.round(base) - (phone ? 1 : 0)));
+  const z = Number(state.config && state.config.map && state.config.map.default_zoom);
+  return z >= 10 && z <= 18 ? z : 15;
 }
 // Op een touchscreen zoom je met twee vingers; de knoppen zijn daar overbodig.
 if (!window.matchMedia("(pointer: coarse)").matches) L.control.zoom({ position: "bottomleft" }).addTo(map);

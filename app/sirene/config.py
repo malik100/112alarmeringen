@@ -187,6 +187,8 @@ DEFAULTS: dict[str, Any] = {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",
         "default_window_minutes": 120,
+        # Zoomniveau bij het openen van de app en bij de locatieknop (10–18).
+        "default_zoom": 15,
     },
     "notifications": {
         "enabled": False,

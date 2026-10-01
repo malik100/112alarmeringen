@@ -377,7 +377,11 @@ function connectEvents() {
     state.location = JSON.parse(e.data);
     renderLocationCard();
     if (!state.location) { renderMe(); renderStatus(); return; }
-    if (first) map.setView([state.location.lat, state.location.lon], homeZoom());
+    // Bij het openen centreren op je huidige locatie: de eerste bekende plek, en daarna nog één
+    // keer zodra de live locatie (telefoon/browser) binnenkomt en de vaste plek vervangt.
+    const live = state.location.source !== "vast";
+    if (first || (live && !state.centeredLive)) map.setView([state.location.lat, state.location.lon], homeZoom());
+    if (live) state.centeredLive = true;
     renderMe();
     renderList();
     renderStatus();

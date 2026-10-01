@@ -121,6 +121,7 @@ map:
   tile_url: https://tile.openstreetmap.org/{z}/{x}/{y}.png
   attribution: "&copy; OpenStreetMap-bijdragers"
   default_window_minutes: 120
+  default_zoom: 15      # zoomniveau bij het openen en bij de locatieknop (10–18)
 
 notifications:
   enabled: false        # optioneel: zet op true voor pushmeldingen

@@ -56,9 +56,9 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
   met sirene (A0/A1/P1) pulseren.
 - **Jouw locatie** met een instelbare straal (standaard 1 km). Wat daarbinnen gebeurt staat
-  bovenaan de lijst, gesorteerd op afstand. De kaart opent op een zoomniveau waarop die hele straal
-  in beeld is én alle lagen zichtbaar zijn: zoom 15 op een pc (2,3 km breed), zoom 14 op een
-  telefoon (smaller scherm). Een grotere straal zoomt vanzelf verder uit.
+  bovenaan de lijst, gesorteerd op afstand. De kaart opent gecentreerd op je huidige locatie op zoom 15
+  (`map.default_zoom`): de straal van 1 km in beeld en alle lagen zichtbaar. Komt na het openen de
+  live locatie van je telefoon of browser binnen, dan centreert de kaart daar nog één keer op.
 - **Vaste flitsers, roodlichtcamera's en trajectcontroles** uit OpenStreetMap, als lagen die je
   aan en uit zet.
 - **Statiegeld-inleverpunten** (supermarkten, automaten) met openingstijden, wat ze innemen

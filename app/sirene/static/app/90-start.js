@@ -19,7 +19,10 @@ async function init() {
 
   const [loc] = await Promise.all([api("/api/location"), loadIncidents()]);
   state.location = loc;
-  if (loc) map.setView([loc.lat, loc.lon], homeZoom());
+  if (loc) {
+    map.setView([loc.lat, loc.lon], homeZoom());
+    if (loc.source !== "vast") state.centeredLive = true;
+  }
   initOverview();
   initNav();
   renderAll();
