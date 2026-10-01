@@ -118,6 +118,10 @@
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#zap"/></svg></span><span class="layer-name">Laadpalen</span>
         <input type="checkbox" class="toggle" id="ch-show">
       </label>
+      <label class="layer-row" id="we-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#cloud-sun"/></svg></span><span class="layer-name">Weer &amp; luchtkwaliteit</span>
+        <input type="checkbox" class="toggle" id="we-show">
+      </label>
       <label class="layer-row" id="nw-show-chip" hidden>
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#newspaper"/></svg></span><span class="layer-name">Nieuws uit de buurt</span>
         <input type="checkbox" class="toggle" id="nw-show">
@@ -350,6 +354,23 @@
           <ol class="list" id="list-ch"></ol>
           <p class="empty" id="empty-ch" hidden></p>
         </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="weer" data-layer="weather" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#cloud-sun"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Weer &amp; luchtkwaliteit</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body" id="we-body">
+          <p class="empty" id="empty-we" hidden></p>
+          <div id="we-now"></div>
+          <div id="we-rain"></div>
+          <div id="we-air"></div>
+          <div id="we-days"></div>
+          <p class="hint" id="we-report"></p>
+          <p class="hint">Bron: <a href="https://www.buienradar.nl" target="_blank" rel="noopener noreferrer">Buienradar</a> en Luchtmeetnet (RIVM).</p>
         </div>
       </section>
 

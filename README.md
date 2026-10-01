@@ -16,6 +16,9 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Openbaar vervoer**: haltes met live vertrektijden (vertraging, "rijdt niet", spoorwijziging),
   alle lijnen op de kaart en bussen, trams en metro's die nu rijden. Van alle vervoerders in
   Nederland, uit de open data van het NDOV Loket via OVapi.
+- **Weer en luchtkwaliteit** voor jouw plek: temperatuur en wind van het dichtstbijzijnde
+  KNMI-station, de buien voor de komende 2 uur als grafiek ("Regen, droog vanaf 14:10"), de
+  Luchtkwaliteitsindex van het dichtstbijzijnde meetstation en de verwachting voor vijf dagen.
 - **AED's, openbare toiletten en drinkwaterpunten** uit OpenStreetMap, met toegang (openbaar, voor
   klanten), binnen of buiten, openingstijden en bij een AED de precieze plek. De lijst zet de
   dichtstbijzijnde AED bovenaan.
@@ -324,6 +327,22 @@ zoom 12), met rechts de dichtstbijzijnde binnen 5 km (`fuel.list_radius_m`).
 - **Prijzen** staan er niet bij: daar is in Nederland geen open bron voor.
 - **Verversen**: één keer per dag (`fuel.refresh_hours`).
 
+## Weer en luchtkwaliteit
+
+De sectie **Weer & luchtkwaliteit** (standaard aan) toont voor jouw plek:
+
+- **Nu**: temperatuur, gevoelstemperatuur, wind en bewolking van het dichtstbijzijnde KNMI-station
+  (via de open feed van [Buienradar](https://www.buienradar.nl), elke 10 minuten).
+- **Buien**: de komende 2 uur per 5 minuten als staafdiagram, met een samenvatting zoals "Droog de
+  komende 2 uur" of "Regen vanaf 14:25". Opgevraagd voor een afgerond punt (~1 km), niet je
+  precieze locatie.
+- **Luchtkwaliteit**: de LKI (1 = goed … 11 = zeer slecht) van het dichtstbijzijnde meetstation van
+  [Luchtmeetnet](https://www.luchtmeetnet.nl) (RIVM en GGD's), elk uur. Slechte lucht kleurt de
+  sectiekop rood.
+- **Vijf dagen**: minimum, maximum en regenkans, plus het weerbericht.
+
+Uitzetten kan met de schakelaar links of `weather.enabled: false`.
+
 ## AED, toilet en drinkwater
 
 De laag **AED, toilet & drinkwater** toont ~4.300 AED's, ~3.400 openbare toiletten en ~2.800
@@ -582,6 +601,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
 | `app/sirene/sources/fuel.py` | tankstations (OSM), met of zonder winkel             |
 | `app/sirene/sources/amenities.py` | AED's, toiletten en drinkwater (OSM)             |
+| `app/sirene/sources/weather.py` | weer en buien (Buienradar), luchtkwaliteit (Luchtmeetnet) |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
 | `app/sirene/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |
 | `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
@@ -608,6 +628,8 @@ installaties en hun gegevens werken.
 - Wegwerkzaamheden: [NDW open data](https://opendata.ndw.nu), planningsfeed uit Melvin (DATEX II).
 - Openbaar vervoer: [OVapi](https://gtfs.ovapi.nl) (GTFS en GTFS-realtime), op basis van de open
   data van het [NDOV Loket](https://ndovloket.nl).
+- Weer: [Buienradar](https://www.buienradar.nl) (vrij te gebruiken met bronvermelding).
+  Luchtkwaliteit: [Luchtmeetnet](https://api.luchtmeetnet.nl/open_api) (RIVM, open data).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
 - Iconen: [Lucide](https://lucide.dev), ISC-licentie, zie `app/sirene/static/vendor/lucide/LICENSE`.

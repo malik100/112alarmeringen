@@ -840,3 +840,20 @@ fieldset { min-width: 0; }
 .am-sign .i { width: 13px; height: 13px; }
 .am-sign.limited { opacity: .6; border-style: dashed; }
 .item.amenity .bar { background: var(--c); }
+
+/* --- weer --- */
+.we-now { display: flex; align-items: center; gap: 12px; margin: 2px 0 8px; }
+.we-temp { font-size: 30px; font-weight: 700; line-height: 1; }
+.we-desc { font-size: 13px; }
+.we-desc small { color: var(--fg-muted); display: block; }
+.we-rain { margin: 6px 0 8px; font-size: 13px; }
+.we-rain svg { display: block; width: 100%; height: 34px; margin-top: 4px; }
+.we-rain .bar { fill: #0ea5e9; } .we-rain .axis { stroke: var(--border); stroke-width: 1; }
+.we-rain .lbl { font-size: 9px; fill: var(--fg-muted); }
+.we-air { font-size: 13px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.we-lki { display: inline-block; min-width: 26px; text-align: center; padding: 1px 6px; border-radius: 6px; color: #fff; font-weight: 700; }
+.we-days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; font-size: 12px; text-align: center; margin: 0 0 8px; }
+.we-days .d { background: var(--bg-soft); border-radius: 8px; padding: 6px 2px; }
+.we-days .d b { display: block; }
+.we-days .d small { color: var(--fg-muted); }
+.we-days .rain { color: #0ea5e9; }

@@ -134,6 +134,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "shops": {k: cfg["shops"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "fuel": {k: cfg["fuel"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "amenities": {k: cfg["amenities"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
+            "weather": {"enabled": cfg["weather"]["enabled"]},
             "roadworks": {k: cfg["roadworks"][k] for k in ("enabled", "min_zoom", "list_radius_m", "ahead_days")},
             "ov": {**{k: cfg["ov"][k] for k in ("enabled", "stops_min_zoom", "lines_min_zoom",
                                                  "vehicles_min_zoom", "list_radius_m")},
@@ -154,7 +155,8 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         import shutil
         names = {"p2000": "112-meldingen", "news": "Nieuws", "announcements": "Bekendmakingen",
                  "roadworks": "Wegwerk", "parking": "Parkeren", "statiegeld": "Statiegeld", "shops": "Winkels",
-                 "fuel": "Tankstations", "amenities": "AED, toilet, water", "charging": "Laadpalen", "charging_status": "Laadpalen (beschikbaarheid)",
+                 "fuel": "Tankstations", "amenities": "AED, toilet, water", "weather": "Weer",
+                 "air": "Luchtkwaliteit", "charging": "Laadpalen", "charging_status": "Laadpalen (beschikbaarheid)",
                  "speedcams": "Flitsers", "ov": "OV-dienstregeling", "ov_realtime": "OV actueel",
                  "homeassistant": "Home Assistant"}
         enabled = {"p2000": True, "news": svc.cfg["news"]["enabled"],
@@ -162,6 +164,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
                    "roadworks": svc.cfg["roadworks"]["enabled"], "parking": svc.cfg["parking"]["enabled"],
                    "statiegeld": svc.cfg["statiegeld"]["enabled"], "shops": svc.cfg["shops"]["enabled"],
                    "fuel": svc.cfg["fuel"]["enabled"], "amenities": svc.cfg["amenities"]["enabled"],
+                   "weather": svc.cfg["weather"]["enabled"], "air": svc.cfg["weather"]["enabled"],
                    "charging": svc.cfg["charging"]["enabled"],
                    "charging_status": svc.cfg["charging"]["enabled"],
                    "speedcams": svc.cfg["speedcams"]["enabled"], "ov": svc.cfg["ov"]["enabled"],
@@ -511,6 +514,19 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         realtime = await svc.ov_realtime()
         return {"vehicles": svc.ov.vehicles_in_bbox(realtime, *area, time.time(), ov_modes(modes)),
                 "realtime_ts": realtime.ts}
+
+    @app.get("/api/weather")
+    async def get_weather(lat: float | None = Query(default=None, ge=-90, le=90),
+                          lon: float | None = Query(default=None, ge=-180, le=180)):
+        """Weer, buien (2 uur) en luchtkwaliteit bij een punt (standaard: jouw locatie)."""
+        if not svc.cfg["weather"]["enabled"]:
+            raise HTTPException(404, "Weer staat uit in de configuratie")
+        if lat is None or lon is None:
+            loc = svc.locations.current
+            if loc is None:
+                return {"station": None, "rain": [], "air": None, "days": [], "report": None}
+            lat, lon = loc.lat, loc.lon
+        return await svc.weather_at(lat, lon)
 
     @app.get("/api/local")
     async def get_local(lat: float | None = Query(default=None, ge=-90, le=90),

@@ -166,6 +166,12 @@ DEFAULTS: dict[str, Any] = {
         "vehicles_min_zoom": 13,
         "list_radius_m": 800,
     },
+    "weather": {
+        # Weer (Buienradar) en luchtkwaliteit (Luchtmeetnet/RIVM) voor je plek.
+        "enabled": True,
+        "refresh_minutes": 10,     # weerfeed (~100 KB)
+        "air_refresh_minutes": 60, # luchtkwaliteit wordt per uur gemeten
+    },
     "map": {
         "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": "&copy; OpenStreetMap-bijdragers",

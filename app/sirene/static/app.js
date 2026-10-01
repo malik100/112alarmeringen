@@ -37,6 +37,7 @@ const state = {
   // Standaard wat je merkt op straat (verkeer, evenementen); bouw en vergunningen zijn een optie.
   bk: { show: false, focus: null, items: [], cats: new Set(["verkeer", "evenementen"]), important: true,
         sort: "relevant", showAll: false },
+  we: { show: true, data: null, from: null, ts: 0 },
   am: { show: false, kinds: new Set(["aed", "toilet", "water"]), points: [], near: [], nearFrom: null },
   fu: { show: false, shops: new Set(["ja", "nee", "onbekend"]), onlyOpen: false, points: [], near: [], nearFrom: null },
   ch: { show: false, profile: "snel", custom: null, stations: [], near: [], statusTs: null, nearFrom: null },
@@ -1662,7 +1663,9 @@ function amListItem({ a, d }) {
   distEl.textContent = fmtDistance(d);
   const meta = document.createElement("span");
   meta.className = "meta";
-  meta.append([...amDetails(a), a.location, a.address].filter(Boolean).join(" · "), " · ", etaSpan(Nav.eta(d)));
+  const details = [...amDetails(a), a.location, a.address].filter(Boolean).join(" · ");
+  if (details) meta.append(details, " · ");
+  meta.append(etaSpan(Nav.eta(d)));
   li.append(bar, what, distEl, meta);
   const open = () => {
     amPendingPopup = a.id;
@@ -1763,6 +1766,124 @@ function initAmenities() {
   });
   scheduleAmenitiesViewport();
   loadAmenitiesNear(true).catch(console.error);
+}
+
+// ---------- weer en luchtkwaliteit ----------
+
+const WE_REFRESH_MS = 5 * 60 * 1000;
+const LKI_COLORS = { goed: "#16a34a", matig: "#ca8a04", onvoldoende: "#ea580c", slecht: "#dc2626", "zeer slecht": "#7f1d1d" };
+const DAY_SHORT = ["zo", "ma", "di", "wo", "do", "vr", "za"];
+
+function weEl(tag, cls, text) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text != null) el.textContent = text;
+  return el;
+}
+
+function fmtTemp(t) {
+  return t == null ? "–" : `${Math.round(t)}°`;
+}
+
+/** Staafdiagram van de buien in de komende 2 uur (per 5 minuten). */
+function rainChart(rain) {
+  const w = 240, h = 34, top = 4, base = 24;
+  const max = Math.max(2, ...rain.map((r) => r.mm_h));
+  const bw = w / rain.length;
+  const bars = rain.map((r, i) => {
+    const bh = r.mm_h > 0 ? Math.max(2, (Math.min(r.mm_h, max) / max) * (base - top)) : 0;
+    return `<rect class="bar" x="${(i * bw).toFixed(1)}" y="${(base - bh).toFixed(1)}" width="${(bw - 1).toFixed(1)}" height="${bh.toFixed(1)}"/>`;
+  }).join("");
+  const labels = rain.filter((_, i) => i % 6 === 0).map((r, j) => `<text class="lbl" x="${(j * 6 * bw).toFixed(1)}" y="${h - 1}">${esc(r.time)}</text>`).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><line class="axis" x1="0" y1="${base}" x2="${w}" y2="${base}"/>${bars}${labels}</svg>`;
+}
+
+function renderWeather() {
+  const w = state.we.data;
+  const cfg = state.config.weather;
+  if (!cfg.enabled) return;
+  const empty = $("empty-we");
+  const st = w && w.station;
+  if (!w || !st) {
+    empty.textContent = !state.location ? "Nog geen locatie bekend." : "Weer wordt opgehaald…";
+    empty.hidden = false;
+    ["we-now", "we-rain", "we-air", "we-days"].forEach((id) => $(id).replaceChildren());
+    $("we-report").textContent = "";
+    setSectionSummary("weer", "");
+    return;
+  }
+  empty.hidden = true;
+  const now = weEl("div", "we-now");
+  const desc = weEl("div", "we-desc");
+  desc.append(st.description || "", weEl("small", "", [
+    st.feels_like != null && Math.round(st.feels_like) !== Math.round(st.temperature) ? `voelt als ${fmtTemp(st.feels_like)}` : null,
+    st.wind_bft != null ? `wind ${st.wind_dir || ""} ${st.wind_bft} Bft` : null,
+    st.humidity != null ? `${Math.round(st.humidity)}% vochtig` : null,
+    `station ${st.name} (${fmtDistance(st.distance_m)})`,
+  ].filter(Boolean).join(" · ")));
+  now.append(weEl("span", "we-temp", fmtTemp(st.temperature)), desc);
+  $("we-now").replaceChildren(now);
+
+  const rainBox = $("we-rain");
+  rainBox.className = "we-rain";
+  rainBox.replaceChildren();
+  if (w.rain && w.rain.length) {
+    rainBox.append(weEl("b", "", w.rain_summary || ""));
+    const chart = document.createElement("div");
+    chart.innerHTML = rainChart(w.rain);
+    rainBox.append(chart.firstChild);
+  }
+
+  const airBox = $("we-air");
+  airBox.className = "we-air";
+  airBox.replaceChildren();
+  if (w.air) {
+    const badge = weEl("span", "we-lki", String(w.air.value));
+    badge.style.background = LKI_COLORS[w.air.label] || "#6b7280";
+    airBox.append(badge, `Luchtkwaliteit ${w.air.label}`, weEl("small", "", ` · ${w.air.name} (${fmtDistance(w.air.distance_m)})`));
+  }
+
+  $("we-days").className = "we-days";
+  $("we-days").replaceChildren(...(w.days || []).slice(0, 5).map((d) => {
+    const box = weEl("div", "d");
+    const date = new Date(`${d.day}T12:00:00`);
+    box.append(weEl("b", "", DAY_SHORT[date.getDay()]), `${d.max}°`, weEl("small", "", ` / ${d.min}°`), document.createElement("br"),
+      weEl("span", "rain", d.rain_chance != null ? `${d.rain_chance}%` : ""));
+    box.title = `${d.description || ""}${d.wind_bft ? ` · wind ${d.wind_dir || ""} ${d.wind_bft} Bft` : ""}`;
+    return box;
+  }));
+  $("we-report").textContent = w.report && w.report.title ? `${w.report.title}. ${w.shortterm || ""}` : (w.shortterm || "");
+
+  const parts = [fmtTemp(st.temperature), (st.description || "").toLowerCase()];
+  if (w.rain_summary) parts.push(w.rain_summary.toLowerCase());
+  if (w.air) parts.push(`lucht ${w.air.label}`);
+  setSectionSummary("weer", parts.filter(Boolean).join(" · "), w.air && ["slecht", "zeer slecht"].includes(w.air.label) ? "urgent" : "");
+}
+
+async function loadWeather(force) {
+  const cfg = state.config.weather;
+  if (!cfg.enabled || !state.we.show) return;
+  const loc = state.location;
+  if (!loc) return renderWeather();
+  const from = state.we.from;
+  if (!force && from && Date.now() - state.we.ts < WE_REFRESH_MS - 1000
+      && haversine(from.lat, from.lon, loc.lat, loc.lon) < 1000) return renderWeather();
+  state.we.from = { lat: loc.lat, lon: loc.lon };
+  state.we.ts = Date.now();
+  try {
+    state.we.data = await api(`/api/weather?lat=${loc.lat.toFixed(3)}&lon=${loc.lon.toFixed(3)}`);
+  } catch (err) { console.warn("Weer:", err.message); }
+  renderWeather();
+}
+
+function initWeather() {
+  if (!state.config.weather.enabled) return;
+  $("we-show-chip").hidden = false;
+  state.we.show = store.get("weShow") !== "0";
+  $("we-show").checked = state.we.show;
+  $("we-show").addEventListener("change", (e) => setLayer("weather", e.target.checked));
+  loadWeather(true).catch(console.error);
+  setInterval(() => { if (document.visibilityState === "visible") loadWeather().catch(console.error); }, WE_REFRESH_MS);
 }
 
 // ---------- nieuws en bekendmakingen uit de buurt ----------
@@ -2875,7 +2996,7 @@ function initNav() {
 function setLayer(layer, on) {
   const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show", shops: "sh-show",
     charging: "ch-show", statiegeld: "sg-show", announcements: "bk-show", roadworks: "rw-show",
-    news: "nw-show", ov: "ov-show", fuel: "fu-show", amenities: "am-show" }[layer];
+    news: "nw-show", ov: "ov-show", fuel: "fu-show", amenities: "am-show", weather: "we-show" }[layer];
   if ($(el)) $(el).checked = on;
   if (layer === "incidents") { state.showIncidents = on; store.set("showIncidents", on ? "1" : "0"); renderIncidents(); }
   if (layer === "cams") { state.showCams = on; store.set("showCams", on ? "1" : "0"); $("cam-layers").hidden = !on; renderCams(); }
@@ -2888,6 +3009,7 @@ function setLayer(layer, on) {
   if (layer === "announcements") { state.bk.show = on; store.set("bkShow", on ? "1" : "0"); renderBkLayer(); }
   if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
   if (layer === "news") { state.nw.show = on; store.set("nwShow", on ? "1" : "0"); }
+  if (layer === "weather") { state.we.show = on; store.set("weShow", on ? "1" : "0"); if (on) loadWeather(true).catch(console.error); }
   if (layer === "ov") {
     state.ov.show = on;
     store.set("ovShow", on ? "1" : "0");
@@ -2901,12 +3023,12 @@ function setLayer(layer, on) {
 
 // Snel kiezen: één tik zet precies de lagen aan die bij een situatie horen.
 const PRESETS = {
-  onderweg: ["ov", "fuel", "roadworks", "cams", "parking", "charging", "amenities"],
-  thuis: ["news", "announcements", "incidents", "roadworks"],
+  onderweg: ["ov", "fuel", "roadworks", "cams", "parking", "charging", "amenities", "weather"],
+  thuis: ["weather", "news", "announcements", "incidents", "roadworks"],
   boodschappen: ["shops", "statiegeld", "parking"],
   uit: [],
 };
-const ALL_LAYERS = ["parking", "statiegeld", "shops", "fuel", "amenities", "roadworks", "ov", "cams", "charging", "news",
+const ALL_LAYERS = ["parking", "statiegeld", "shops", "fuel", "amenities", "roadworks", "ov", "cams", "charging", "weather", "news",
   "announcements", "incidents"];
 
 function applyPreset(name) {
@@ -2918,7 +3040,7 @@ function applyPreset(name) {
 /** Markeer de preset die precies overeenkomt met wat er nu aanstaat (als die er is). */
 function layerIsOn(layer) {
   return { parking: state.pk.show, statiegeld: state.sg.show, shops: state.sh.show, fuel: state.fu.show,
-    amenities: state.am.show,
+    amenities: state.am.show, weather: state.we.show,
     roadworks: state.rw.show, ov: state.ov.show, cams: state.showCams, charging: state.ch.show,
     news: state.nw.show, announcements: state.bk.show, incidents: state.showIncidents }[layer];
 }
@@ -2928,7 +3050,7 @@ function renderPresets() {
   const c = state.config;
   const enabled = (layer) => ({ parking: c.parking.enabled, statiegeld: c.statiegeld.enabled, shops: c.shops.enabled,
     fuel: c.fuel.enabled, amenities: c.amenities.enabled, roadworks: c.roadworks.enabled, ov: c.ov.enabled, cams: c.speedcams_enabled,
-    charging: c.charging.enabled, news: c.local.news, announcements: c.local.announcements, incidents: true })[layer];
+    charging: c.charging.enabled, weather: c.weather.enabled, news: c.local.news, announcements: c.local.announcements, incidents: true })[layer];
   const current = ALL_LAYERS.filter((l) => layerIsOn(l) && enabled(l)).join(",");
   document.querySelectorAll("[data-preset]").forEach((btn) => {
     const want = ALL_LAYERS.filter((l) => PRESETS[btn.dataset.preset].includes(l) && enabled(l)).join(",");
@@ -2996,6 +3118,7 @@ const SECTION_ON = {
   roadworks: () => state.config.roadworks.enabled && state.rw.show,
   ov: () => state.config.ov.enabled && state.ov.show,
   charging: () => state.config.charging.enabled && state.ch.show,
+  weather: () => state.config.weather.enabled && state.we.show,
   news: () => state.config.local.news && state.nw.show,
   announcements: () => state.config.local.announcements && state.bk.show,
   incidents: () => state.showIncidents,
@@ -3221,7 +3344,9 @@ function connectEvents() {
     loadOvNear().catch(console.error);
     loadFuelNear().catch(console.error);
     loadAmenitiesNear().catch(console.error);
+    loadWeather().catch(console.error);
   });
+  es.addEventListener("weather", () => loadWeather(true).catch(console.error));
   es.addEventListener("amenities", () => {
     scheduleAmenitiesViewport();
     loadAmenitiesNear(true).catch(console.error);
@@ -3622,6 +3747,7 @@ async function init() {
   initShops();
   initFuel();
   initAmenities();
+  initWeather();
   initLocal();
   initRoadworks();
   initOv();

@@ -36,6 +36,7 @@ from .sources.gtfs import download_gtfs, import_gtfs
 from .sources.gtfs_rt import DEFAULT_URL as OV_REALTIME_URL
 from .sources.gtfs_rt import fetch_alerts, fetch_trip_updates, fetch_vehicles
 from .sources.amenities import fetch_amenities
+from .sources import weather as weather_src
 from .sources.fuel import fetch_fuel
 from .sources.shops import fetch_shops, is_late, same_store
 from .sources.speedcams import fetch_speedcams
@@ -85,6 +86,8 @@ class Service:
             "shops": {"last_ok": None, "last_error": None, "count": 0},
             "fuel": {"last_ok": None, "last_error": None, "count": 0},
             "amenities": {"last_ok": None, "last_error": None, "count": 0},
+            "weather": {"last_ok": None, "last_error": None},
+            "air": {"last_ok": None, "last_error": None, "count": 0},
             "roadworks": {"last_ok": None, "last_error": None, "count": 0},
             "ov": {"last_ok": None, "last_error": None, "count": 0, "importing": False},
             "ov_realtime": {"last_ok": None, "last_error": None},
@@ -97,6 +100,11 @@ class Service:
         # Beschikbaarheid van laadpalen: alleen in het geheugen (vluchtig, elk kwartier nieuw).
         self.charging_status: dict[str, dict[str, Any]] = {}
         self.charging_status_ts: float | None = None
+        # Weer en luchtkwaliteit: klein, alleen in het geheugen (elke 10 min resp. elk uur nieuw).
+        self.weather: dict[str, Any] | None = None
+        self.air_values: dict[str, dict[str, Any]] = {}
+        self.air_stations: dict[str, dict[str, Any]] = self.db.meta_get("lki_stations") or {}
+        self._rain_cache: dict[tuple[float, float], tuple[float, list[dict[str, Any]]]] = {}
         self._charging_wanted = 0.0            # laatste keer dat iemand de laadpalen bekeek
         self._charging_task: asyncio.Task | None = None
         # Per feed: (aantal fouten op rij, niet opnieuw proberen voor dit tijdstip).
@@ -512,6 +520,64 @@ class Service:
         self.bus.publish("amenities", {"count": len(items)})
         return True
 
+    # --- weer en luchtkwaliteit -------------------------------------------------
+
+    async def refresh_weather_once(self) -> None:
+        try:
+            self.weather = await weather_src.fetch_feed(self.client)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("Weer ophalen mislukt: %s", exc)
+            self.status["weather"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return
+        self.status["weather"]["last_ok"] = time.time()
+        self.bus.publish("weather", {"ts": self.status["weather"]["last_ok"]})
+
+    async def refresh_air_once(self) -> None:
+        try:
+            self.air_values = await weather_src.fetch_lki(self.client)
+            missing = [n for n in self.air_values if n not in self.air_stations]
+            if missing:
+                self.air_stations.update(await weather_src.fetch_lki_stations(self.client, missing))
+                self.db.meta_set("lki_stations", self.air_stations)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("Luchtkwaliteit ophalen mislukt: %s", exc)
+            self.status["air"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return
+        self.status["air"].update(last_ok=time.time(), count=len(self.air_values))
+        self.bus.publish("weather", {"ts": time.time()})
+
+    async def rain_at(self, lat: float, lon: float) -> list[dict[str, Any]]:
+        """Buienverwachting voor een afgerond punt (~1 km), 5 minuten gecachet."""
+        key = (round(lat, 2), round(lon, 2))
+        cached = self._rain_cache.get(key)
+        if cached and time.time() - cached[0] < 300:
+            return cached[1]
+        try:
+            rain = await weather_src.fetch_rain(self.client, *key)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.debug("Buienverwachting mislukt: %s", exc)
+            return cached[1] if cached else []
+        self._rain_cache[key] = (time.time(), rain)
+        if len(self._rain_cache) > 50:
+            self._rain_cache.pop(next(iter(self._rain_cache)))
+        return rain
+
+    async def weather_at(self, lat: float, lon: float) -> dict[str, Any]:
+        w = self.weather or {}
+        station = weather_src.nearest_station(w.get("stations", []), lat, lon) if w else None
+        rain = await self.rain_at(lat, lon)
+        return {
+            "station": station,
+            "rain": rain,
+            "rain_summary": weather_src.rain_summary(rain) if rain else None,
+            "air": weather_src.nearest_lki(self.air_stations, self.air_values, lat, lon),
+            "days": w.get("days", []),
+            "report": w.get("report"),
+            "shortterm": w.get("shortterm"),
+            "sunrise": w.get("sunrise"), "sunset": w.get("sunset"),
+            "ts": self.status["weather"]["last_ok"],
+        }
+
     # --- laadpalen ---------------------------------------------------------
 
     async def refresh_roadworks_once(self) -> bool:
@@ -727,6 +793,11 @@ class Service:
             self.status["fuel"]["count"] = self.db.fuel_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "fuel", self.cfg["fuel"]["refresh_hours"] * 3600, self.refresh_fuel_once)))
+        if self.cfg["weather"]["enabled"]:
+            self._tasks.append(asyncio.create_task(self._loop(
+                "weer", self.cfg["weather"]["refresh_minutes"] * 60, self.refresh_weather_once)))
+            self._tasks.append(asyncio.create_task(self._loop(
+                "lucht", self.cfg["weather"]["air_refresh_minutes"] * 60, self.refresh_air_once)))
         if self.cfg["amenities"]["enabled"]:
             self.status["amenities"]["count"] = self.db.amenities_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(
