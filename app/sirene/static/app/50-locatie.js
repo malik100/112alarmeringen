@@ -331,7 +331,7 @@ function addLocateControl() {
       L.DomEvent.on(btn, "click", () => {
         if (canShareLocation() && watchId == null) startBrowserLocation();
         else if (!state.location) { try { sessionStorage.removeItem("locCardClosed"); } catch { /* privémodus */ } renderLocationCard(); }
-        if (state.location) map.setView([state.location.lat, state.location.lon], Math.max(map.getZoom(), 15));
+        if (state.location) map.setView([state.location.lat, state.location.lon], Math.max(map.getZoom(), homeZoom()));
       });
       return btn;
     },

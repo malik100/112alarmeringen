@@ -377,7 +377,7 @@ function connectEvents() {
     state.location = JSON.parse(e.data);
     renderLocationCard();
     if (!state.location) { renderMe(); renderStatus(); return; }
-    if (first) map.setView([state.location.lat, state.location.lon], 14);
+    if (first) map.setView([state.location.lat, state.location.lon], homeZoom());
     renderMe();
     renderList();
     renderStatus();

@@ -19,7 +19,7 @@ async function init() {
 
   const [loc] = await Promise.all([api("/api/location"), loadIncidents()]);
   state.location = loc;
-  if (loc) map.setView([loc.lat, loc.lon], 14);
+  if (loc) map.setView([loc.lat, loc.lon], homeZoom());
   initOverview();
   initNav();
   renderAll();
