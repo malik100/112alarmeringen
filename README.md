@@ -560,7 +560,7 @@ omzet naar het standaardformaat GTFS.
   en het tracé op de kaart.
 - **Lijnen** (vanaf zoom 13) in de kleur van de vervoerder. Tik op een lijn: op een drukke plek
   zie je alle lijnen die daar rijden.
-- **Live voertuigen** (vanaf zoom 14, lijnnummers vanaf zoom 15; daaronder stipjes in de kleur
+- **Live voertuigen** (vanaf zoom 14; vanaf zoom 15 met bus-, tram- of metro-icoon en lijnnummer, daaronder stipjes in de kleur
   van de lijn): bussen, trams en metro's die nu rijden.
   Een rode rand betekent 3 minuten of meer vertraging. Treinen zitten (nog) niet in de open
   voertuigposities, wel in de vertrektijden.

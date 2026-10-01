@@ -334,10 +334,12 @@ function ovVehicleIcon(v) {
       iconSize: [12, 12], iconAnchor: [6, 6], popupAnchor: [0, -6],
     });
   }
+  // Bus-, tram-, metro- of veericoon met het lijnnummer ernaast, in de kleur van de lijn.
+  const info = Ov.modeInfo(v.mode);
   return L.divIcon({
     className: "ov-veh-marker",
-    html: `<div class="ov-veh${late}" style="background:${bg};color:${fg}">${esc(Ov.lineLabel(v))}</div>`,
-    iconSize: [30, 18], iconAnchor: [15, 9], popupAnchor: [0, -9],
+    html: `<div class="ov-veh${late}" style="background:${bg};color:${fg}" title="${esc(info.label)} ${esc(v.line || "")}">${icon(info.icon)}<span>${esc(Ov.lineLabel(v))}</span></div>`,
+    iconSize: [44, 20], iconAnchor: [22, 10], popupAnchor: [0, -10],
   });
 }
 

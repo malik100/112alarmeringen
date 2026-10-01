@@ -730,7 +730,6 @@ fieldset { min-width: 0; }
 .ov-stop .i { width: 12px; height: 12px; }
 .ov-stop.station { width: 26px; height: 26px; border-width: 3px; }
 .ov-stop.station .i { width: 15px; height: 15px; }
-.ov-veh.dot { width: 12px; height: 12px; min-width: 0; padding: 0; border-radius: 50%; }
 .ov-veh-marker { background: none; border: 0; transition: transform 1.5s linear; }
 .ov-still .ov-veh-marker, .leaflet-zoom-anim .ov-veh-marker { transition: none; }
 .ov-veh {
@@ -738,6 +737,9 @@ fieldset { min-width: 0; }
   font: 700 11px/16px system-ui, sans-serif; border: 1px solid #fff; white-space: nowrap;
   box-shadow: 0 1px 4px rgba(0, 0, 0, .45);
 }
+.ov-veh { display: inline-flex; align-items: center; justify-content: center; gap: 3px; height: 20px; min-width: 40px; padding: 0 6px 0 5px; border-radius: 10px; }
+.ov-veh .i { width: 13px; height: 13px; flex: none; stroke-width: 2.25; }
+.ov-veh.dot { width: 12px; height: 12px; min-width: 0; padding: 0; border-radius: 50%; }
 .ov-veh.late { outline: 2px solid var(--err); }
 .item.ov-halte .ov-deps { grid-column: 2 / span 2; }
 .item.ov-halte .ov-dep { padding: 3px 0; }
