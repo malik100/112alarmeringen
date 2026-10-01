@@ -83,6 +83,10 @@ fuel:                   # tankstations (OSM), met of zonder winkel
   min_zoom: 12
   list_radius_m: 5000   # straal voor de lijst "tankstations in de buurt"
 
+history:                # afgelopen week: per dag vastleggen wat er rond je plek gebeurde
+  enabled: true
+  days: 7
+
 waste:                  # afvalkalender: agenda-link (iCal) van je gemeente; kan ook in het paneel
   enabled: true
   ical_url: ""

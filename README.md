@@ -16,6 +16,8 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Openbaar vervoer**: haltes met live vertrektijden (vertraging, "rijdt niet", spoorwijziging),
   alle lijnen op de kaart en bussen, trams en metro's die nu rijden. Van alle vervoerders in
   Nederland, uit de open data van het NDOV Loket via OVapi.
+- **Afgelopen week**: per dag wat er rond je plek gebeurde (meldingen met sirene, bekendmakingen,
+  afsluitingen, afval), met een staafje per dag. Vandaag live, de rest elke nacht vastgelegd.
 - **Afvalkalender**: wanneer welke bak aan de straat moet ("Morgen: GFT"), via de agenda-link
   (iCal) van je eigen gemeente of inzamelaar.
 - **Weer en luchtkwaliteit** voor jouw plek: temperatuur en wind van het dichtstbijzijnde
@@ -342,6 +344,14 @@ zoom 12), met rechts de dichtstbijzijnde binnen 5 km (`fuel.list_radius_m`).
   extra's (vrachtwagens, wasstraat, bandenlucht, toilet), plus *Route* en *Aanpassen* op OpenStreetMap.
 - **Prijzen** staan er niet bij: daar is in Nederland geen open bron voor.
 - **Verversen**: één keer per dag (`fuel.refresh_hours`).
+
+## Afgelopen week
+
+De sectie **Afgelopen week** (schakelaar links, zit in de preset *Thuis*) toont per dag wat er
+binnen je straal gebeurde: 112-meldingen (met sirene apart), bekendmakingen binnen 1,5 km,
+afsluitingen en wat er aan de straat moest. Vandaag wordt live berekend; elke nacht wordt de dag
+ervoor vastgelegd (`history.days`, standaard 7 dagen bewaard), zodat je ook na een paar dagen weg
+nog ziet wat je gemist hebt. Zonder vaste plek of live locatie blijft de sectie leeg.
 
 ## Afvalkalender
 

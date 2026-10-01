@@ -138,6 +138,11 @@ CREATE TABLE IF NOT EXISTS roadworks (
 );
 CREATE INDEX IF NOT EXISTS roadworks_lat_lon ON roadworks (lat, lon);
 
+CREATE TABLE IF NOT EXISTS digest (
+    date TEXT PRIMARY KEY,
+    data TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -486,6 +491,21 @@ class Database:
 
     def roadworks_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM roadworks").fetchone()[0]
+
+    # --- dagoverzichten (historie) --------------------------------------------
+
+    def digest_set(self, date: str, data: dict[str, Any]) -> None:
+        with self.conn:
+            self.conn.execute("INSERT OR REPLACE INTO digest (date, data) VALUES (?, ?)",
+                              (date, json.dumps(data, ensure_ascii=False)))
+
+    def digests(self, since_date: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute("SELECT data FROM digest WHERE date >= ? ORDER BY date DESC", (since_date,)).fetchall()
+        return [json.loads(r["data"]) for r in rows]
+
+    def purge_digests(self, before_date: str) -> None:
+        with self.conn:
+            self.conn.execute("DELETE FROM digest WHERE date < ?", (before_date,))
 
     # --- meta -------------------------------------------------------------
 

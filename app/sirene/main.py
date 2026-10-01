@@ -140,6 +140,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "amenities": {k: cfg["amenities"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "weather": {"enabled": cfg["weather"]["enabled"]},
             "waste": {"enabled": cfg["waste"]["enabled"]},
+            "history": {k: cfg["history"][k] for k in ("enabled", "days")},
             "roadworks": {k: cfg["roadworks"][k] for k in ("enabled", "min_zoom", "list_radius_m", "ahead_days")},
             "ov": {**{k: cfg["ov"][k] for k in ("enabled", "stops_min_zoom", "lines_min_zoom",
                                                  "vehicles_min_zoom", "list_radius_m")},
@@ -542,6 +543,13 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         except httpx.HTTPError as exc:
             raise HTTPException(422, f"De link kon niet worden opgehaald: {exc}")
         return {"url": svc.waste_url(), "events": svc.waste_upcoming(), "count": len(events)}
+
+    @app.get("/api/history")
+    def get_history():
+        """Per dag wat er rond je plek gebeurde: vandaag live, de rest bewaard."""
+        if not svc.cfg["history"]["enabled"]:
+            raise HTTPException(404, "Historie staat uit in de configuratie")
+        return svc.history()
 
     @app.get("/api/weather")
     async def get_weather(lat: float | None = Query(default=None, ge=-90, le=90),

@@ -134,6 +134,10 @@
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#stamp"/></svg></span><span class="layer-name">Bekendmakingen</span>
         <input type="checkbox" class="toggle" id="bk-show">
       </label>
+      <label class="layer-row" id="hi-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#calendar"/></svg></span><span class="layer-name">Afgelopen week</span>
+        <input type="checkbox" class="toggle" id="hi-show">
+      </label>
       <label class="layer-row">
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#siren"/></svg></span><span class="layer-name">112-meldingen</span>
         <input type="checkbox" class="toggle" id="layer-incidents">
@@ -490,6 +494,19 @@
           <ol class="list" id="list-view"></ol>
           <p class="empty" id="empty-view" hidden>Geen meldingen in dit kaartgebied.</p>
         </section>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="week" data-layer="history" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#calendar"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Afgelopen week</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+          <p class="hint" id="hi-hint"></p>
+          <div class="hi-bars" id="hi-bars"></div>
+          <div id="hi-days"></div>
         </div>
       </section>
 

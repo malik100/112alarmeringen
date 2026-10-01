@@ -870,3 +870,17 @@ fieldset { min-width: 0; }
 .wa-list .item.tomorrow .dist { color: #b45309; }
 .wa-form { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
 .wa-form input { flex: 1 1 200px; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); }
+
+/* --- afgelopen week --- */
+.hi-bars { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; align-items: end; height: 56px; margin: 4px 0 10px; }
+.hi-bars .b { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: 10px; color: var(--fg-muted); }
+.hi-bars .b i { display: block; width: 70%; background: var(--politie); border-radius: 3px 3px 0 0; min-height: 2px; }
+.hi-bars .b.today i { background: var(--me); }
+.hi-bars .b b { font-style: normal; color: var(--fg); font-size: 11px; }
+.hi-day { border-top: 1px solid var(--border); padding: 6px 0; font-size: 13px; }
+.hi-day summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+.hi-day summary b { min-width: 72px; }
+.hi-day summary span { color: var(--fg-muted); }
+.hi-day ul { margin: 4px 0 0 16px; padding: 0; font-size: 12px; }
+.hi-day li { margin: 2px 0; }
+.hi-day .sirene { color: var(--brandweer); font-weight: 600; }

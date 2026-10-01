@@ -172,6 +172,11 @@ DEFAULTS: dict[str, Any] = {
         "ical_url": "",
         "refresh_hours": 24,
     },
+    "history": {
+        # Afgelopen week: per dag wat er rond je plek gebeurde (meldingen, bekendmakingen, afsluitingen).
+        "enabled": True,
+        "days": 7,
+    },
     "weather": {
         # Weer (Buienradar) en luchtkwaliteit (Luchtmeetnet/RIVM) voor je plek.
         "enabled": True,

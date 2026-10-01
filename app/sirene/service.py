@@ -90,6 +90,7 @@ class Service:
             "amenities": {"last_ok": None, "last_error": None, "count": 0},
             "weather": {"last_ok": None, "last_error": None},
             "waste": {"last_ok": None, "last_error": None, "count": 0},
+            "history": {"last_ok": None, "last_error": None},
             "air": {"last_ok": None, "last_error": None, "count": 0},
             "roadworks": {"last_ok": None, "last_error": None, "count": 0},
             "ov": {"last_ok": None, "last_error": None, "count": 0, "importing": False},
@@ -681,6 +682,76 @@ class Service:
         horizon = (dt.date.today() + dt.timedelta(days=days)).isoformat()
         return [e for e in (self.db.meta_get("waste_events") or []) if today <= e["date"] <= horizon]
 
+    # --- historie: dagoverzichten ------------------------------------------------------
+
+    def build_digest(self, day: dt.date, loc: Location | None = None) -> dict[str, Any]:
+        """Wat er op één dag rond je plek gebeurde: meldingen, bekendmakingen, afsluitingen, afval."""
+        loc = loc or self.locations.current
+        radius = self.cfg["radius_m"]
+        start = dt.datetime.combine(day, dt.time()).timestamp()
+        end = start + 86400
+        out: dict[str, Any] = {"date": day.isoformat(), "incidents": {"count": 0, "sirene": 0, "by": {}, "top": []},
+                               "announcements": {"count": 0, "top": []}, "roadworks": {"count": 0, "names": []},
+                               "waste": [], "has_location": loc is not None}
+        if loc is None:
+            return out
+        inc = out["incidents"]
+        for i in self.db.incidents_since(start):
+            if i["ts"] >= end or i["lat"] is None:
+                continue
+            d = haversine_m(loc.lat, loc.lon, i["lat"], i["lon"])
+            if d > radius:
+                continue
+            sirene = i["priority"] is not None and i["priority"] <= 1
+            inc["count"] += 1
+            inc["sirene"] += int(sirene)
+            inc["by"][i["discipline"]] = inc["by"].get(i["discipline"], 0) + 1
+            if len(inc["top"]) < 6:
+                inc["top"].append({"ts": i["ts"], "text": i["description"] or i["title"], "discipline": i["discipline"],
+                                   "sirene": sirene, "distance_m": round(d)})
+        gemeenten = self.status["announcements"].get("gemeenten") or []
+        for a in self.db.announcements_for(gemeenten, start - 86400):
+            if a.get("date") != day.isoformat() or a.get("lat") is None:
+                continue
+            if haversine_m(loc.lat, loc.lon, a["lat"], a["lon"]) > self.cfg["announcements"]["radius_m"]:
+                continue
+            out["announcements"]["count"] += 1
+            if len(out["announcements"]["top"]) < 4:
+                out["announcements"]["top"].append({"title": a["title"], "category": a["category"], "url": a["url"]})
+        pad = radius / 111_000 * 1.5
+        for w in self.db.roadworks_in_bbox(loc.lat - pad, loc.lon - pad, loc.lat + pad, loc.lon + pad, end, start):
+            if not w["closed"] or haversine_m(loc.lat, loc.lon, w["lat"], w["lon"]) > radius:
+                continue
+            out["roadworks"]["count"] += 1
+            name = w.get("road") or w.get("note") or w.get("cause") or "afsluiting"
+            if name not in out["roadworks"]["names"] and len(out["roadworks"]["names"]) < 4:
+                out["roadworks"]["names"].append(name)
+        out["waste"] = [e["label"] for e in (self.db.meta_get("waste_events") or []) if e["date"] == day.isoformat()]
+        return out
+
+    async def digest_once(self) -> None:
+        """Gisteren vastleggen zolang de meldingen van die dag er nog zijn (keep_hours)."""
+        if not self.cfg["history"]["enabled"]:
+            return
+        today = dt.date.today()
+        yesterday = today - dt.timedelta(days=1)
+        stored = {d["date"] for d in self.db.digests(yesterday.isoformat())}
+        if yesterday.isoformat() not in stored and self.locations.current is not None:
+            self.db.digest_set(yesterday.isoformat(), self.build_digest(yesterday))
+            self.status["history"]["last_ok"] = time.time()
+        self.db.purge_digests((today - dt.timedelta(days=self.cfg["history"]["days"] + 1)).isoformat())
+
+    def history(self) -> list[dict[str, Any]]:
+        """Vandaag (live) plus de bewaarde dagen, nieuwste eerst."""
+        today = dt.date.today()
+        days = self.cfg["history"]["days"]
+        stored = {d["date"]: d for d in self.db.digests((today - dt.timedelta(days=days)).isoformat())}
+        out = [{**self.build_digest(today), "today": True}]
+        for n in range(1, days + 1):
+            day = (today - dt.timedelta(days=n)).isoformat()
+            out.append(stored.get(day) or {"date": day, "missing": True})
+        return out
+
     # --- weer en luchtkwaliteit -------------------------------------------------
 
     async def refresh_weather_once(self) -> None:
@@ -961,6 +1032,8 @@ class Service:
                 self._tasks.append(asyncio.create_task(self._loop("afvalmelding", 15 * 60, self.notify_waste_loop)))
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "waste", self.cfg["waste"]["refresh_hours"] * 3600, self.refresh_waste_once)))
+        if self.cfg["history"]["enabled"]:
+            self._tasks.append(asyncio.create_task(self._loop("historie", 30 * 60, self.digest_once)))
         if self.cfg["weather"]["enabled"]:
             self._tasks.append(asyncio.create_task(self._loop(
                 "weer", self.cfg["weather"]["refresh_minutes"] * 60, self.refresh_weather_once)))
