@@ -123,6 +123,32 @@ def point_of(locatiegebied: str | None) -> tuple[float, float] | None:
     return lat, lon
 
 
+MAX_SHAPE_POINTS = 80
+
+
+def shape_of(locatiegebied: str | None) -> dict[str, Any] | None:
+    """Het aangegeven gebied voor op de kaart: {"type": "Polygon"|"LineString", "coords": [[lat, lon], …]}.
+
+    Alleen de buitenrand van het (eerste) vlak; een los punt geeft None (dat is de marker al).
+    """
+    if not locatiegebied or _LATLON_RE.match(locatiegebied):
+        return None
+    wkt = locatiegebied.strip().upper()
+    kind = "Polygon" if wkt.startswith(("POLYGON", "MULTIPOLYGON")) else \
+        "LineString" if wkt.startswith(("LINESTRING", "MULTILINESTRING")) else None
+    if kind is None:
+        return None
+    first = wkt.split(")")[0]  # eerste ring/lijn
+    coords = [(float(y), float(x)) for x, y in _COORD_RE.findall(first)]
+    coords = [(lat, lon) for lat, lon in coords if -90 <= lat <= 90 and -180 <= lon <= 180]
+    if len(coords) < 2:
+        return None
+    if len(coords) > MAX_SHAPE_POINTS:
+        step = len(coords) / (MAX_SHAPE_POINTS - 1)
+        coords = [coords[int(i * step)] for i in range(MAX_SHAPE_POINTS - 1)] + [coords[-1]]
+    return {"type": kind, "coords": [[round(lat, 6), round(lon, 6)] for lat, lon in coords]}
+
+
 def short_title(title: str) -> str:
     """Titel zonder zaaknummer aan het eind ("…, 3512AH Utrecht, GU-Z2026-0068098")."""
     return _ZAAK_RE.sub("", title.strip()).rstrip(" ,")
@@ -160,10 +186,13 @@ def parse_sru(xml: bytes | str) -> tuple[int, list[dict[str, Any]]]:
         date = _text(meta, ".//dcterms:available") or _text(meta, ".//dcterms:modified")
         lat = lon = None
         label = None
+        shape = None
         for mark in meta.iterfind(".//ow:gebiedsmarkering/*", NS):
-            point = point_of(_text(mark, "ow:locatiegebied"))
+            gebied = _text(mark, "ow:locatiegebied")
+            point = point_of(gebied)
             if point:
                 lat, lon = point
+                shape = shape_of(gebied)
                 label = _text(mark, "ow:geometrielabel")
                 if label and _JUNK_LABEL_RE.match(label):
                     label = None  # bijv. "Handmatig 1": zelf getekend vlak zonder naam
@@ -187,6 +216,7 @@ def parse_sru(xml: bytes | str) -> tuple[int, list[dict[str, Any]]]:
             "label": label,
             "lat": lat,
             "lon": lon,
+            "shape": shape,
             "deadline": (_text(meta, ".//ow:datumEindeReactietermijn") or "")[:10] or None,
             "url": url,
         })

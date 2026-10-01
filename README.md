@@ -583,6 +583,7 @@ Een lange straat kan honderden meters afwijken. Houd daar rekening mee bij een s
 - **Bekendmakingen**: alleen van gemeenten. Provincie, waterschap en Rijkswaterstaat publiceren
   ook (bijv. wegwerkzaamheden op provinciale wegen), maar die zitten er nog niet in. Het punt op de
   kaart is het midden van het aangegeven gebied; bij een lange straat kan dat een stuk verderop zijn.
+  Tik je de bekendmaking aan, dan wordt het hele gebied (straat of bouwvlak) op de kaart getekend.
 - **Lokaal nieuws**: alleen artikelen uit de ingestelde feeds, en herkend op plaatsnaam. Een artikel
   over "Utrecht" kan ook over de provincie gaan.
 - **Statiegeld-kaartdienst**: dit is geen officieel gedocumenteerde API, maar de kaartdienst

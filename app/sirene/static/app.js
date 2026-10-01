@@ -1993,6 +1993,17 @@ const BK_SORT = {
 };
 const LOCAL_REFRESH_MS = 10 * 60 * 1000;
 const bkLayer = L.layerGroup().addTo(map);
+const bkShapeLayer = L.layerGroup().addTo(map);   // het gebied van de aangeklikte bekendmaking
+const BK_COLORS = { bouwen: "#b45309", verkeer: "#2563eb", evenementen: "#7c3aed", vergunning: "#0f766e", overig: "#6b7280" };
+
+/** Teken het aangegeven gebied (straat, bouwvlak) bij een open popup. */
+function bkDrawShape(a) {
+  bkShapeLayer.clearLayers();
+  if (!a || !a.shape) return;
+  const color = BK_COLORS[a.category] || BK_COLORS.overig;
+  const opts = { color, weight: 3, opacity: 0.9, fillColor: color, fillOpacity: 0.15, interactive: false };
+  (a.shape.type === "Polygon" ? L.polygon(a.shape.coords, opts) : L.polyline(a.shape.coords, opts)).addTo(bkShapeLayer);
+}
 const bkMarkers = new Map();
 let bkPendingPopup = null;
 
@@ -2068,6 +2079,8 @@ function renderBkLayer() {
     if (a.lat == null || !(state.bk.show ? bkVisible(a) : a.id === state.bk.focus)) continue;
     const marker = L.marker([a.lat, a.lon], { icon: bkIcon(a), keyboard: false, zIndexOffset: -400 })
       .bindPopup(() => bkPopup(a), { maxWidth: 280 });
+    marker.on("popupopen", () => bkDrawShape(a));
+    marker.on("popupclose", () => bkDrawShape(null));
     marker.addTo(bkLayer);
     bkMarkers.set(a.id, marker);
   }

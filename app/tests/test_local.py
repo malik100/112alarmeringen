@@ -247,3 +247,13 @@ def test_placeholder_label_dropped():
     _, [a] = parse_sru(sru(record("gmb-1", "Aangevraagde evenementenvergunningen, Wintermarkt, Molenpark",
                                   kind="evenementenvergunning", label="Handmatig 1")))
     assert a["label"] is None and a["lat"] is not None
+
+
+def test_shape_of_geometry():
+    from sirene.sources.bekendmakingen import shape_of
+    poly = shape_of("POLYGON((5.1235 52.0975,5.1233 52.0976,5.1234 52.0977,5.1235 52.0975))")
+    assert poly["type"] == "Polygon" and poly["coords"][0] == [52.0975, 5.1235] and len(poly["coords"]) == 4
+    assert shape_of("MULTIPOLYGON(((5.0 52.0,5.1 52.0,5.1 52.1,5.0 52.0)),((6 53,6 53.1,6.1 53,6 53)))")["coords"][-1] == [52.0, 5.0]
+    assert shape_of("LINESTRING(5.0 52.0,5.2 52.2)") == {"type": "LineString", "coords": [[52.0, 5.0], [52.2, 5.2]]}
+    assert shape_of("POINT(5.0 52.0)") is None and shape_of("52.1,5.1") is None
+    assert shape_of("POLYGON ((136931 456617, 136920 456635))") is None   # rijksdriehoek
