@@ -16,6 +16,8 @@ Pi. Pushmeldingen zijn optioneel en staan standaard uit.
 - **Openbaar vervoer**: haltes met live vertrektijden (vertraging, "rijdt niet", spoorwijziging),
   alle lijnen op de kaart en bussen, trams en metro's die nu rijden. Van alle vervoerders in
   Nederland, uit de open data van het NDOV Loket via OVapi.
+- **Afvalkalender**: wanneer welke bak aan de straat moet ("Morgen: GFT"), via de agenda-link
+  (iCal) van je eigen gemeente of inzamelaar.
 - **Weer en luchtkwaliteit** voor jouw plek: temperatuur en wind van het dichtstbijzijnde
   KNMI-station, de buien voor de komende 2 uur als grafiek ("Regen, droog vanaf 14:10"), de
   Luchtkwaliteitsindex van het dichtstbijzijnde meetstation en de verwachting voor vijf dagen.
@@ -327,6 +329,17 @@ zoom 12), met rechts de dichtstbijzijnde binnen 5 km (`fuel.list_radius_m`).
 - **Prijzen** staan er niet bij: daar is in Nederland geen open bron voor.
 - **Verversen**: één keer per dag (`fuel.refresh_hours`).
 
+## Afvalkalender
+
+Er is geen landelijke open bron voor ophaaldagen; elke gemeente of inzamelaar heeft zijn eigen
+afvalkalender. Bijna allemaal bieden ze een knop **Agenda** of **iCal** waarmee je je eigen
+ophaaldagen als agenda-link krijgt (Afvalwijzer, ROVA, Cyclus, Meerlanden, Dar, HVC, de gemeente
+Amsterdam, …). Die link plak je in de sectie *Afvalkalender → Agenda-link instellen*; ook mogelijk
+via `waste.ical_url` in `config.yaml`. Buurtradar leest de agenda één keer per dag en toont de
+komende drie weken: "Morgen: GFT", "Vrijdag 10 okt: Papier". De sectiekop kleurt oranje als er
+morgen iets opgehaald wordt. Soorten worden herkend aan de titel (GFT, papier, PMD, rest, glas,
+textiel, kerstboom, grofvuil, KCA); een onbekende titel wordt letterlijk getoond.
+
 ## Weer en luchtkwaliteit
 
 De sectie **Weer & luchtkwaliteit** (standaard aan) toont voor jouw plek:
@@ -601,6 +614,7 @@ SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:ap
 | `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
 | `app/sirene/sources/fuel.py` | tankstations (OSM), met of zonder winkel             |
 | `app/sirene/sources/amenities.py` | AED's, toiletten en drinkwater (OSM)             |
+| `app/sirene/sources/waste.py` | afvalkalender uit een agenda-link (iCal)             |
 | `app/sirene/sources/weather.py` | weer en buien (Buienradar), luchtkwaliteit (Luchtmeetnet) |
 | `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
 | `app/sirene/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |

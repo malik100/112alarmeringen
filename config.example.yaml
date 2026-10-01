@@ -83,6 +83,11 @@ fuel:                   # tankstations (OSM), met of zonder winkel
   min_zoom: 12
   list_radius_m: 5000   # straal voor de lijst "tankstations in de buurt"
 
+waste:                  # afvalkalender: agenda-link (iCal) van je gemeente; kan ook in het paneel
+  enabled: true
+  ical_url: ""
+  refresh_hours: 24
+
 weather:                # weer en buien (Buienradar), luchtkwaliteit (Luchtmeetnet/RIVM)
   enabled: true
   refresh_minutes: 10

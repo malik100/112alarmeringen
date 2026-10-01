@@ -857,3 +857,12 @@ fieldset { min-width: 0; }
 .we-days .d b { display: block; }
 .we-days .d small { color: var(--fg-muted); }
 .we-days .rain { color: #0ea5e9; }
+
+/* --- afvalkalender --- */
+.wa-list .item { grid-template-columns: 10px 1fr auto; cursor: default; }
+.wa-list .item:hover { background: none; }
+.wa-list .bar { background: var(--c, var(--fg-muted)); }
+.wa-list .item.today .what, .wa-list .item.tomorrow .what { color: var(--fg); }
+.wa-list .item.tomorrow .dist { color: #b45309; }
+.wa-form { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.wa-form input { flex: 1 1 200px; min-width: 0; font: inherit; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); }

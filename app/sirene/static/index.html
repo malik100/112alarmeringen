@@ -122,6 +122,10 @@
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#cloud-sun"/></svg></span><span class="layer-name">Weer &amp; luchtkwaliteit</span>
         <input type="checkbox" class="toggle" id="we-show">
       </label>
+      <label class="layer-row" id="wa-show-chip" hidden>
+        <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#trash-2"/></svg></span><span class="layer-name">Afvalkalender</span>
+        <input type="checkbox" class="toggle" id="wa-show">
+      </label>
       <label class="layer-row" id="nw-show-chip" hidden>
         <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#newspaper"/></svg></span><span class="layer-name">Nieuws uit de buurt</span>
         <input type="checkbox" class="toggle" id="nw-show">
@@ -371,6 +375,30 @@
           <div id="we-days"></div>
           <p class="hint" id="we-report"></p>
           <p class="hint">Bron: <a href="https://www.buienradar.nl" target="_blank" rel="noopener noreferrer">Buienradar</a> en Luchtmeetnet (RIVM).</p>
+        </div>
+      </section>
+
+      <section class="lsec" data-sec="afval" data-layer="waste" hidden>
+        <button type="button" class="lsec-head" aria-expanded="true">
+          <span class="layer-ic"><svg class="i" aria-hidden="true"><use href="/static/icons.svg#trash-2"/></svg></span>
+          <span class="lsec-title"><span class="lsec-name">Afvalkalender</span><span class="lsec-sum"></span></span>
+          <svg class="i caret" aria-hidden="true"><use href="/static/icons.svg#chevron-down"/></svg>
+        </button>
+        <div class="lsec-body">
+          <ol class="list wa-list" id="list-wa"></ol>
+          <p class="empty" id="empty-wa" hidden></p>
+          <details class="ch-filters" id="wa-setup">
+            <summary>Agenda-link instellen</summary>
+            <p class="hint">Er is geen landelijke bron voor ophaaldagen. Ga naar de afvalkalender van je gemeente of
+              inzamelaar (Afvalwijzer, ROVA, Cyclus, Meerlanden, Dar, HVC, …), vul je adres in en kies
+              <b>Agenda</b> of <b>iCal</b>. Plak die link hier; Buurtradar leest hem elke dag opnieuw.</p>
+            <form id="wa-form" class="wa-form">
+              <input type="url" id="wa-url" placeholder="https://…/kalender.ics of webcal://…" aria-label="Agenda-link">
+              <button type="submit" class="btn primary">Opslaan</button>
+              <button type="button" class="btn" id="wa-clear" hidden>Wissen</button>
+            </form>
+            <p class="hint" id="wa-msg"></p>
+          </details>
         </div>
       </section>
 

@@ -57,6 +57,10 @@ class LocationIn(BaseModel):
     accuracy: float | None = Field(default=None, ge=0)
 
 
+class WasteIn(BaseModel):
+    url: str = Field(max_length=1000)
+
+
 class LoginIn(BaseModel):
     password: str = Field(max_length=200)
 
@@ -135,6 +139,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
             "fuel": {k: cfg["fuel"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "amenities": {k: cfg["amenities"][k] for k in ("enabled", "min_zoom", "list_radius_m")},
             "weather": {"enabled": cfg["weather"]["enabled"]},
+            "waste": {"enabled": cfg["waste"]["enabled"]},
             "roadworks": {k: cfg["roadworks"][k] for k in ("enabled", "min_zoom", "list_radius_m", "ahead_days")},
             "ov": {**{k: cfg["ov"][k] for k in ("enabled", "stops_min_zoom", "lines_min_zoom",
                                                  "vehicles_min_zoom", "list_radius_m")},
@@ -156,7 +161,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         names = {"p2000": "112-meldingen", "news": "Nieuws", "announcements": "Bekendmakingen",
                  "roadworks": "Wegwerk", "parking": "Parkeren", "statiegeld": "Statiegeld", "shops": "Winkels",
                  "fuel": "Tankstations", "amenities": "AED, toilet, water", "weather": "Weer",
-                 "air": "Luchtkwaliteit", "charging": "Laadpalen", "charging_status": "Laadpalen (beschikbaarheid)",
+                 "air": "Luchtkwaliteit", "waste": "Afvalkalender", "charging": "Laadpalen", "charging_status": "Laadpalen (beschikbaarheid)",
                  "speedcams": "Flitsers", "ov": "OV-dienstregeling", "ov_realtime": "OV actueel",
                  "homeassistant": "Home Assistant"}
         enabled = {"p2000": True, "news": svc.cfg["news"]["enabled"],
@@ -165,6 +170,7 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
                    "statiegeld": svc.cfg["statiegeld"]["enabled"], "shops": svc.cfg["shops"]["enabled"],
                    "fuel": svc.cfg["fuel"]["enabled"], "amenities": svc.cfg["amenities"]["enabled"],
                    "weather": svc.cfg["weather"]["enabled"], "air": svc.cfg["weather"]["enabled"],
+                   "waste": svc.cfg["waste"]["enabled"] and bool(svc.waste_url()),
                    "charging": svc.cfg["charging"]["enabled"],
                    "charging_status": svc.cfg["charging"]["enabled"],
                    "speedcams": svc.cfg["speedcams"]["enabled"], "ov": svc.cfg["ov"]["enabled"],
@@ -514,6 +520,28 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
         realtime = await svc.ov_realtime()
         return {"vehicles": svc.ov.vehicles_in_bbox(realtime, *area, time.time(), ov_modes(modes)),
                 "realtime_ts": realtime.ts}
+
+    @app.get("/api/waste")
+    def get_waste():
+        """Ophaaldagen van de komende weken, plus de ingestelde agenda-link."""
+        if not svc.cfg["waste"]["enabled"]:
+            raise HTTPException(404, "Afvalkalender staat uit in de configuratie")
+        return {"url": svc.waste_url(), "events": svc.waste_upcoming(),
+                "updated": svc.status["waste"]["last_ok"],
+                "error": (svc.status["waste"]["last_error"] or "").split(":", 1)[-1].strip() or None}
+
+    @app.put("/api/waste")
+    async def put_waste(body: WasteIn):
+        """Agenda-link instellen (leeg = wissen). Een link die niet werkt wordt niet bewaard."""
+        if not svc.cfg["waste"]["enabled"]:
+            raise HTTPException(404, "Afvalkalender staat uit in de configuratie")
+        try:
+            events = await svc.set_waste_url(body.url)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        except httpx.HTTPError as exc:
+            raise HTTPException(422, f"De link kon niet worden opgehaald: {exc}")
+        return {"url": svc.waste_url(), "events": svc.waste_upcoming(), "count": len(events)}
 
     @app.get("/api/weather")
     async def get_weather(lat: float | None = Query(default=None, ge=-90, le=90),

@@ -37,6 +37,7 @@ from .sources.gtfs_rt import DEFAULT_URL as OV_REALTIME_URL
 from .sources.gtfs_rt import fetch_alerts, fetch_trip_updates, fetch_vehicles
 from .sources.amenities import fetch_amenities
 from .sources import weather as weather_src
+from .sources.waste import fetch_ical
 from .sources.fuel import fetch_fuel
 from .sources.shops import fetch_shops, is_late, same_store
 from .sources.speedcams import fetch_speedcams
@@ -87,6 +88,7 @@ class Service:
             "fuel": {"last_ok": None, "last_error": None, "count": 0},
             "amenities": {"last_ok": None, "last_error": None, "count": 0},
             "weather": {"last_ok": None, "last_error": None},
+            "waste": {"last_ok": None, "last_error": None, "count": 0},
             "air": {"last_ok": None, "last_error": None, "count": 0},
             "roadworks": {"last_ok": None, "last_error": None, "count": 0},
             "ov": {"last_ok": None, "last_error": None, "count": 0, "importing": False},
@@ -520,6 +522,48 @@ class Service:
         self.bus.publish("amenities", {"count": len(items)})
         return True
 
+    # --- afvalkalender --------------------------------------------------------------
+
+    def waste_url(self) -> str:
+        return self.db.meta_get("waste_url") or self.cfg["waste"]["ical_url"] or ""
+
+    async def set_waste_url(self, url: str) -> list[dict[str, Any]]:
+        """Nieuwe agenda-link: meteen proberen; alleen bewaren als die werkt."""
+        url = url.strip()
+        if not url:
+            self.db.meta_set("waste_url", None)
+            self.db.meta_set("waste_events", None)
+            self.status["waste"].update(last_ok=None, last_error=None, count=0)
+            return []
+        events = await fetch_ical(self.client, url)
+        self.db.meta_set("waste_url", url)
+        self.db.meta_set("waste_events", events)
+        self.db.meta_set("waste_updated", time.time())
+        self.status["waste"].update(last_ok=time.time(), last_error=None, count=len(events))
+        self.bus.publish("waste", {"count": len(events)})
+        return events
+
+    async def refresh_waste_once(self) -> bool:
+        url = self.waste_url()
+        if not url:
+            return True
+        try:
+            events = await fetch_ical(self.client, url)
+        except (httpx.HTTPError, ValueError) as exc:
+            log.warning("Afvalkalender ophalen mislukt: %s", exc)
+            self.status["waste"]["last_error"] = f"{time.time():.0f}: {exc}"
+            return False
+        self.db.meta_set("waste_events", events)
+        self.db.meta_set("waste_updated", time.time())
+        self.status["waste"].update(last_ok=time.time(), count=len(events))
+        self.bus.publish("waste", {"count": len(events)})
+        return True
+
+    def waste_upcoming(self, days: int = 21) -> list[dict[str, Any]]:
+        today = dt.date.today().isoformat()
+        horizon = (dt.date.today() + dt.timedelta(days=days)).isoformat()
+        return [e for e in (self.db.meta_get("waste_events") or []) if today <= e["date"] <= horizon]
+
     # --- weer en luchtkwaliteit -------------------------------------------------
 
     async def refresh_weather_once(self) -> None:
@@ -793,6 +837,10 @@ class Service:
             self.status["fuel"]["count"] = self.db.fuel_count()
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "fuel", self.cfg["fuel"]["refresh_hours"] * 3600, self.refresh_fuel_once)))
+        if self.cfg["waste"]["enabled"]:
+            self.status["waste"]["count"] = len(self.db.meta_get("waste_events") or [])
+            self._tasks.append(asyncio.create_task(self._refresh_loop(
+                "waste", self.cfg["waste"]["refresh_hours"] * 3600, self.refresh_waste_once)))
         if self.cfg["weather"]["enabled"]:
             self._tasks.append(asyncio.create_task(self._loop(
                 "weer", self.cfg["weather"]["refresh_minutes"] * 60, self.refresh_weather_once)))

@@ -166,6 +166,12 @@ DEFAULTS: dict[str, Any] = {
         "vehicles_min_zoom": 13,
         "list_radius_m": 800,
     },
+    "waste": {
+        # Afvalkalender: agenda-link (iCal) van je gemeente of inzamelaar; ook in te stellen in het paneel.
+        "enabled": True,
+        "ical_url": "",
+        "refresh_hours": 24,
+    },
     "weather": {
         # Weer (Buienradar) en luchtkwaliteit (Luchtmeetnet/RIVM) voor je plek.
         "enabled": True,

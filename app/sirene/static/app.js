@@ -37,6 +37,7 @@ const state = {
   // Standaard wat je merkt op straat (verkeer, evenementen); bouw en vergunningen zijn een optie.
   bk: { show: false, focus: null, items: [], cats: new Set(["verkeer", "evenementen"]), important: true,
         sort: "relevant", showAll: false },
+  wa: { show: true, data: null },
   we: { show: true, data: null, from: null, ts: 0 },
   am: { show: false, kinds: new Set(["aed", "toilet", "water"]), points: [], near: [], nearFrom: null },
   fu: { show: false, shops: new Set(["ja", "nee", "onbekend"]), onlyOpen: false, points: [], near: [], nearFrom: null },
@@ -1886,6 +1887,95 @@ function initWeather() {
   setInterval(() => { if (document.visibilityState === "visible") loadWeather().catch(console.error); }, WE_REFRESH_MS);
 }
 
+// ---------- afvalkalender ----------
+
+const WA_COLORS = { gft: "#16a34a", papier: "#2563eb", pmd: "#ea580c", rest: "#4b5563", glas: "#0891b2",
+  textiel: "#9333ea", kerstboom: "#15803d", grof: "#92400e", chemisch: "#dc2626", overig: "#6b7280" };
+const WA_SHOW = 8;
+
+function waDayLabel(iso, today) {
+  const d = new Date(`${iso}T12:00:00`);
+  const diff = Math.round((d - today) / 86400000);
+  if (diff === 0) return "Vandaag";
+  if (diff === 1) return "Morgen";
+  const text = d.toLocaleDateString("nl-NL", { weekday: diff < 7 ? "long" : "short", day: "numeric", month: diff < 7 ? undefined : "short" });
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function renderWaste() {
+  const cfg = state.config.waste;
+  if (!cfg.enabled) return;
+  const data = state.wa.data;
+  const empty = $("empty-wa");
+  const list = $("list-wa");
+  const setup = $("wa-setup");
+  $("wa-url").value = (data && data.url) || "";
+  $("wa-clear").hidden = !(data && data.url);
+  if (!data || !data.url) {
+    list.replaceChildren();
+    empty.textContent = "Nog geen afvalkalender gekoppeld. Stel hieronder de agenda-link van je gemeente in.";
+    empty.hidden = false;
+    setup.open = true;
+    setSectionSummary("afval", "Nog niet ingesteld");
+    return;
+  }
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const events = data.events.slice(0, WA_SHOW);
+  list.replaceChildren(...events.map((e) => {
+    const li = document.createElement("li");
+    const diff = Math.round((new Date(`${e.date}T12:00:00`) - today) / 86400000);
+    li.className = `item${diff === 0 ? " today" : diff === 1 ? " tomorrow" : ""}`;
+    li.style.setProperty("--c", WA_COLORS[e.kind] || WA_COLORS.overig);
+    const bar = document.createElement("span"); bar.className = "bar";
+    const what = document.createElement("span"); what.className = "what"; what.textContent = e.label;
+    what.title = e.summary;
+    const when = document.createElement("span"); when.className = "dist"; when.textContent = waDayLabel(e.date, today);
+    li.append(bar, what, when);
+    return li;
+  }));
+  empty.textContent = data.error ? `Ophalen mislukt: ${data.error}` : "Geen ophaaldagen in de komende drie weken.";
+  empty.hidden = events.length > 0 && !data.error;
+  const next = data.events[0];
+  const sameDay = next ? data.events.filter((e) => e.date === next.date).map((e) => e.label).join(" + ") : "";
+  setSectionSummary("afval", next ? `${waDayLabel(next.date, today)}: ${sameDay}` : "Niets gepland",
+    next && waDayLabel(next.date, today) === "Morgen" ? "urgent" : "");
+}
+
+async function loadWaste() {
+  if (!state.config.waste.enabled || !state.wa.show) return;
+  try { state.wa.data = await api("/api/waste"); } catch (err) { console.warn("Afval:", err.message); }
+  renderWaste();
+}
+
+function initWaste() {
+  if (!state.config.waste.enabled) return;
+  $("wa-show-chip").hidden = false;
+  state.wa.show = store.get("waShow") !== "0";
+  $("wa-show").checked = state.wa.show;
+  $("wa-show").addEventListener("change", (e) => setLayer("waste", e.target.checked));
+  $("wa-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("wa-msg");
+    msg.textContent = "Agenda ophalen…";
+    try {
+      const resp = await fetch("/api/waste", { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: $("wa-url").value.trim() }) });
+      const body = await resp.json();
+      if (!resp.ok) { msg.textContent = body.detail || "Dat lukte niet."; return; }
+      msg.textContent = `Gelukt: ${body.count} ophaaldagen gevonden.`;
+      $("wa-setup").open = false;
+      await loadWaste();
+    } catch (err) { msg.textContent = `Dat lukte niet: ${err.message}`; }
+  });
+  $("wa-clear").addEventListener("click", async () => {
+    await fetch("/api/waste", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: "" }) });
+    $("wa-msg").textContent = "";
+    await loadWaste();
+  });
+  loadWaste().catch(console.error);
+  setInterval(() => { if (document.visibilityState === "visible") loadWaste().catch(console.error); }, 30 * 60 * 1000);
+}
+
 // ---------- nieuws en bekendmakingen uit de buurt ----------
 
 const BK_ICON = { bouwen: "construction", verkeer: "traffic-cone", evenementen: "party-popper",
@@ -2996,7 +3086,7 @@ function initNav() {
 function setLayer(layer, on) {
   const el = { incidents: "layer-incidents", cams: "layer-cams", parking: "pk-show", shops: "sh-show",
     charging: "ch-show", statiegeld: "sg-show", announcements: "bk-show", roadworks: "rw-show",
-    news: "nw-show", ov: "ov-show", fuel: "fu-show", amenities: "am-show", weather: "we-show" }[layer];
+    news: "nw-show", ov: "ov-show", fuel: "fu-show", amenities: "am-show", weather: "we-show", waste: "wa-show" }[layer];
   if ($(el)) $(el).checked = on;
   if (layer === "incidents") { state.showIncidents = on; store.set("showIncidents", on ? "1" : "0"); renderIncidents(); }
   if (layer === "cams") { state.showCams = on; store.set("showCams", on ? "1" : "0"); $("cam-layers").hidden = !on; renderCams(); }
@@ -3009,6 +3099,7 @@ function setLayer(layer, on) {
   if (layer === "announcements") { state.bk.show = on; store.set("bkShow", on ? "1" : "0"); renderBkLayer(); }
   if (layer === "statiegeld") { state.sg.show = on; store.set("sgShow", on ? "1" : "0"); scheduleSgViewport(); }
   if (layer === "news") { state.nw.show = on; store.set("nwShow", on ? "1" : "0"); }
+  if (layer === "waste") { state.wa.show = on; store.set("waShow", on ? "1" : "0"); if (on) loadWaste().catch(console.error); }
   if (layer === "weather") { state.we.show = on; store.set("weShow", on ? "1" : "0"); if (on) loadWeather(true).catch(console.error); }
   if (layer === "ov") {
     state.ov.show = on;
@@ -3024,11 +3115,11 @@ function setLayer(layer, on) {
 // Snel kiezen: één tik zet precies de lagen aan die bij een situatie horen.
 const PRESETS = {
   onderweg: ["ov", "fuel", "roadworks", "cams", "parking", "charging", "amenities", "weather"],
-  thuis: ["weather", "news", "announcements", "incidents", "roadworks"],
+  thuis: ["weather", "waste", "news", "announcements", "incidents", "roadworks"],
   boodschappen: ["shops", "statiegeld", "parking"],
   uit: [],
 };
-const ALL_LAYERS = ["parking", "statiegeld", "shops", "fuel", "amenities", "roadworks", "ov", "cams", "charging", "weather", "news",
+const ALL_LAYERS = ["parking", "statiegeld", "shops", "fuel", "amenities", "roadworks", "ov", "cams", "charging", "weather", "waste", "news",
   "announcements", "incidents"];
 
 function applyPreset(name) {
@@ -3040,7 +3131,7 @@ function applyPreset(name) {
 /** Markeer de preset die precies overeenkomt met wat er nu aanstaat (als die er is). */
 function layerIsOn(layer) {
   return { parking: state.pk.show, statiegeld: state.sg.show, shops: state.sh.show, fuel: state.fu.show,
-    amenities: state.am.show, weather: state.we.show,
+    amenities: state.am.show, weather: state.we.show, waste: state.wa.show,
     roadworks: state.rw.show, ov: state.ov.show, cams: state.showCams, charging: state.ch.show,
     news: state.nw.show, announcements: state.bk.show, incidents: state.showIncidents }[layer];
 }
@@ -3050,7 +3141,7 @@ function renderPresets() {
   const c = state.config;
   const enabled = (layer) => ({ parking: c.parking.enabled, statiegeld: c.statiegeld.enabled, shops: c.shops.enabled,
     fuel: c.fuel.enabled, amenities: c.amenities.enabled, roadworks: c.roadworks.enabled, ov: c.ov.enabled, cams: c.speedcams_enabled,
-    charging: c.charging.enabled, weather: c.weather.enabled, news: c.local.news, announcements: c.local.announcements, incidents: true })[layer];
+    charging: c.charging.enabled, weather: c.weather.enabled, waste: c.waste.enabled, news: c.local.news, announcements: c.local.announcements, incidents: true })[layer];
   const current = ALL_LAYERS.filter((l) => layerIsOn(l) && enabled(l)).join(",");
   document.querySelectorAll("[data-preset]").forEach((btn) => {
     const want = ALL_LAYERS.filter((l) => PRESETS[btn.dataset.preset].includes(l) && enabled(l)).join(",");
@@ -3119,6 +3210,7 @@ const SECTION_ON = {
   ov: () => state.config.ov.enabled && state.ov.show,
   charging: () => state.config.charging.enabled && state.ch.show,
   weather: () => state.config.weather.enabled && state.we.show,
+  waste: () => state.config.waste.enabled && state.wa.show,
   news: () => state.config.local.news && state.nw.show,
   announcements: () => state.config.local.announcements && state.bk.show,
   incidents: () => state.showIncidents,
@@ -3347,6 +3439,7 @@ function connectEvents() {
     loadWeather().catch(console.error);
   });
   es.addEventListener("weather", () => loadWeather(true).catch(console.error));
+  es.addEventListener("waste", () => loadWaste().catch(console.error));
   es.addEventListener("amenities", () => {
     scheduleAmenitiesViewport();
     loadAmenitiesNear(true).catch(console.error);
@@ -3748,6 +3841,7 @@ async function init() {
   initFuel();
   initAmenities();
   initWeather();
+  initWaste();
   initLocal();
   initRoadworks();
   initOv();
