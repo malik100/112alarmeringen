@@ -685,6 +685,7 @@ function pkPopup(zone) {
     ${facts ? `<div><small>${esc(facts)}</small></div>` : ""}
     ${zone.special_days ? '<div class="pk-note">Op feestdagen en bij evenementen kunnen andere tijden gelden.</div>' : ""}
     ${zone.approx === "automaten" ? '<div class="pk-note">Zonegrens niet bekend bij de RDW: de stippen zijn de parkeerautomaten van deze zone.</div>' : ""}
+    ${zone.approx === "straat" ? `<div class="pk-note">Zonegrens niet bekend bij de RDW: de P staat op het midden van ${esc(zone.street || "de straat uit de zonenaam")}.</div>` : ""}
     ${zone.approx_distance_m != null ? `<div class="pk-note">Waarschijnlijk geldt deze zone hier: er staat een automaat op ${esc(fmtDistance(zone.approx_distance_m))}.</div>` : ""}
     <div class="pk-note">Bron: RDW/NPR. Borden ter plaatse gaan altijd voor.</div>
     ${zone.kind === "garage" ? `<div class="popup-links">${routeLink(...pkPoint(zone))}</div>` : ""}
@@ -727,8 +728,9 @@ function renderParking() {
       shape.bindTooltip(() => `<b>${esc(zone.name)}</b><br>${esc(st.text)}<br><small>parkeerautomaat</small>`, { sticky: true, direction: "top", className: "pk-tip" });
     } else if (zone.geometry.type === "Point") {
       const [lon, lat] = zone.geometry.coordinates;
+      const approx = zone.approx === "straat";
       shape = L.marker([lat, lon], {
-        icon: L.divIcon({ className: "pk-marker", html: '<div class="pk-sign">P</div>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+        icon: L.divIcon({ className: "pk-marker", html: `<div class="pk-sign${approx ? " approx" : ""}" style="--c:${Parking.zoneColor(zone)}">P</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
         keyboard: false,
         zIndexOffset: -600,
       });

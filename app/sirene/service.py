@@ -30,7 +30,7 @@ from .sources.roadworks import fetch_roadworks, fetch_street
 from .sources.roadworks import is_active as roadwork_active
 from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import PARSER_VERSION as PARKING_PARSER_VERSION
-from .sources.npr import fetch_zones
+from .sources.npr import build_zones, fetch_datasets, locate_street, missing_areas
 from .ov import OvStore, Realtime
 from .sources.gtfs import DEFAULT_URL as GTFS_URL
 from .sources.gtfs import download_gtfs, import_gtfs
@@ -540,9 +540,35 @@ class Service:
 
     # --- parkeerzones -----------------------------------------------------
 
+    async def parking_street_points(self, data: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+        """Gebieden zonder vlak of automaten: het midden van de straat uit de gebiedsnaam (PDOK, gecachet)."""
+        if not self.cfg["geocoder"]["pdok_enabled"]:
+            return {}
+        out: dict[tuple[str, str], dict[str, Any]] = {}
+        for c in missing_areas(data):
+            if not c["street"] or not c["gemeente"]:
+                continue
+            key = f"pkstraat:{c['manager']}:{c['areaid']}:{c['street']}"
+            row = self.db.geocache_get(key)
+            if row is None:
+                try:
+                    found = await locate_street(self.client, c["street"], c["gemeente"])
+                except (httpx.HTTPError, ValueError) as exc:
+                    log.debug("Straat %s (%s): %s", c["street"], c["gemeente"], exc)
+                    continue
+                self.db.geocache_put(key, found["lat"] if found else None, found["lon"] if found else None,
+                                     "straat" if found else None, found["street"] if found else None)
+                row = self.db.geocache_get(key)
+            if row["lat"] is not None:
+                out[(c["manager"], c["areaid"])] = {"lat": row["lat"], "lon": row["lon"], "street": row["label"]}
+        return out
+
     async def refresh_parking_once(self) -> bool:
         try:
-            zones = await fetch_zones(self.client)
+            data = await fetch_datasets(self.client)
+            zones = build_zones(data, street_points=await self.parking_street_points(data))
+            if not zones:
+                raise ValueError("Geen parkeerzones gevonden")
         except (httpx.HTTPError, ValueError, KeyError) as exc:
             log.warning("Parkeerzones ophalen mislukt: %s", exc)
             self.status["parking"]["last_error"] = f"{time.time():.0f}: {exc}"

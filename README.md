@@ -262,9 +262,12 @@ opgehaald (circa 45 MB). Daaruit worden zo'n 4.600 zones opgebouwd.
 - Zones die alleen voor **bezoek van bewoners** gelden (bijv. Rotterdam "Sector 12", Maastricht
   "Centrum-West bezoek"), ook als er een bezoekerstarief aan hangt, tonen we als vergunningzone en
   niet als betaalzone voor iedereen.
-- Nog zonder plek op de kaart: ~190 gebieden in 44 gemeenten, vooral blauwe zones en kleine
-  parkeerterreinen zonder kaartvlak en zonder automaten (bijv. Enkhuizen, Simpelveld, Westland,
-  Meierijstad, Hoogeveen). Hun tijden en tarieven staan wel in het register.
+- Gebieden zonder kaartvlak én zonder automaten (vooral blauwe zones in bijv. Enkhuizen, Simpelveld,
+  Westland, Hoogeveen, Assen) krijgen een **gestippelde P op het midden van de straat** uit de
+  zonenaam ("BZ Westerstraat" → Westerstraat, opgezocht via PDOK en gecontroleerd op naam). Dat
+  lukt voor ~100 zones; de popup zegt erbij dat de grens niet bekend is.
+- Nog zonder plek: ~70 gebieden waarvan de naam geen straat noemt ("Gebied A", "Zone 3",
+  "Blauwe zone Winkelcentrum"). Hun tijden en tarieven staan wel in het register.
 
 | Soort             | Op de kaart                                                      |
 |-------------------|------------------------------------------------------------------|

@@ -270,6 +270,7 @@ h2 { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-
 .item.parking .bar, .item.charging .bar { background: var(--c, var(--fg-muted)); }
 .pk-status { font-weight: 600; color: var(--c, var(--fg)); }
 .pk-marker { background: none; border: 0; }
+.pk-sign.approx { border-style: dashed; background: #fff; color: var(--c, #2563eb); border-color: var(--c, #2563eb); }
 .pk-sign {
   width: 22px; height: 22px; border-radius: 5px;
   display: grid; place-items: center;

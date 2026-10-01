@@ -48,8 +48,9 @@ ROW_LIMIT = 500_000
 # 2: alle vlakken van een gebied samengevoegd (daarvoor bleef er per gebied maar één over).
 # 3: bezoekersregelingen zonder tarief zijn vergunningzones (geen betaalzone met onbekend tarief).
 # 4: gebieden zonder kaartvlak krijgen de plekken van hun parkeerautomaten (MultiPoint).
+# 6: gebieden zonder vlak én zonder automaten: het midden van de straat uit de gebiedsnaam (Point).
 # 5: ook bezoekerszones mét (bezoekers)tarief zijn vergunningzones, geen betaalzone voor iedereen.
-PARSER_VERSION = 5
+PARSER_VERSION = 6
 
 WEEKDAYS = ["MAANDAG", "DINSDAG", "WOENSDAG", "DONDERDAG", "VRIJDAG", "ZATERDAG", "ZONDAG"]
 
@@ -259,7 +260,85 @@ def classify(usages: list[str]) -> str | None:
     return None
 
 
-def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None) -> list[dict[str, Any]]:
+# Woorden in een gebiedsnaam die geen straatnaam zijn ("Blauwe Zone Westerstraat" -> "Westerstraat").
+_DESC_NOISE_RE = re.compile(
+    r"^\s*(bz|blauwe\s*zone|parkeerschijfzone|straatparke?ren|parkeerterrein|parkeerplaats|parkeerdek|"
+    r"parkeergarage|winkelgebied|centrum(gebied)?|betaald\s*parkeren|zone\s*\w+\s*-)\s*[:,-]?\s*", re.I)
+_DESC_TAIL_RE = re.compile(
+    r"\s*(\(.*?\)|\bte\b.*|\bin\b\s+[A-Z].*|\bbij\b.*|max\.?\s*\d+.*|\d+\s*(min|uur)\b.*|"
+    r"\b(ma|di|wo|do|vr|za|zo)-.*|\b(noord|zuid|oost|west|[nzow]z)(zijde)?\b.*|\b\d+e\s+uur.*|"
+    r"\bbezoekers\b.*|\bvergunninghouders\b.*|\bwc\b.*)$", re.I)
+
+
+def street_from_desc(desc: str) -> str | None:
+    """"BZ Westerstraat" -> "Westerstraat"; "Straatparkeren Geestweg te Naaldwijk" -> "Geestweg";
+    "Gebied A" -> None (geen straatnaam in te herkennen)."""
+    text = (desc or "").strip()
+    # Amsterdam: "T13B_U03 10c Scheldestraat" (gebiedscode, tariefcode, straat).
+    text = re.sub(r"^[A-Z]\d+[A-Z]?_U\d+\s+((10c|WS|PO|[IVX]+)\s+)*", "", text)
+    for _ in range(3):
+        text = _DESC_NOISE_RE.sub("", text)
+    text = re.split(r"[;/,]", text)[0]
+    text = _DESC_TAIL_RE.sub("", text).strip(" -:.")
+    text = re.sub(r"\s+[a-zA-Z]$", "", text)   # "Dr. Nolensstraat a"
+    text = re.sub(r"\s+", " ", text)
+    if len(text) < 4 or not re.search(r"[a-z]", text, re.I):
+        return None
+    # Alleen iets wat op een straat, plein, laan, kade of dijk lijkt.
+    if not re.search(r"(straat|weg|laan|plein|kade|dijk|gracht|singel|markt|hof|pad|steeg|dreef|baan|"
+                     r"plaats|burg|wal|dam|haven|park|strand|poort|kamp|akker|erf|veld|werf|hoek|"
+                     r"stationsplein|boulevard|promenade|allee|lei)\b", text, re.I):
+        return None
+    if re.fullmatch(r"(zone|gebied|sector)\s*\w+", text, re.I):
+        return None
+    return text
+
+
+def missing_areas(data: dict[str, list[dict[str, Any]]], today: date | None = None) -> list[dict[str, Any]]:
+    """Gebieden met een regeling maar zonder kaartvlak of automaten: kandidaten om via de straatnaam
+    op de kaart te zetten. [{manager, areaid, desc, gemeente, street}]."""
+    t = (today or date.today()).strftime("%Y%m%d")
+    with_geom = {(r["areamanagerid"], r["areaid"]) for r in data["geometrie"]
+                 if r.get("areageometryastext") and is_active(r.get("startdatearea"), r.get("enddatearea"), t)}
+    with_meter = {(r["areamanagerid"], r.get("areaid")) for r in data.get("verkooppunt", [])}
+    managers = {r["areamanagerid"]: r for r in data["beheerder"]}
+    areas = {(r["areamanagerid"], r["areaid"]): r for r in data["gebied"]
+             if is_active(r.get("startdatearea"), r.get("enddatearea"), t)}
+    usages = {(r["areamanagerid"], r["usageid"]): r for r in data["gebruiksdoel"]
+              if is_active(r.get("startdateusageid"), r.get("enddateusageid"), t)}
+
+    def top_usage(manager: str, usage: str) -> str:
+        for _ in range(6):
+            row = usages.get((manager, usage))
+            sup = row and row.get("superiorusageid")
+            if not sup or sup == usage or sup == "PARKEREN":
+                break
+            manager, usage = row.get("superiorareamanagerid", manager), sup
+        return usage
+
+    regs_of: dict[tuple, list[str]] = defaultdict(list)
+    for r in data["gebiedregeling"]:
+        if is_active(r.get("startdatearearegulation"), r.get("enddatearearegulation"), t):
+            regs_of[(r["areamanagerid"], r["areaid"])].append(top_usage(r["areamanagerid"], r["usageid"]))
+    out = []
+    for key, tops in regs_of.items():
+        if key in with_geom or key in with_meter or key not in areas:
+            continue
+        # Alleen wat voor iedereen geldt (betaald, blauwe zone); vergunningzones en garages
+        # zonder plek laten we liggen, anders staan er honderden vage P's op de kaart.
+        if classify([u for u in tops if not u.startswith(SKIP_USAGE)]) not in ("betaald", "blauw"):
+            continue
+        desc = areas[key].get("areadesc") or ""
+        gemeente = (managers.get(key[0]) or {}).get("areamanagerdesc") or ""
+        out.append({"manager": key[0], "areaid": key[1], "desc": desc, "gemeente": gemeente,
+                    "street": street_from_desc(desc)})
+    return out
+
+
+def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None,
+                street_points: dict[tuple[str, str], dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """`street_points`: (manager, areaid) -> {"lat", "lon", "street"} voor gebieden zonder kaartvlak,
+    gevonden via de straatnaam in de gebiedsnaam (zie missing_areas)."""
     t = (today or date.today()).strftime("%Y%m%d")
 
     managers = {r["areamanagerid"]: r for r in data["beheerder"]
@@ -361,6 +440,11 @@ def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None
             meters[key].append(point)
     for key, points in meters.items():
         area_geoms[key] = [{"type": "MultiPoint", "coordinates": points}]
+    street_of: dict[tuple, str] = {}
+    for key, sp in (street_points or {}).items():
+        if key not in area_geoms:
+            area_geoms[key] = [{"type": "Point", "coordinates": [round(sp["lon"], 6), round(sp["lat"], 6)]}]
+            street_of[key] = sp["street"]
 
     zones = []
     seen: dict[str, dict[str, Any]] = {}
@@ -440,7 +524,8 @@ def build_zones(data: dict[str, list[dict[str, Any]]], today: date | None = None
             "capacity": int(_num(spec.get("capacity"))) or None,
             "max_height_cm": int(_num(spec.get("maximumvehicleheight"))) or None,
             # Geen zonegrens bekend: de punten zijn de parkeerautomaten van deze zone.
-            "approx": "automaten" if geom["type"] == "MultiPoint" else None,
+            "approx": "automaten" if geom["type"] == "MultiPoint" else "straat" if key in street_of else None,
+            "street": street_of.get(key),
             "_visitor_only": visitor_only,
         })
         seen[fingerprint] = zones[-1]
@@ -467,9 +552,34 @@ async def fetch_datasets(client: httpx.AsyncClient, today: date | None = None) -
     return data
 
 
-async def fetch_zones(client: httpx.AsyncClient) -> list[dict[str, Any]]:
+STREET_URL = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free"
+
+
+def _norm_street(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower().replace("dr.", "dr").replace("st.", "sint"))
+
+
+async def locate_street(client: httpx.AsyncClient, street: str, gemeente: str,
+                        url: str = STREET_URL) -> dict[str, Any] | None:
+    """Midden van een straat in een gemeente (PDOK). None als PDOK iets anders vindt dan gevraagd."""
+    resp = await client.get(url, params={"q": street, "fq": [f"gemeentenaam:\"{gemeente}\"", "type:weg"],
+                                         "rows": 3, "fl": "weergavenaam,straatnaam,centroide_ll"}, timeout=15)
+    resp.raise_for_status()
+    wanted = _norm_street(street)
+    for doc in resp.json().get("response", {}).get("docs", []):
+        found = _norm_street(doc.get("straatnaam") or "")
+        # Gelijk, of de gebiedsnaam heeft nog iets achter de straat ("Pollartstraat Verzorgingstehuis").
+        ok = found and (found == wanted or found.endswith(wanted) or (len(found) >= 6 and wanted.startswith(found)))
+        if ok and doc.get("centroide_ll"):
+            lon, lat = doc["centroide_ll"].removeprefix("POINT(").removesuffix(")").split()
+            return {"lat": float(lat), "lon": float(lon), "street": doc.get("weergavenaam") or street}
+    return None
+
+
+async def fetch_zones(client: httpx.AsyncClient,
+                      street_points: dict[tuple[str, str], dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     data = await fetch_datasets(client)
-    zones = build_zones(data)
+    zones = build_zones(data, street_points=street_points)
     if not zones:
         raise ValueError("Geen parkeerzones gevonden")
     log.info("%d parkeerzones opgebouwd", len(zones))

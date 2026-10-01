@@ -313,3 +313,56 @@ def test_visitor_rate_area_is_permit_zone():
     zones = {z["id"]: z for z in npr.build_zones(data, TODAY)}
     assert zones["363:CWB"]["kind"] == "vergunning"
     assert "_visitor_only" not in zones["363:CWB"]
+
+
+def street_zone(data):
+    """Blauwe zone zonder kaartvlak én zonder automaten, met een straatnaam in de gebiedsnaam."""
+    data["gebied"].append(dict(data["gebied"][0], areaid="BZW", areadesc="BZ Westerstraat"))
+    data["gebied"].append(dict(data["gebied"][0], areaid="GEB", areadesc="Gebied A"))
+    for areaid in ("BZW", "GEB"):
+        data["gebiedregeling"].append({"areamanagerid": "363", "areaid": areaid, "regulationid": "BP11V",
+                                       "usageid": "BETAALDP", "startdatearearegulation": "20050101000000"})
+    return data
+
+
+def test_street_from_desc():
+    f = npr.street_from_desc
+    assert f("BZ Westerstraat") == "Westerstraat"
+    assert f("Blauwe Zone Dr. Nolensstraat a (B)") == "Dr. Nolensstraat"
+    assert f("Straatparkeren Geestweg te Naaldwijk (Westland)") == "Geestweg"
+    assert f("Parkeerterrein Klokkenslagstraat (Druten)") == "Klokkenslagstraat"
+    assert f("T13B_U03 10c Scheldestraat") == "Scheldestraat"
+    assert f("Wilhelminastraat bij voormalig postkantoor") == "Wilhelminastraat"
+    assert f("Gebied A") is None and f("Zone 3, telkens 2 uur parkeren") is None
+    assert f("Blauwe Zone, Steenwijk, max. 120 minuten") is None
+
+
+def test_missing_areas_and_street_points():
+    data = street_zone(dataset())
+    missing = {m["areaid"]: m for m in npr.missing_areas(data, TODAY)}
+    assert missing["BZW"]["street"] == "Westerstraat" and missing["BZW"]["gemeente"] == "Amsterdam"
+    assert missing["GEB"]["street"] is None
+    assert "T11V" not in missing                      # heeft een vlak
+    zones = {z["id"]: z for z in npr.build_zones(
+        data, TODAY, street_points={("363", "BZW"): {"lat": 52.70, "lon": 5.28, "street": "Westerstraat, Enkhuizen"}})}
+    z = zones["363:BZW"]
+    assert z["approx"] == "straat" and z["street"] == "Westerstraat, Enkhuizen"
+    assert z["geometry"] == {"type": "Point", "coordinates": [5.28, 52.7]}
+    assert "363:GEB" not in zones                      # geen plek: niet op de kaart
+
+
+@respx.mock
+async def test_locate_street_and_refresh(service):
+    data = street_zone(dataset())
+    for name, ds in npr.DATASETS.items():
+        respx.get(f"{npr.BASE_URL}/{ds}.json").mock(return_value=httpx.Response(200, json=data[name]))
+    pdok = respx.get(npr.STREET_URL).mock(return_value=httpx.Response(200, json={"response": {"docs": [
+        {"weergavenaam": "Westerstraat, Amsterdam", "straatnaam": "Westerstraat", "centroide_ll": "POINT(4.88 52.38)"}]}}))
+    assert await service.refresh_parking_once()
+    zones = {z["id"]: z for z in service.db.parking_in_bbox(52, 4, 53, 6, None, 100)}
+    assert zones["363:BZW"]["approx"] == "straat" and zones["363:BZW"]["geometry"]["coordinates"] == [4.88, 52.38]
+    assert pdok.call_count == 1
+    assert await service.refresh_parking_once()
+    assert pdok.call_count == 1                        # straat onthouden, niet elke dag opnieuw vragen
+    # Een straat die PDOK niet kent (of iets anders teruggeeft) wordt niet gebruikt.
+    assert await npr.locate_street(service.client, "Nergensstraat", "Amsterdam") is None
