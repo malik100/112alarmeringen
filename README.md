@@ -212,6 +212,17 @@ Rijd je zelf een straal binnen waarin net een incident is gestart, dan krijg je 
 Met `channel: ntfy` gaan meldingen naar je eigen ntfy-server
 (`docker compose --profile ntfy up -d`).
 
+Dezelfde meldingen gaan, als ze aanstaan, ook over je buurt (elk uit te zetten in `notifications`):
+
+- `roadworks`: een **afsluiting** binnen `radius_m` die nu bezig is of binnen twee dagen begint
+  ("🚧 Afsluiting nu: Parnassiaveld (120 m)"), één keer per werk.
+- `announcements`: een **belangrijke bekendmaking** binnen de straal (evenement, verkeersbesluit,
+  sloop of nieuwbouw; relevantie ≥ 1,5), met de reactietermijn.
+- `waste`: 's avonds om `waste_hour` (standaard 19 uur) wat **morgen aan de straat** moet
+  ("🗑️ Morgen: GFT + Papier"), als de afvalkalender gekoppeld is.
+
+Voor deze meldingen telt ook een vaste plek (thuis), niet alleen een live locatie.
+
 ## Statiegeld-inleverpunten
 
 De punten komen uit dezelfde openbare kaartdienst als de

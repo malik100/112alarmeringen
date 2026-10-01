@@ -189,6 +189,11 @@ DEFAULTS: dict[str, Any] = {
         "only_priority_1": True,
         # Minimale nauwkeurigheid van de geocoding: "postcode", "straat" of "plaats".
         "min_precision": "straat",
+        # Ook melden (zelfde kanaal, allemaal binnen radius_m rond je plek):
+        "roadworks": True,       # afsluiting die vandaag of morgen begint
+        "announcements": True,   # belangrijke bekendmaking (evenement, verkeersbesluit, sloop, ...)
+        "waste": True,           # 's avonds: wat morgen aan de straat moet
+        "waste_hour": 19,
         "homeassistant_service": "notify.mobile_app_telefoon",
         "ntfy": {"url": "http://ntfy", "topic": "buurtradar", "token": ""},
     },

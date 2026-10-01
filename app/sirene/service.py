@@ -27,6 +27,7 @@ from .sources.bekendmakingen import fetch_announcements, fetch_area
 from .sources.bekendmakingen import relevance as announcement_relevance
 from .sources.roadworks import DEFAULT_URL as ROADWORKS_URL
 from .sources.roadworks import fetch_roadworks, fetch_street
+from .sources.roadworks import is_active as roadwork_active
 from .sources.charging import fetch_availability, fetch_stations
 from .sources.npr import PARSER_VERSION as PARKING_PARSER_VERSION
 from .sources.npr import fetch_zones
@@ -320,6 +321,8 @@ class Service:
         places = await self.area_for(loc.lat, loc.lon)
         if await self.refresh_announcements(self.gemeenten_near(places)):
             self.bus.publish("local", {"ts": time.time()})
+            overview = await self.local_overview(loc.lat, loc.lon)
+            await self.notify_announcements(overview["announcements"])
 
     async def local_overview(self, lat: float, lon: float) -> dict[str, Any]:
         """Nieuws dat een plaats in de buurt noemt en bekendmakingen rond dit punt."""
@@ -395,6 +398,94 @@ class Service:
             return False
         self.db.mark_notified(incident["id"])
         return True
+
+    # --- meldingen over wegwerk, bekendmakingen en afval ---------------------------
+
+    def _already_notified(self, key: str) -> bool:
+        return key in (self.db.meta_get("notified_items") or {})
+
+    def _mark_notified(self, key: str) -> None:
+        items: dict[str, float] = self.db.meta_get("notified_items") or {}
+        now = time.time()
+        items = {k: ts for k, ts in items.items() if now - ts < 90 * 86400}
+        items[key] = now
+        self.db.meta_set("notified_items", items)
+
+    async def _push(self, key: str, title: str, body: str, url: str | None, tags: list[str]) -> bool:
+        if not self.notifier or self._already_notified(key):
+            return False
+        try:
+            await self.notifier.send_text(title, body, tag=f"buurtradar-{key}", url=url, tags=tags)
+        except httpx.HTTPError as exc:
+            log.warning("Melding versturen mislukt: %s", exc)
+            return False
+        self._mark_notified(key)
+        return True
+
+    async def notify_roadworks(self) -> int:
+        """Afsluiting binnen de straal die nu bezig is of binnen twee dagen begint."""
+        ncfg = self.cfg["notifications"]
+        loc = self.locations.current
+        if not (ncfg["enabled"] and ncfg.get("roadworks") and loc and self.cfg["roadworks"]["enabled"]):
+            return 0
+        now = time.time()
+        radius = self.cfg["radius_m"]
+        pad = radius / 111_000 * 1.5
+        sent = 0
+        for w in self.db.roadworks_in_bbox(loc.lat - pad, loc.lon - pad, loc.lat + pad, loc.lon + pad,
+                                           now + 2 * 86400, now):
+            if not w["closed"]:
+                continue
+            d = haversine_m(loc.lat, loc.lon, w["lat"], w["lon"])
+            if d > radius:
+                continue
+            street = await self.street_at(w["lat"], w["lon"]) or w.get("road") or w.get("note") or "Weg"
+            when = "nu" if roadwork_active(w, now) else "binnenkort"
+            body = (w["warnings"][0] if w["warnings"] else "Weg afgesloten") + (f" · {w['cause']}" if w.get("cause") else "")
+            if w.get("end"):
+                body += f" · t/m {dt.datetime.fromtimestamp(w['end']).strftime('%-d %b')}"
+            if await self._push(f"rw:{w['id']}", f"🚧 Afsluiting {when}: {street} ({round(d)} m)", body, w.get("url"), ["construction"]):
+                sent += 1
+        return sent
+
+    async def notify_announcements(self, items: list[dict[str, Any]]) -> int:
+        """Belangrijke bekendmaking (relevantie ≥ 1,5) binnen de straal."""
+        ncfg = self.cfg["notifications"]
+        loc = self.locations.current
+        if not (ncfg["enabled"] and ncfg.get("announcements") and loc):
+            return 0
+        sent = 0
+        for a in items:
+            if a.get("lat") is None or a.get("relevance", 0) < 1.5:
+                continue
+            d = haversine_m(loc.lat, loc.lon, a["lat"], a["lon"])
+            if d > self.cfg["radius_m"]:
+                continue
+            body = (a.get("abstract") or a["title"])[:200]
+            if a.get("deadline"):
+                body += f" · reageren t/m {a['deadline']}"
+            label = {"evenementen": "Evenement", "verkeer": "Verkeersbesluit", "bouwen": "Bouwen"}.get(a["category"], "Bekendmaking")
+            if await self._push(f"bk:{a['id']}", f"📜 {label} op {round(d)} m: {a['title'][:80]}", body, a.get("url"), ["scroll"]):
+                sent += 1
+        return sent
+
+    async def notify_waste(self, now: float | None = None) -> bool:
+        """'s Avonds (waste_hour) melden wat morgen aan de straat moet."""
+        ncfg = self.cfg["notifications"]
+        if not (ncfg["enabled"] and ncfg.get("waste") and self.cfg["waste"]["enabled"]):
+            return False
+        local = dt.datetime.fromtimestamp(now or time.time())
+        if local.hour < ncfg.get("waste_hour", 19):
+            return False
+        tomorrow = (local.date() + dt.timedelta(days=1)).isoformat()
+        labels = [e["label"] for e in (self.db.meta_get("waste_events") or []) if e["date"] == tomorrow]
+        if not labels:
+            return False
+        return await self._push(f"waste:{tomorrow}", f"🗑️ Morgen: {' + '.join(labels)}",
+                                "Zet de container vanavond aan de straat.", None, ["wastebasket"])
+
+    async def notify_waste_loop(self) -> None:
+        await self.notify_waste()
 
     # --- locatie ----------------------------------------------------------
 
@@ -639,6 +730,7 @@ class Service:
             self.db.meta_set("roadworks_etag", etag)
             self.status["roadworks"]["count"] = len(works)
             self.bus.publish("roadworks", {"count": len(works)})
+            await self.notify_roadworks()
         self.db.meta_set("roadworks_updated", time.time())
         self.status["roadworks"]["last_ok"] = time.time()
         return True
@@ -839,6 +931,8 @@ class Service:
                 "fuel", self.cfg["fuel"]["refresh_hours"] * 3600, self.refresh_fuel_once)))
         if self.cfg["waste"]["enabled"]:
             self.status["waste"]["count"] = len(self.db.meta_get("waste_events") or [])
+            if self.cfg["notifications"]["enabled"] and self.cfg["notifications"].get("waste"):
+                self._tasks.append(asyncio.create_task(self._loop("afvalmelding", 15 * 60, self.notify_waste_loop)))
             self._tasks.append(asyncio.create_task(self._refresh_loop(
                 "waste", self.cfg["waste"]["refresh_hours"] * 3600, self.refresh_waste_once)))
         if self.cfg["weather"]["enabled"]:

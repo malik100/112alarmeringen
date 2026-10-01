@@ -123,6 +123,10 @@ notifications:
   channel: homeassistant   # of: ntfy
   only_priority_1: true    # alleen incidenten met sirene (A0/A1/P1)
   min_precision: straat    # postcode | straat | plaats
+  roadworks: true          # ook: afsluiting in de buurt die nu of binnen 2 dagen begint
+  announcements: true      # ook: belangrijke bekendmaking binnen radius_m
+  waste: true              # ook: 's avonds wat morgen aan de straat moet
+  waste_hour: 19
   homeassistant_service: notify.mobile_app_telefoon
   ntfy:
     url: http://ntfy
