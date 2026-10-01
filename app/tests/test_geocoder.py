@@ -1,8 +1,8 @@
 import httpx
 import respx
 
-from sirene.db import Database
-from sirene.geocoder import Geocoder
+from buurtradar.db import Database
+from buurtradar.geocoder import Geocoder
 
 from .conftest import PDOK, pdok_doc, pdok_response
 

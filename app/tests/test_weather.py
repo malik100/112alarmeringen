@@ -2,8 +2,8 @@ import httpx
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources import weather as w
+from buurtradar.main import create_app
+from buurtradar.sources import weather as w
 
 FEED = {"actual": {"sunrise": "2026-10-01T07:38:00", "sunset": "2026-10-01T19:16:00", "stationmeasurements": [
     {"stationid": 1, "stationname": "Meetstation Schiphol", "lat": 52.3, "lon": 4.77, "timestamp": "2026-10-01T01:40:00",

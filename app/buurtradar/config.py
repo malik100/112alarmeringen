@@ -11,7 +11,7 @@ import yaml
 
 DEFAULTS: dict[str, Any] = {
     "radius_m": 1000,
-    "database": "/data/sirene.db",
+    "database": "/data/buurtradar.db",
     # Leeg = "Buurtradar/<versie> (self-hosted, persoonlijk gebruik)".
     "user_agent": "",
     "access": {
@@ -213,6 +213,7 @@ ENV_OVERRIDES: dict[str, tuple[str, ...]] = {
     "HA_ENTITY_ID": ("location", "homeassistant", "entity_id"),
     "NTFY_TOKEN": ("notifications", "ntfy", "token"),
     "BUURTRADAR_PASSWORD": ("access", "password"),
+    "BUURTRADAR_DB": ("database",),
     "SIRENE_DB": ("database",),
 }
 
@@ -228,7 +229,9 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 def load_config(path: str | os.PathLike | None = None) -> dict[str, Any]:
     cfg = copy.deepcopy(DEFAULTS)
-    path = Path(path or os.environ.get("SIRENE_CONFIG", "/config/config.yaml"))
+    # SIRENE_* zijn de oude namen (werknaam van het project); die blijven werken.
+    path = Path(path or os.environ.get("BUURTRADAR_CONFIG") or os.environ.get("SIRENE_CONFIG")
+                or "/config/config.yaml")
     if path.is_file():
         with path.open(encoding="utf-8") as fh:
             _deep_merge(cfg, yaml.safe_load(fh) or {})

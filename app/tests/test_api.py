@@ -3,7 +3,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
+from buurtradar.main import create_app
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ def test_home_location(service):
 
 def test_search(service):
     import respx
-    from sirene.config import DEFAULTS
+    from buurtradar.config import DEFAULTS
     from tests.conftest import pdok_response, pdok_doc
     with respx.mock:
         respx.get(DEFAULTS["geocoder"]["pdok_url"]).mock(return_value=pdok_response(
@@ -86,7 +86,7 @@ def test_search(service):
 
 def test_password_protection(cfg):
     import httpx as _httpx
-    from sirene.service import Service
+    from buurtradar.service import Service
     cfg["access"]["password"] = "geheim"
     svc = Service(cfg, client=_httpx.AsyncClient())
     with TestClient(create_app(svc, start_background=False)) as client:

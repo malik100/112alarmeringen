@@ -607,5 +607,5 @@ def create_app(service: Service | None = None, start_background: bool = True) ->
     return app
 
 
-def app() -> FastAPI:  # voor `uvicorn --factory sirene.main:app`
+def app() -> FastAPI:  # voor `uvicorn --factory buurtradar.main:app`
     return create_app()

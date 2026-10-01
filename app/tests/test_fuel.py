@@ -2,8 +2,8 @@ import httpx
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources.fuel import classify, parse_overpass
+from buurtradar.main import create_app
+from buurtradar.sources.fuel import classify, parse_overpass
 
 
 def fuel(id_, lat, lon, **tags):

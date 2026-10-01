@@ -6,8 +6,8 @@ import httpx
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources.roadworks import (
+from buurtradar.main import create_app
+from buurtradar.sources.roadworks import (
     DEFAULT_URL, REVERSE_URL, is_active, parse_feed, relevance,
 )
 

@@ -10,7 +10,7 @@ services:
       TZ: Europe/Amsterdam
     volumes:
       - ./config.yaml:/config/config.yaml:ro
-      - sirene-data:/data
+      - buurtradar-data:/data
 
   # Optioneel: Home Assistant in dezelfde stack.
   # Start met: docker compose --profile homeassistant up -d
@@ -43,5 +43,5 @@ services:
       - "8090:80"
 
 volumes:
-  sirene-data:
+  buurtradar-data:
   ntfy-cache:

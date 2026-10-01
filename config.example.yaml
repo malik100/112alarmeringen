@@ -1,5 +1,5 @@
 # Buurtradar – kopieer naar config.yaml en pas aan.
-# Alles wat je weglaat krijgt de standaardwaarde (zie app/sirene/config.py).
+# Alles wat je weglaat krijgt de standaardwaarde (zie app/buurtradar/config.py).
 
 # Wachtwoord voor de hele app. Leeg = open (prima op je thuisnetwerk). Liever in .env:
 # BUURTRADAR_PASSWORD=...
@@ -44,7 +44,7 @@ news:
   poll_interval_s: 300  # elke 5 minuten
   keep_hours: 48        # hoe lang artikelen bewaard blijven
   local_radius_m: 5000  # "nieuws uit je buurt": artikelen die een plaats binnen deze straal noemen
-  # Eigen lijst? Dan vervangt die de standaardlijst (zie app/sirene/config.py), bijv.:
+  # Eigen lijst? Dan vervangt die de standaardlijst (zie app/buurtradar/config.py), bijv.:
   # feeds:
   #   - {name: NH Nieuws, url: "https://rss.nhnieuws.nl/rss"}
   #   - {name: NOS, url: "https://feeds.nos.nl/nosnieuwsbinnenland"}

@@ -3,8 +3,8 @@ import copy
 import httpx
 import pytest
 
-from sirene.config import DEFAULTS
-from sirene.service import Service
+from buurtradar.config import DEFAULTS
+from buurtradar.service import Service
 
 PDOK = DEFAULTS["geocoder"]["pdok_url"]
 

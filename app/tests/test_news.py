@@ -5,9 +5,9 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.news import match, normalize, roads
-from sirene.sources.p2000_rss import FeedItem
+from buurtradar.main import create_app
+from buurtradar.news import match, normalize, roads
+from buurtradar.sources.p2000_rss import FeedItem
 
 T0 = 1_790_000_000.0
 

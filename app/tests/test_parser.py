@@ -1,6 +1,6 @@
 import pytest
 
-from sirene.parser import parse_message, parse_location, parse_postcode
+from buurtradar.parser import parse_message, parse_location, parse_postcode
 
 
 @pytest.mark.parametrize("title, description, discipline, priority, street, city, postcode", [

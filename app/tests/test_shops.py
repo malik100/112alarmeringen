@@ -3,8 +3,8 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources.shops import is_late, parse_opening_hours, parse_overpass, same_store
+from buurtradar.main import create_app
+from buurtradar.sources.shops import is_late, parse_opening_hours, parse_overpass, same_store
 
 W = lambda *ranges: [[list(r) for r in ranges]] * 7  # noqa: E731
 
@@ -96,7 +96,7 @@ async def test_refresh_fills_hours_from_statiegeld_and_api(service):
 
 
 def test_link_statiegeld():
-    from sirene.sources.shops import link_statiegeld
+    from buurtradar.sources.shops import link_statiegeld
     ah = {"id": "n1", "kind": "supermarkt", "name": "Albert Heijn", "brand": "Albert Heijn", "lat": 52.37871, "lon": 4.84676}
     vomar = {"id": "n2", "kind": "supermarkt", "name": "Vomar", "brand": "Vomar", "lat": 52.37860, "lon": 4.84730}
     ah2 = {"id": "n3", "kind": "supermarkt", "name": "Albert Heijn", "brand": "Albert Heijn", "lat": 52.37880, "lon": 4.84690}

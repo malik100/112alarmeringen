@@ -1,81 +1,85 @@
 # Buurtradar
 
-Een live kaart van wat er in je buurt gebeurt: supermarkten en avondwinkels, parkeerzones,
-laadpalen, statiegeld-inleverpunten, openbaar vervoer met live vertrektijden, lokaal nieuws en bekendmakingen van de gemeente, wegwerkzaamheden en afsluitingen, 112-meldingen met het nieuws erbij, en flitsers. Het draait volledig op je eigen server of Raspberry
-Pi. Pushmeldingen zijn optioneel en staan standaard uit.
+**Een live kaart van je eigen buurt, op je eigen server.** 112-meldingen, openbaar vervoer met
+actuele vertrektijden, parkeertarieven, laadpalen, winkels, tankstations, AED's, wegwerkzaamheden,
+bekendmakingen van de gemeente, nieuws uit de buurt, weer, afvalkalender. Alles in één kaart, voor
+heel Nederland, uit open data. Zonder account, zonder reclame, en je locatie verlaat je server nooit.
 
-- **Buurtoverzicht**: bovenaan in één regel wat er nu speelt, bijvoorbeeld
-  "0 meldingen · 4 winkels open · €8,01/u parkeren · 5 laadpunten vrij · 8 statiegeldpunten open"
-  (met iconen). Een melding met sirene dichtbij kleurt de 112-sectie rood en geeft een waarschuwing
-  bovenaan het scherm.
-- **Nieuws en bekendmakingen uit je buurt**: recente artikelen die je eigen of een nabije plaats
-  noemen, en officiële bekendmakingen van je gemeente binnen 1,5 km (bouwaanvragen, verkeersbesluiten,
-  evenementen, vergunningen), met de reactietermijn erbij.
-- **Wegwerkzaamheden en afsluitingen**: van gemeente, provincie en Rijkswaterstaat, ook in je eigen
-  straat. Afgesloten wegdelen als rode lijn op de kaart, met omleiding, periode en soort werk.
-- **Openbaar vervoer**: haltes met live vertrektijden (vertraging, "rijdt niet", spoorwijziging),
-  alle lijnen op de kaart en bussen, trams en metro's die nu rijden. Van alle vervoerders in
-  Nederland, uit de open data van het NDOV Loket via OVapi.
-- **Afgelopen week**: per dag wat er rond je plek gebeurde (meldingen met sirene, bekendmakingen,
-  afsluitingen, afval), met een staafje per dag. Vandaag live, de rest elke nacht vastgelegd.
-- **Afvalkalender**: wanneer welke bak aan de straat moet ("Morgen: GFT"), via de agenda-link
-  (iCal) van je eigen gemeente of inzamelaar.
-- **Weer en luchtkwaliteit** voor jouw plek: temperatuur en wind van het dichtstbijzijnde
-  KNMI-station, de buien voor de komende 2 uur als grafiek ("Regen, droog vanaf 14:10"), de
-  Luchtkwaliteitsindex van het dichtstbijzijnde meetstation en de verwachting voor vijf dagen.
-- **AED's, openbare toiletten en drinkwaterpunten** uit OpenStreetMap, met toegang (openbaar, voor
-  klanten), binnen of buiten, openingstijden en bij een AED de precieze plek. De lijst zet de
-  dichtstbijzijnde AED bovenaan.
-- **Tankstations**, met of zonder winkel (onbemand), met openingstijden, brandstoffen en extra's
-  zoals wasstraat of bandenlucht.
-- **Supermarkten, buurt-/avondwinkels en markten** met openingstijden, filters "Alleen nu open"
-  en "Open na 22:00", en een label "LAAT OPEN".
-- **Snel kiezen**: bovenaan het kaartlagenmenu staan de presets *Onderweg* (ov, tankstations,
-  wegwerk, flitsers, parkeren, laadpalen), *Thuis* (nieuws, bekendmakingen, 112, wegwerk),
-  *Boodschappen* (winkels, statiegeld, parkeren) en *Alles uit*. Eén tik in plaats van tien schakelaars.
-- **Zoeken**: een adres, straat, plaats, postcode of ov-halte opzoeken in de balk bovenaan (via PDOK
-  en de eigen dienstregeling). Een halte opent meteen het vertrekbord; een adres krijgt een speld
-  met *Route* en *Als vaste plek*.
-- **Route en reistijd:** de link "Route" opent je eigen navigatie-app (standaard Apple Kaarten op
-  een iPhone; te wijzigen naar Google Maps, Waze of OpenStreetMap onder *Overzicht → Instellingen*).
-  De lijsten tonen een geschatte reistijd, bijv. "4 min lopen · 1 min fietsen" (hemelsbreed × 1,3,
-  gemiddelde snelheden). Alleen als je op de routeknop tikt, gaat de bestemming naar die navigatie-app. Bij
-  112-meldingen staat bewust geen routeknop.
-- **Minimalistisch:** één locatieknop op de kaart (deelt je locatie en centreert), filters als
-  schakelpillen, en een groene of rode stip naast de naam voor de live verbinding. Een
-  locatiewaarschuwing verschijnt alleen als er iets mis is.
-- **Iconen** uit [Lucide](https://lucide.dev) (ISC-licentie), lokaal meegeleverd in
-  `app/sirene/static/icons.svg`. Met "Zet op beginscherm" (iPhone) of "App installeren" (Android,
-  Chrome) wordt Buurtradar een echte app op je telefoon: eigen icoon, zonder browserbalk.
-- **Twee panelen**: links *Kaartlagen* (per laag een schakelaar: parkeren, statiegeld, winkels,
-  tankstations, wegwerk, openbaar vervoer, flitsers met roodlicht/traject apart, laadpalen, nieuws, bekendmakingen, 112), rechts
-  de inhoud van precies de lagen die aanstaan, in dezelfde volgorde. Elke sectie heeft een kop
-  met een korte samenvatting ("Parkeren · Nu €5,37 per uur") en klap je apart in. Beide panelen
-  klap je ook helemaal in; de app onthoudt alles per apparaat. Op de telefoon is *Kaartlagen*
-  een uitklapmenu en de inhoud een vel onderaan.
-- **P2000-incidenten** van brandweer, ambulance en politie, gekleurd per dienst. Incidenten
-  met sirene (A0/A1/P1) pulseren.
-- **Jouw locatie** met een instelbare straal (standaard 1 km). Wat daarbinnen gebeurt staat
-  bovenaan de lijst, gesorteerd op afstand. De kaart opent gecentreerd op je huidige locatie op zoom 15
-  (`map.default_zoom`): de straal van 1 km in beeld en alle lagen zichtbaar. Komt na het openen de
-  live locatie van je telefoon of browser binnen, dan centreert de kaart daar nog één keer op.
-- **Vaste flitsers, roodlichtcamera's en trajectcontroles** uit OpenStreetMap, als lagen die je
-  aan en uit zet.
-- **Statiegeld-inleverpunten** (supermarkten, automaten) met openingstijden, wat ze innemen
-  en hoe je je geld krijgt. Een filter **"Alleen nu open"** toont alleen wat op dit moment
-  open is, en een lijst toont de dichtstbijzijnde punten.
-- **Parkeerzones** met tarieven en tijden: betaald parkeren (gekleurd naar de prijs van dit moment),
-  blauwe zones, vergunningzones en garages/P+R. Het paneel toont wat er **op jouw plek** geldt,
-  bijvoorbeeld "Nu €8,05 per uur (tot middernacht)".
-- **Laadpalen** met live beschikbaarheid, vermogen en tarief, met **profielen voor verschillende
-  gebruikers** (snelladen onderweg, laden in de straat, bestemmingsladen, zonder laadpas, CHAdeMO).
-- **Nieuws bij meldingen**: verschijnt er een nieuwsartikel over een melding (regionale omroep,
-  NOS, 112-site), dan staat dat bij de melding, met "📰 NIEUWS" in de lijst.
-- **Live**: nieuwe incidenten verschijnen binnen ongeveer een minuut, zonder dat je de pagina
-  hoeft te verversen.
-- **Optionele meldingen** via Home Assistant of een eigen ntfy-server.
+![Buurtradar op een pc: kaart met ov-lijnen, haltes, AED's en het paneel rechts](docs/screenshots/overzicht.png)
 
-Flexflitsers zitten er (nog) niet in: daar bestaat geen open databron voor.
+<p align="center">
+  <img src="docs/screenshots/ov-vertrekbord.png" alt="Vertrekbord van een halte met actuele tijden" width="48%">
+  <img src="docs/screenshots/telefoon-paneel.png" alt="Buurtradar op een telefoon" width="24%">
+</p>
+
+## Waarom
+
+Voor elk stukje van je buurt is er een aparte app: 9292 voor de bus, Parkeerwijzer voor het tarief,
+Afvalwijzer voor de bak, Flitsmeister, Buienradar, een 112-app, de app van je gemeente. Elk met een
+eigen account, reclame of abonnement, en elk met je locatie in een datacenter. Buurtradar brengt dat
+bij elkaar in één kaart die thuis draait, op een Raspberry Pi of een oude pc, en die alleen open data
+ophaalt. Wie Home Assistant heeft, kan de locatie van zijn telefoon koppelen en pushmeldingen krijgen.
+
+## Wat zit erin
+
+| Laag | Bron | Wat je ziet |
+|---|---|---|
+| **Openbaar vervoer** | OVapi / NDOV Loket | Haltes met live vertrektijden (vertraging, uitval, spoorwijziging), alle lijnen in de kleur van de vervoerder, bussen en trams die nu rijden, storingen. Alle vervoerders in Nederland. |
+| **Parkeren** | RDW / Nationaal Parkeerregister | Betaald parkeren gekleurd naar het tarief van dit moment, blauwe zones, vergunningzones, garages. "Wat geldt hier nu?" voor je eigen plek. |
+| **112-meldingen** | P2000 (alarmeringen.nl) | Brandweer, ambulance en politie binnen je straal, met het nieuwsartikel erbij zodra dat verschijnt. |
+| **Wegwerk en afsluitingen** | NDW / Melvin | Van gemeente tot Rijkswaterstaat, ook in je eigen straat, met omleiding en periode. |
+| **Bekendmakingen** | overheid.nl | Vergunningen, verkeersbesluiten en evenementen binnen 1,5 km, gesorteerd op nut, met het gebied op de kaart. |
+| **Nieuws uit de buurt** | RSS van omroepen en 112-sites | Artikelen die jouw plaats noemen, actueel eerst. |
+| **Weer en luchtkwaliteit** | Buienradar, Luchtmeetnet (RIVM) | Nu, buien voor 2 uur als grafiek, luchtkwaliteitsindex, vijf dagen. |
+| **Afvalkalender** | agenda-link van je gemeente | "Morgen: GFT", met een melding 's avonds. |
+| **Laadpalen** | NDW (OCPI) | Live vrij of bezet, vermogen, tarief, profielen per soort gebruiker. |
+| **Winkels, statiegeld, tankstations** | OpenStreetMap, Statiegeld Nederland | Supermarkten en avondwinkels met "nu open", inleverpunten, tankstations met of zonder winkel. |
+| **AED, toilet, drinkwater** | OpenStreetMap | Dichtstbijzijnde AED bovenaan, met waar hij hangt. |
+| **Flitsers** | OpenStreetMap | Vaste flitsers, roodlichtcamera's, trajectcontroles. |
+| **Afgelopen week** | eigen database | Per dag wat er rond je plek gebeurde. |
+
+Verder: zoeken op adres of halte, presets (*Onderweg*, *Thuis*, *Boodschappen*), route-knop naar je
+eigen navigatie-app, installeerbaar als app op je telefoon, optioneel wachtwoord, pushmeldingen via
+Home Assistant of ntfy. De uitgebreide uitleg per laag staat verderop in dit document.
+
+## Snel beginnen
+
+**Met Docker** (Raspberry Pi 4/5, NAS, pc):
+
+```bash
+git clone https://github.com/malik100/112alarmeringen.git buurtradar
+cd buurtradar
+cp config.example.yaml config.yaml
+cp .env.example .env
+docker compose up -d --build
+```
+
+**Zonder Docker** (Python 3.11+): `start.bat` (Windows) of `./start.sh` (macOS/Linux) in de projectmap.
+Dat maakt de eerste keer alles aan en opent je browser.
+
+Open daarna `http://localhost:8080`. Klik op *Deel mijn locatie* of kies een vaste plek op de kaart.
+Bij de eerste start haalt de app de landelijke gegevens op (parkeren, ov-dienstregeling, winkels); dat
+duurt een paar minuten. Bijwerken: `scripts/update.sh` of `scripts\update.ps1`.
+
+Zie [Installatie](#installatie) voor Home Assistant, pushmeldingen, HTTPS en een wachtwoord.
+
+## Meedoen
+
+Buurtradar is een hobbyproject en kan hulp gebruiken. Alles is welkom, van een typfout tot een
+nieuwe laag:
+
+- **Fouten melden of ideeën aandragen:** open een [issue](https://github.com/malik100/112alarmeringen/issues).
+  Een schermafbeelding en je gemeente helpen; parkeer- en ov-gegevens verschillen per plaats.
+- **Gegevens controleren:** klopt een parkeertarief, een openingstijd of een halte niet? Vaak zit
+  de fout in de bron (RDW, OpenStreetMap). Bij OSM-gegevens staat in elke popup een knop
+  *Aanpassen*; verbeteringen daar helpen iedereen.
+- **Nieuwe bronnen:** op het verlanglijstje staan deelvervoer (GBFS), bezetting van parkeergarages,
+  evenementen, KNMI-weerwaarschuwingen en een eigen P2000-ontvanger (RTL-SDR). Heb je een open
+  bron die werkt, open dan een issue of een pull request.
+- **Code:** zie [CONTRIBUTING.md](CONTRIBUTING.md) voor de opzet, de tests en hoe een nieuwe laag
+  in elkaar zit. Elke laag is één Python-bestand voor de bron en één JavaScript-bestand voor de kaart.
+
+Licentie: [MIT](LICENSE). Gebruik het, pas het aan, deel het.
 
 ## Hoe de data stroomt
 
@@ -106,7 +110,7 @@ PDOK (adres → GPS) ──────┘        │   │
 Je hebt Docker en Docker Compose nodig. Een Raspberry Pi 4 of 5 is ruim voldoende.
 
 ```bash
-git clone -b claude/p2000-sirene-alerts-selfhosted-sbherl https://github.com/malik100/112alarmeringen.git buurtradar
+git clone https://github.com/malik100/112alarmeringen.git buurtradar
 cd buurtradar
 cp config.example.yaml config.yaml
 cp .env.example .env
@@ -115,13 +119,11 @@ docker compose up -d --build
 
 Open daarna `http://<ip-van-je-server>:8080`.
 
-> Zolang de code nog niet in de hoofdbranch staat, heb je de `-b claude/p2000-…`-optie nodig.
-
 ### Lokaal op je pc
 
 **Met Docker** (Windows, macOS of Linux): installeer [Docker Desktop](https://www.docker.com/products/docker-desktop/),
 voer de stappen hierboven uit en open `http://localhost:8080`. Stoppen: `docker compose down`
-(je gegevens blijven bewaard in het volume `sirene-data`).
+(je gegevens blijven bewaard in het volume `buurtradar-data`).
 
 **Zonder Docker** (Python 3.11 of nieuwer): gebruik het startscript. De eerste keer maakt het
 `config.yaml` en een Python-omgeving aan en installeert het de pakketten; daarna start het direct.
@@ -626,40 +628,42 @@ pytest                                  # Python-tests
 node --test "tests/js/*.test.js"        # openingstijden, parkeren, laden, ov (Node 18+)
 playwright install chromium             # eenmalig, voor de rooktest in een echte browser
 pytest tests/e2e                        # laadt de kaart, zet elke laag aan, let op fouten
-SIRENE_CONFIG=../config.yaml SIRENE_DB=./dev.db uvicorn --factory sirene.main:app --reload --port 8080
+BUURTRADAR_CONFIG=../config.yaml BUURTRADAR_DB=./dev.db uvicorn --factory buurtradar.main:app --reload --port 8080
 ```
 
 | Pad                        | Inhoud                                                  |
 |----------------------------|---------------------------------------------------------|
-| `app/sirene/parser.py`     | P2000-tekst → dienst, prioriteit, straat, plaats, postcode |
-| `app/sirene/geocoder.py`   | adres → coördinaten (cache + PDOK)                      |
-| `app/sirene/sources/`      | P2000-feed, flitsers, statiegeld, parkeren (RDW)        |
-| `app/sirene/service.py`    | ophalen, opslaan, live doorsturen, meldingen            |
-| `app/sirene/main.py`       | API en webserver                                        |
-| `app/sirene/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
-| `app/sirene/static/app/`   | de kaart per onderdeel: `00-core.js` (state, kaart, hulpfuncties), daarna één bestand per laag (`21-parkeren.js`, `31-ov.js`, …), `40-overzicht.js` (lagen, presets, secties), `50-locatie.js` (zoeken, locatie, status) en `90-start.js`; geladen in die volgorde als gewone scripts |
-| `app/sirene/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
-| `app/sirene/news.py`       | nieuwsartikelen aan meldingen koppelen, lokaal nieuws herkennen |
-| `app/sirene/sources/roadworks.py` | wegwerkzaamheden en afsluitingen (NDW/Melvin, DATEX II) |
-| `app/sirene/sources/bekendmakingen.py` | bekendmakingen (overheid.nl) en plaatsen rond je locatie (PDOK) |
-| `app/sirene/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
-| `app/sirene/sources/fuel.py` | tankstations (OSM), met of zonder winkel             |
-| `app/sirene/sources/amenities.py` | AED's, toiletten en drinkwater (OSM)             |
-| `app/sirene/sources/waste.py` | afvalkalender uit een agenda-link (iCal)             |
-| `app/sirene/sources/weather.py` | weer en buien (Buienradar), luchtkwaliteit (Luchtmeetnet) |
-| `app/sirene/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
-| `app/sirene/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |
-| `app/sirene/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
-| `app/sirene/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
-| `app/sirene/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |
-| `app/sirene/sources/gtfs.py` | dienstregeling (GTFS) → ov.db: haltes, ritten, lijnen |
-| `app/sirene/sources/gtfs_rt.py` | actuele ov-gegevens (GTFS-realtime): tijden, voertuigen, storingen |
-| `app/sirene/ov.py`         | vertrektijden, ritten, lijnen en voertuigen, met actuele tijden |
-| `app/sirene/static/ov.js`  | lijnbordjes, vertraging en vertrektijd tonen            |
+| `app/buurtradar/parser.py`     | P2000-tekst → dienst, prioriteit, straat, plaats, postcode |
+| `app/buurtradar/geocoder.py`   | adres → coördinaten (cache + PDOK)                      |
+| `app/buurtradar/sources/`      | P2000-feed, flitsers, statiegeld, parkeren (RDW)        |
+| `app/buurtradar/service.py`    | ophalen, opslaan, live doorsturen, meldingen            |
+| `app/buurtradar/main.py`       | API en webserver                                        |
+| `app/buurtradar/static/`       | de kaart (Leaflet, zonder externe CDN)                  |
+| `app/buurtradar/static/app/`   | de kaart per onderdeel: `00-core.js` (state, kaart, hulpfuncties), daarna één bestand per laag (`21-parkeren.js`, `31-ov.js`, …), `40-overzicht.js` (lagen, presets, secties), `50-locatie.js` (zoeken, locatie, status) en `90-start.js`; geladen in die volgorde als gewone scripts |
+| `app/buurtradar/static/openinghours.js` | "nu open?" op basis van de openingstijden      |
+| `app/buurtradar/news.py`       | nieuwsartikelen aan meldingen koppelen, lokaal nieuws herkennen |
+| `app/buurtradar/sources/roadworks.py` | wegwerkzaamheden en afsluitingen (NDW/Melvin, DATEX II) |
+| `app/buurtradar/sources/bekendmakingen.py` | bekendmakingen (overheid.nl) en plaatsen rond je locatie (PDOK) |
+| `app/buurtradar/sources/shops.py` | winkels en markten (OSM) + openingstijden-vertaler  |
+| `app/buurtradar/sources/fuel.py` | tankstations (OSM), met of zonder winkel             |
+| `app/buurtradar/sources/amenities.py` | AED's, toiletten en drinkwater (OSM)             |
+| `app/buurtradar/sources/waste.py` | afvalkalender uit een agenda-link (iCal)             |
+| `app/buurtradar/sources/weather.py` | weer en buien (Buienradar), luchtkwaliteit (Luchtmeetnet) |
+| `app/buurtradar/sources/charging.py` | laadpalen (NDW): verwerken en filteren per profiel |
+| `app/buurtradar/static/nav.js` | route openen in je navigatie-app, reistijd schatten      |
+| `app/buurtradar/static/charging.js` | laadprofielen, tarieven en beschikbaarheid tonen  |
+| `app/buurtradar/sources/npr.py` | RDW/NPR-parkeerdata → zones met rooster en tarieven     |
+| `app/buurtradar/static/parking.js` | "wat geldt hier nu?" voor een parkeerzone            |
+| `app/buurtradar/sources/gtfs.py` | dienstregeling (GTFS) → ov.db: haltes, ritten, lijnen |
+| `app/buurtradar/sources/gtfs_rt.py` | actuele ov-gegevens (GTFS-realtime): tijden, voertuigen, storingen |
+| `app/buurtradar/ov.py`         | vertrektijden, ritten, lijnen en voertuigen, met actuele tijden |
+| `app/buurtradar/static/ov.js`  | lijnbordjes, vertraging en vertrektijd tonen            |
 
-De code gebruikt intern nog de oorspronkelijke werknaam `sirene` (de map `app/sirene`, de
-database `sirene.db` en het Docker-volume `sirene-data`). Dat is bewust: zo blijven bestaande
-installaties en hun gegevens werken.
+Bestaande installaties van vóór de naamswijziging (werknaam `sirene`) blijven werken: de
+omgevingsvariabelen `SIRENE_CONFIG` en `SIRENE_DB` worden nog begrepen en een `sirene.db` naast de
+nieuwe databaselocatie wordt bij het starten hernoemd. Alleen het Docker-volume heet nu
+`buurtradar-data`; je oude gegevens zet je over met
+`docker run --rm -v sirene-data:/van -v buurtradar-data:/naar alpine cp -a /van/. /naar/`.
 
 ## Bronnen en licenties
 
@@ -677,5 +681,5 @@ installaties en hun gegevens werken.
   Luchtkwaliteit: [Luchtmeetnet](https://api.luchtmeetnet.nl/open_api) (RIVM, open data).
 - Parkeerzones, tarieven en tijden: [RDW Open Data Parkeren](https://opendata.rdw.nl) (NPR).
 - Flitsers en kaart: © [OpenStreetMap-bijdragers](https://www.openstreetmap.org/copyright), ODbL.
-- Iconen: [Lucide](https://lucide.dev), ISC-licentie, zie `app/sirene/static/vendor/lucide/LICENSE`.
-- [Leaflet](https://leafletjs.com): BSD-2-licentie, meegeleverd in `app/sirene/static/vendor/leaflet`.
+- Iconen: [Lucide](https://lucide.dev), ISC-licentie, zie `app/buurtradar/static/vendor/lucide/LICENSE`.
+- [Leaflet](https://leafletjs.com): BSD-2-licentie, meegeleverd in `app/buurtradar/static/vendor/leaflet`.

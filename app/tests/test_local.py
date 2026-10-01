@@ -5,12 +5,12 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from sirene import news
-from sirene.main import create_app
-from sirene.sources.bekendmakingen import (
+from buurtradar import news
+from buurtradar.main import create_app
+from buurtradar.sources.bekendmakingen import (
     REVERSE_URL, SRU_URL, build_query, category_of, parse_sru, point_of, short_title,
 )
-from sirene.sources.p2000_rss import FeedItem
+from buurtradar.sources.p2000_rss import FeedItem
 
 
 def record(ident, title, kind="omgevingsvergunning", gemeente="Utrecht", date="2026-09-28",
@@ -208,7 +208,7 @@ def ann(title, category, distance_m=500, date="2026-09-28", deadline=None, abstr
 
 def test_relevance_prefers_noticeable_nearby_and_fresh():
     import datetime
-    from sirene.sources.bekendmakingen import relevance
+    from buurtradar.sources.bekendmakingen import relevance
     today = datetime.date(2026, 9, 28)
     r = lambda a: relevance(a, 1500, today)  # noqa: E731
     event = r(ann("Aangevraagde evenementenvergunningen, Wintermarkt", "evenementen"))
@@ -250,7 +250,7 @@ def test_placeholder_label_dropped():
 
 
 def test_shape_of_geometry():
-    from sirene.sources.bekendmakingen import shape_of
+    from buurtradar.sources.bekendmakingen import shape_of
     poly = shape_of("POLYGON((5.1235 52.0975,5.1233 52.0976,5.1234 52.0977,5.1235 52.0975))")
     assert poly["type"] == "Polygon" and poly["coords"][0] == [52.0975, 5.1235] and len(poly["coords"]) == 4
     assert shape_of("MULTIPOLYGON(((5.0 52.0,5.1 52.0,5.1 52.1,5.0 52.0)),((6 53,6 53.1,6.1 53,6 53)))")["coords"][-1] == [52.0, 5.0]

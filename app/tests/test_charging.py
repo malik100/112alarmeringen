@@ -9,8 +9,8 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources import charging as ch
+from buurtradar.main import create_app
+from buurtradar.sources import charging as ch
 
 
 def connector(standard="IEC_62196_T2", kw=11, dc=False, tariff="t-ac"):

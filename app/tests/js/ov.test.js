@@ -1,7 +1,7 @@
 // Draaien met: node --test "tests/js/*.test.js"
 const test = require("node:test");
 const assert = require("node:assert");
-const Ov = require("../../sirene/static/ov.js");
+const Ov = require("../../buurtradar/static/ov.js");
 
 test("tekst op het lijnbordje", () => {
   assert.strictEqual(Ov.lineLabel({ line: "7", mode: "tram" }), "7");

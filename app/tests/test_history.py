@@ -3,8 +3,8 @@ import time
 
 from fastapi.testclient import TestClient
 
-from sirene.location import Location
-from sirene.main import create_app
+from buurtradar.location import Location
+from buurtradar.main import create_app
 
 HOME = (52.3276, 4.9340)
 

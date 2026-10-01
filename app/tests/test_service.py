@@ -3,9 +3,9 @@ import time
 import httpx
 import respx
 
-from sirene.location import Location
-from sirene.notifier import Notifier
-from sirene.sources.p2000_rss import FeedItem
+from buurtradar.location import Location
+from buurtradar.notifier import Notifier
+from buurtradar.sources.p2000_rss import FeedItem
 
 from .conftest import PDOK, pdok_doc, pdok_response
 

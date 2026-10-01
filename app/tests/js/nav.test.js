@@ -1,7 +1,7 @@
 // Draaien met: node --test "tests/js/*.test.js"
 const test = require("node:test");
 const assert = require("node:assert");
-const { routeUrl, eta, minutes } = require("../../sirene/static/nav.js");
+const { routeUrl, eta, minutes } = require("../../buurtradar/static/nav.js");
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15";
 const ANDROID = "Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36";

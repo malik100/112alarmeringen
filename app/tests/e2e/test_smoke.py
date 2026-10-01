@@ -17,9 +17,9 @@ import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
 
-from sirene.config import DEFAULTS  # noqa: E402
-from sirene.main import create_app  # noqa: E402
-from sirene.service import Service  # noqa: E402
+from buurtradar.config import DEFAULTS  # noqa: E402
+from buurtradar.main import create_app  # noqa: E402
+from buurtradar.service import Service  # noqa: E402
 
 LAYERS = ["parking", "statiegeld", "shops", "fuel", "roadworks", "ov", "cams", "charging", "news",
           "announcements", "incidents"]
@@ -36,7 +36,7 @@ def server(tmp_path_factory):
     import uvicorn
 
     cfg = copy.deepcopy(DEFAULTS)
-    cfg["database"] = str(tmp_path_factory.mktemp("db") / "sirene.db")
+    cfg["database"] = str(tmp_path_factory.mktemp("db") / "buurtradar.db")
     cfg["location"]["fallback"] = {"lat": 52.378, "lon": 4.846}
     svc = Service(cfg)
     app = create_app(svc, start_background=False)

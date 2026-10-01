@@ -4,9 +4,9 @@ import time
 import httpx
 import respx
 
-from sirene.location import Location
-from sirene.notifier import Notifier
-from sirene.sources.roadworks import REVERSE_URL
+from buurtradar.location import Location
+from buurtradar.notifier import Notifier
+from buurtradar.sources.roadworks import REVERSE_URL
 
 NTFY = "http://ntfy/"
 

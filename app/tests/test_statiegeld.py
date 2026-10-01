@@ -3,8 +3,8 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources.statiegeld import DEFAULT_URL, parse_day, parse_features
+from buurtradar.main import create_app
+from buurtradar.sources.statiegeld import DEFAULT_URL, parse_day, parse_features
 
 
 def feature(fid, name="Albert Heijn", lat=52.3731, lon=4.8926, **props):

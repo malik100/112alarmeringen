@@ -10,12 +10,12 @@ import respx
 from fastapi.testclient import TestClient
 from google.transit import gtfs_realtime_pb2 as rt
 
-from sirene.main import create_app
-from sirene.ov import OvStore, Realtime, day_base, estimate
-from sirene.sources.gtfs import DEFAULT_URL as GTFS_URL
-from sirene.sources.gtfs import import_gtfs, mode_of, simplify
-from sirene.sources.gtfs_rt import DEFAULT_URL as RT_URL
-from sirene.sources.gtfs_rt import StopUpdate, TripUpdate, parse_alerts, parse_trip_updates, parse_vehicles
+from buurtradar.main import create_app
+from buurtradar.ov import OvStore, Realtime, day_base, estimate
+from buurtradar.sources.gtfs import DEFAULT_URL as GTFS_URL
+from buurtradar.sources.gtfs import import_gtfs, mode_of, simplify
+from buurtradar.sources.gtfs_rt import DEFAULT_URL as RT_URL
+from buurtradar.sources.gtfs_rt import StopUpdate, TripUpdate, parse_alerts, parse_trip_updates, parse_vehicles
 
 TODAY = dt.date(2026, 10, 1)
 BASE = day_base(TODAY)
@@ -280,7 +280,7 @@ def test_parse_realtime_feeds():
 def test_api_end_to_end(service, monkeypatch):
     # Doen alsof het nu 08:00 op 1 oktober is (ov.py en main.py gebruiken time.time()).
     monkeypatch.setattr(time, "time", lambda: NOW)
-    monkeypatch.setattr("sirene.service.dt.date", type("D", (dt.date,), {"today": staticmethod(lambda: TODAY)}))
+    monkeypatch.setattr("buurtradar.service.dt.date", type("D", (dt.date,), {"today": staticmethod(lambda: TODAY)}))
     respx.get(GTFS_URL).mock(return_value=httpx.Response(200, content=gtfs_zip()))
     rt_routes = {
         "tripUpdates.pb": respx.get(RT_URL + "tripUpdates.pb").mock(return_value=httpx.Response(200, content=trip_feed())),
@@ -328,7 +328,7 @@ def test_api_end_to_end(service, monkeypatch):
 
 def test_ov_disabled(cfg):
     cfg["ov"]["enabled"] = False
-    from sirene.service import Service
+    from buurtradar.service import Service
     svc = Service(cfg, client=httpx.AsyncClient())
     with TestClient(create_app(svc, start_background=False)) as client:
         assert client.get("/api/config").json()["ov"]["enabled"] is False

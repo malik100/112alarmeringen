@@ -1,7 +1,7 @@
 // Draaien met: node --test "tests/js/*.test.js"
 const test = require("node:test");
 const assert = require("node:assert");
-const { PROFILES, query, tariffText, availability, summary, warnings } = require("../../sirene/static/charging.js");
+const { PROFILES, query, tariffText, availability, summary, warnings } = require("../../buurtradar/static/charging.js");
 
 const station = (extra = {}) => ({
   connectors: [{ plug: "CCS", kw: 150, dc: true, count: 2, tariff: { kwh: 0.59, start: 0.35, hour: null, parking_hour: null, varies: false } }],
@@ -53,7 +53,7 @@ test("waarschuwingen per gebruiker", () => {
 });
 
 test("leesbare naam in plaats van interne code", () => {
-  const { displayName } = require("../../sirene/static/charging.js");
+  const { displayName } = require("../../buurtradar/static/charging.js");
   const base = { operator: "Vattenfall InCharge", address: "Jansdam 14 3512HB Utrecht" };
   assert.strictEqual(displayName({ ...base, name: "OST23P0070_0167_0" }), "Vattenfall InCharge · Jansdam 14");
   assert.strictEqual(displayName({ ...base, name: "TNLP030402 - Jansdam 14, Utrecht" }), "Jansdam 14, Utrecht");

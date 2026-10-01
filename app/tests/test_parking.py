@@ -5,8 +5,8 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources import npr
+from buurtradar.main import create_app
+from buurtradar.sources import npr
 
 TODAY = date(2026, 9, 28)
 SQUARE = "POLYGON ((4.89 52.37, 4.90 52.37, 4.90 52.38, 4.89 52.38, 4.89 52.37))"

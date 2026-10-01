@@ -1,6 +1,6 @@
-from sirene.geo import haversine_m
-from sirene.sources.p2000_rss import parse_rss
-from sirene.sources.speedcams import QUERY, parse_overpass
+from buurtradar.geo import haversine_m
+from buurtradar.sources.p2000_rss import parse_rss
+from buurtradar.sources.speedcams import QUERY, parse_overpass
 
 RSS = """<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0"><channel><title>Alarmeringen.nl feed</title>

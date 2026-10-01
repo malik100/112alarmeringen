@@ -4,8 +4,8 @@ import httpx
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources.waste import classify, parse_ical
+from buurtradar.main import create_app
+from buurtradar.sources.waste import classify, parse_ical
 
 TODAY = dt.date(2026, 10, 1)
 ICAL = """BEGIN:VCALENDAR
@@ -48,8 +48,8 @@ def test_parse_ical():
 
 @respx.mock
 def test_set_url_and_api(service, monkeypatch):
-    monkeypatch.setattr("sirene.sources.waste.dt.date", type("D", (dt.date,), {"today": staticmethod(lambda: TODAY)}))
-    monkeypatch.setattr("sirene.service.dt.date", type("D", (dt.date,), {"today": staticmethod(lambda: TODAY)}))
+    monkeypatch.setattr("buurtradar.sources.waste.dt.date", type("D", (dt.date,), {"today": staticmethod(lambda: TODAY)}))
+    monkeypatch.setattr("buurtradar.service.dt.date", type("D", (dt.date,), {"today": staticmethod(lambda: TODAY)}))
     respx.get("https://kalender.test/x.ics").mock(return_value=httpx.Response(200, text=ICAL))
     respx.get("https://kalender.test/leeg").mock(return_value=httpx.Response(200, text="<html>nee</html>"))
     with TestClient(create_app(service, start_background=False)) as client:

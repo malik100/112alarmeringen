@@ -2,8 +2,8 @@ import httpx
 import respx
 from fastapi.testclient import TestClient
 
-from sirene.main import create_app
-from sirene.sources.amenities import parse_overpass
+from buurtradar.main import create_app
+from buurtradar.sources.amenities import parse_overpass
 
 
 def el(id_, lat, lon, **tags):

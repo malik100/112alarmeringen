@@ -1,7 +1,7 @@
 // Draaien met: node --test "tests/js/*.test.js"
 const test = require("node:test");
 const assert = require("node:assert");
-const { status, weekLines } = require("../../sirene/static/parking.js");
+const { status, weekLines } = require("../../buurtradar/static/parking.js");
 
 // Maandag 28 september 2026, zomertijd (UTC+2).
 const at = (iso) => new Date(iso);
@@ -71,7 +71,7 @@ test("weekoverzicht: tijdvakken met hetzelfde tarief samen", () => {
 });
 
 test("kleur per tarief, los van het tijdstip", () => {
-  const { zoneRate, zoneColor, RATE_SCALE } = require("../../sirene/static/parking.js");
+  const { zoneRate, zoneColor, RATE_SCALE } = require("../../buurtradar/static/parking.js");
   const zone = (rate, kind = "betaald") => ({
     kind, fares: { A: { rate_h: rate }, D: { rate_h: 1 } },
     schedule: WEEK([{ s: 540, e: 1440, fare: "A", max: null }]),

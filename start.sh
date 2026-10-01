@@ -37,4 +37,4 @@ echo ""
 ( sleep 4; (command -v open >/dev/null && open "http://localhost:$PORT") \
   || (command -v xdg-open >/dev/null && xdg-open "http://localhost:$PORT") ) >/dev/null 2>&1 &
 cd app
-SIRENE_CONFIG=../config.yaml SIRENE_DB=./buurtradar.db exec .venv/bin/uvicorn --factory sirene.main:app --port "$PORT"
+BUURTRADAR_CONFIG=../config.yaml BUURTRADAR_DB=./buurtradar.db exec .venv/bin/uvicorn --factory buurtradar.main:app --port "$PORT"

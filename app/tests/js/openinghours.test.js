@@ -1,7 +1,7 @@
 // Draaien met: node --test "tests/js/*.test.js"
 const test = require("node:test");
 const assert = require("node:assert");
-const { status, amsterdamNow } = require("../../sirene/static/openinghours.js");
+const { status, amsterdamNow } = require("../../buurtradar/static/openinghours.js");
 
 // Maandag 28 september 2026 is zomertijd (UTC+2).
 const at = (iso) => new Date(iso);

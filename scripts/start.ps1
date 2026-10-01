@@ -38,7 +38,7 @@ Write-Host ""
 Write-Host "Buurtradar draait op  http://localhost:$Port   (stoppen: Ctrl+C)"
 Write-Host ""
 Set-Location app
-$env:SIRENE_CONFIG = "../config.yaml"
-$env:SIRENE_DB = "./buurtradar.db"
+$env:BUURTRADAR_CONFIG = "../config.yaml"
+$env:BUURTRADAR_DB = "./buurtradar.db"
 Start-Job { Start-Sleep 4; Start-Process "http://localhost:$using:Port" } | Out-Null
-& ".venv\Scripts\python.exe" -m uvicorn --factory sirene.main:app --port $Port
+& ".venv\Scripts\python.exe" -m uvicorn --factory buurtradar.main:app --port $Port

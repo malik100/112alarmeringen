@@ -159,6 +159,12 @@ class Database:
     def __init__(self, path: str) -> None:
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+            # Oudere installaties heetten "sirene.db": die database stilletjes overnemen.
+            old = Path(path).with_name("sirene.db")
+            if not Path(path).exists() and old.exists():
+                for suffix in ("", "-wal", "-shm"):
+                    if old.with_name(old.name + suffix).exists():
+                        old.with_name(old.name + suffix).rename(Path(path).with_name(Path(path).name + suffix))
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
