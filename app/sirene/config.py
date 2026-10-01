@@ -163,7 +163,7 @@ DEFAULTS: dict[str, Any] = {
         "realtime_interval_s": 30,
         "stops_min_zoom": 15,
         "lines_min_zoom": 13,
-        "vehicles_min_zoom": 13,
+        "vehicles_min_zoom": 14,  # overdag rijden er honderden voertuigen in een stad
         "list_radius_m": 800,
     },
     "waste": {

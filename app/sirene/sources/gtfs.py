@@ -18,6 +18,7 @@ import json
 import logging
 import math
 import os
+import re
 import sqlite3
 import zipfile
 from collections import Counter, defaultdict
@@ -30,7 +31,7 @@ log = logging.getLogger(__name__)
 
 DEFAULT_URL = "https://gtfs.ovapi.nl/nl/gtfs-nl.zip"
 # Verhoog bij een andere opbouw van ov.db: dan wordt de dienstregeling meteen opnieuw ingelezen.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # route_type -> soort vervoer. Basistypen van GTFS plus de uitgebreide (Europese) typen.
 MODES = {0: "tram", 1: "metro", 2: "trein", 3: "bus", 4: "veer", 5: "tram", 6: "bus", 7: "trein",
@@ -210,6 +211,54 @@ def cluster_haltes(stops: list[dict[str, Any]],
     return out
 
 
+STATION_MERGE_M = 350   # bus/tram-haltes zo dicht bij een treinstation met dezelfde naam horen erbij
+_STOPWORDS = {"station", "ns", "cs", "stn", "centraal station"}
+
+
+def _tokens(name: str) -> list[str]:
+    return [t for t in re.sub(r"[^a-z0-9 ]", " ", name.lower().replace(",", " ")).split() if t]
+
+
+def station_match(train_name: str, other_name: str) -> bool:
+    """"Amsterdam Centraal" ~ "Amsterdam, Centraal Station"; "Zwolle" ~ "Zwolle, Station";
+    maar "Amsterdam Sloterdijk" niet ~ "Amsterdam, Bos en Lommerplein"."""
+    t = _tokens(train_name)
+    o = set(_tokens(other_name))
+    if not t or not o:
+        return False
+    if len(t) == 1:
+        return t[0] in o and (o <= {t[0]} | _STOPWORDS or "station" in o)
+    core = set(t[1:]) - _STOPWORDS   # zonder de plaatsnaam vooraan
+    return bool(core & o)
+
+
+def merge_stations(stops: list[dict[str, Any]], halte_of: dict[str, int],
+                   train_stop_ids: set[str]) -> dict[str, int]:
+    """Bus- en tramhaltes bij een treinstation samenvoegen tot één halte (het station)."""
+    by_halte: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for s in stops:
+        by_halte[halte_of[s["id"]]].append(s)
+    train_haltes = {halte_of[sid] for sid in train_stop_ids if sid in halte_of}
+    centre = {h: (sum(s["lat"] for s in m) / len(m), sum(s["lon"] for s in m) / len(m)) for h, m in by_halte.items()}
+    grid: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for h, (lat, lon) in centre.items():
+        grid[(int(lat * 250), int(lon * 150))].append(h)
+    remap: dict[int, int] = {}
+    for th in train_haltes:
+        tlat, tlon = centre[th]
+        tname = by_halte[th][0]["name"]
+        gy, gx = int(tlat * 250), int(tlon * 150)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                for h in grid.get((gy + dy, gx + dx), ()):
+                    if h == th or h in train_haltes or h in remap:
+                        continue
+                    if _metres(tlat, tlon, *centre[h]) <= STATION_MERGE_M and \
+                            any(station_match(tname, s["name"]) for s in by_halte[h]):
+                        remap[h] = th
+    return {sid: remap.get(h, h) for sid, h in halte_of.items()}
+
+
 def _rows(zf: zipfile.ZipFile, name: str) -> Iterator[dict[str, str]]:
     if name not in zf.namelist():
         return iter(())
@@ -376,10 +425,14 @@ def import_gtfs(zip_path: str | Path, db_path: str | Path, today: dt.date | None
         used_parents = {s["parent"] for s in stops_raw if s["parent"] and stop_k[s["id"]] in used_stops}
         stops_raw = [s for s in stops_raw if stop_k[s["id"]] in used_stops or s["parent"] in used_parents]
         halte_of = cluster_haltes(stops_raw, stations)
+        train_routes = {k for k, mode in route_mode.items() if mode == "trein"}
+        k_to_id = {stop_k[s["id"]]: s["id"] for s in stops_raw}
+        train_stop_ids = {k_to_id[stop] for stop, route in stop_routes if route in train_routes and stop in k_to_id}
+        halte_of = merge_stations(stops_raw, halte_of, train_stop_ids)
         conn.executemany("INSERT INTO stops VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
             (stop_k[s["id"]], s["id"], s["name"], s["lat"], s["lon"], s["platform"], s["parent"],
              halte_of[s["id"]]) for s in stops_raw])
-        _fill_haltes(conn, stops_raw, stop_k, halte_of, stop_routes, stations)
+        _fill_haltes(conn, stops_raw, stop_k, halte_of, stop_routes, stations, train_stop_ids)
         counts["stops"] = len(stops_raw)
         counts["haltes"] = len(set(halte_of.values()))
 
@@ -397,8 +450,10 @@ def import_gtfs(zip_path: str | Path, db_path: str | Path, today: dt.date | None
 
 def _fill_haltes(conn: sqlite3.Connection, stops: list[dict[str, Any]], stop_k: dict[str, int],
                  halte_of: dict[str, int], stop_routes: set[tuple[int, int]],
-                 stations: dict[str, dict[str, Any]] | None = None) -> None:
+                 stations: dict[str, dict[str, Any]] | None = None,
+                 train_stop_ids: set[str] | None = None) -> None:
     stations = stations or {}
+    train_stop_ids = train_stop_ids or set()
     routes = {r[0]: r for r in conn.execute("SELECT k, short, mode, color, text_color, long FROM routes")}
     halte_routes: dict[int, set[int]] = defaultdict(set)
     k_to_halte = {stop_k[s["id"]]: halte_of[s["id"]] for s in stops}
@@ -411,12 +466,15 @@ def _fill_haltes(conn: sqlite3.Connection, stops: list[dict[str, Any]], stop_k: 
     rows = []
     for halte, group in members.items():
         # De naam van het station ("Leeuwarden, Busstation") is beter dan die van een perron
-        # ("Leeuwarden, Busstation (Perron A)"); liefst een naam met plaats erin.
+        # ("Leeuwarden, Busstation (Perron A)"); liefst een naam met plaats erin. Een treinstation
+        # houdt zijn eigen naam ("Amsterdam Centraal"), ook met bushaltes erbij.
         names = Counter(stations[s["parent"]]["name"] for s in group
                         if s["parent"] in stations and stations[s["parent"]]["name"] != "Onbekend")
         if not names:
             names = Counter(s["name"] for s in group)
-        name = max(names, key=lambda n: ("," in n, names[n], len(n)))
+        train_names = {stations[s["parent"]]["name"] for s in group if s["id"] in train_stop_ids
+                       and s["parent"] in stations and stations[s["parent"]]["name"] != "Onbekend"}
+        name = max(names, key=lambda n: (n in train_names, "," in n, names[n], len(n)))
         lat = sum(s["lat"] for s in group) / len(group)
         lon = sum(s["lon"] for s in group) / len(group)
         lines = {}

@@ -2678,11 +2678,14 @@ function ovStopVisible(h) {
 function ovStopIcon(h) {
   const mode = h.modes[0] || "bus";
   const info = Ov.modeInfo(mode);
-  return `<div class="ov-stop" style="--c:${info.color}">${icon(info.icon)}</div>`;
+  const station = mode === "trein" || mode === "metro";
+  return `<div class="ov-stop${station ? " station" : ""}" style="--c:${info.color}">${icon(info.icon)}</div>`;
 }
 
 function ovMakeStopMarker(h) {
-  const marker = spreadMarker(h.lat, h.lon, ovStopIcon(h), "ov-stop-marker", 20, [0, 0], h.name, 200);
+  const station = h.modes[0] === "trein" || h.modes[0] === "metro";
+  const marker = spreadMarker(h.lat, h.lon, ovStopIcon(h), "ov-stop-marker", station ? 26 : 20, [0, 0], h.name,
+    station ? 300 : 200);
   marker.bindPopup(() => `<b>${esc(h.name)}</b><p class="empty">Vertrektijden laden…</p>`,
     { maxWidth: 340, minWidth: 260, className: "ov-popup" });
   marker.on("popupopen", (e) => { ovShowBoard(h, e.popup); ovAutoRefresh(e.popup); });
@@ -2693,8 +2696,11 @@ function ovMakeStopMarker(h) {
 
 function renderOvStops() {
   const cfg = state.config.ov;
-  const on = state.ov.show && state.ov.parts.has("stops") && map.getZoom() >= cfg.stops_min_zoom;
-  const wanted = new Map(on ? state.ov.haltes.filter(ovStopVisible).map((h) => [h.id, h]) : []);
+  const z = map.getZoom();
+  const on = state.ov.show && state.ov.parts.has("stops") && z >= cfg.lines_min_zoom;
+  // Uitgezoomd alleen de stations (trein, metro); alle haltes pas vanaf stops_min_zoom.
+  const show = (h) => ovStopVisible(h) && (z >= cfg.stops_min_zoom || h.modes[0] === "trein" || h.modes[0] === "metro");
+  const wanted = new Map(on ? state.ov.haltes.filter(show).map((h) => [h.id, h]) : []);
   const label = map.getZoom() >= LABEL_ZOOM;
   for (const [id, marker] of ovStopMarkers) {
     // Een open vertrekbord laten staan, ook als de halte net buiten beeld valt.
@@ -2783,9 +2789,18 @@ function ovLinePopup(latlng) {
 
 // --- voertuigen ---
 
+const OV_VEH_LABEL_ZOOM = 15;   // daaronder alleen een stip, anders ligt de kaart vol lijnnummers
+
 function ovVehicleIcon(v) {
   const { bg, fg } = Ov.badgeColors(v);
   const late = Ov.delayMinutes(v.delay) >= 3 ? " late" : "";
+  if (map.getZoom() < OV_VEH_LABEL_ZOOM) {
+    return L.divIcon({
+      className: "ov-veh-marker",
+      html: `<div class="ov-veh dot${late}" style="background:${bg}" title="${esc(Ov.lineLabel(v))}"></div>`,
+      iconSize: [12, 12], iconAnchor: [6, 6], popupAnchor: [0, -6],
+    });
+  }
   return L.divIcon({
     className: "ov-veh-marker",
     html: `<div class="ov-veh${late}" style="background:${bg};color:${fg}">${esc(Ov.lineLabel(v))}</div>`,
@@ -2829,9 +2844,13 @@ function renderOvVehicles() {
       ovVehicleMarkers.set(v.id, marker);
     } else {
       marker.setLatLng([v.lat, v.lon]);
-      if (Ov.delayMinutes(marker._ov.delay) !== Ov.delayMinutes(v.delay)) marker.setIcon(ovVehicleIcon(v));
+      const compact = map.getZoom() < OV_VEH_LABEL_ZOOM;
+      if (Ov.delayMinutes(marker._ov.delay) !== Ov.delayMinutes(v.delay) || marker._ovCompact !== compact) {
+        marker.setIcon(ovVehicleIcon(v));
+      }
     }
     marker._ov = v;
+    marker._ovCompact = map.getZoom() < OV_VEH_LABEL_ZOOM;
   }
   for (const [id, marker] of ovVehicleMarkers) {
     if (!seen.has(id)) { ovVehicleLayer.removeLayer(marker); ovVehicleMarkers.delete(id); }
@@ -2862,7 +2881,7 @@ async function loadOvViewport(forceVehicles) {
   const seq = ++ovSeq;
   const view = ovBbox();
   const jobs = [];
-  if (state.ov.show && cfg.ready && state.ov.parts.has("stops") && z >= cfg.stops_min_zoom) {
+  if (state.ov.show && cfg.ready && state.ov.parts.has("stops") && z >= cfg.lines_min_zoom) {
     if (!ovCovers(state.ov.haltesArea, view)) {
       const area = ovBbox(0.5);
       jobs.push(api(`/api/ov/haltes?bbox=${area.map((v) => v.toFixed(5)).join(",")}`).then((haltes) => {

@@ -68,7 +68,7 @@ ov:                     # openbaar vervoer (OVapi/NDOV Loket)
   realtime_interval_s: 30  # actuele tijden/voertuigen: hooguit zo vaak, alleen als iemand kijkt
   stops_min_zoom: 15
   lines_min_zoom: 13
-  vehicles_min_zoom: 13
+  vehicles_min_zoom: 14
   list_radius_m: 800    # straal voor "haltes in de buurt"
 
 shops:

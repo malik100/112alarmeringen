@@ -524,7 +524,9 @@ omzet naar het standaardformaat GTFS.
   stoppen en de eerstvolgende vertrekken. Een groene stip betekent een actuele tijd; rood is
   vertraging, doorgestreept betekent dat de rit niet rijdt. De sectiekop zegt wat er als eerste
   vertrekt, bijv. "Tram 7 over 3 min · Bos en Lommerplein".
-- **Vertrekbord**: tik op een halte op de kaart (vanaf zoom 15). Je ziet alle vertrekken van de komende
+- **Vertrekbord**: tik op een halte op de kaart (stations en metrohaltes vanaf zoom 13, alle
+  haltes vanaf zoom 15). Bus- en tramhaltes bij een treinstation zijn samengevoegd tot één
+  station ("Amsterdam Centraal": trein, metro, tram, bus en veer op één bord). Je ziet alle vertrekken van de komende
   24 uur, van alle perrons samen (beide kanten van de straat, of trein en bus bij een station), met
   perron of spoor en een spoorwijziging. Storingen voor die halte of lijn staan erboven. Het bord
   ververst zichzelf elke 30 seconden zolang het openstaat.
@@ -532,7 +534,8 @@ omzet naar het standaardformaat GTFS.
   en het tracé op de kaart.
 - **Lijnen** (vanaf zoom 13) in de kleur van de vervoerder. Tik op een lijn: op een drukke plek
   zie je alle lijnen die daar rijden.
-- **Live voertuigen** (vanaf zoom 13): bussen, trams en metro's die nu rijden, met hun lijnnummer.
+- **Live voertuigen** (vanaf zoom 14, lijnnummers vanaf zoom 15; daaronder stipjes in de kleur
+  van de lijn): bussen, trams en metro's die nu rijden.
   Een rode rand betekent 3 minuten of meer vertraging. Treinen zitten (nog) niet in de open
   voertuigposities, wel in de vertrektijden.
 - **Filters** onder de schakelaar links: haltes, lijnen en voertuigen apart, en per soort vervoer.
